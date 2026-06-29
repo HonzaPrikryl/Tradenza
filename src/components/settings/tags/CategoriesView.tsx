@@ -1,0 +1,243 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
+import { t, tRich } from '@/i18n'
+import { useConfirm } from '@/components/providers/ConfirmProvider'
+import { useSelection } from '@/hooks/useSelection'
+import Select from '@/components/ui/Select'
+import { createTagGroup, updateTagGroup, deleteTagGroup } from '@/lib/actions/tags'
+import ActionMenu from '@/components/ui/ActionMenu'
+import { ColorPicker, Modal, PALETTE, inputClass, labelClass, type Category } from './shared'
+
+export default function CategoriesView({ categories, onChanged }: { categories: Category[]; onChanged: () => void }) {
+  const confirm = useConfirm()
+  const [sort, setSort] = useState<'asc' | 'desc'>('asc')
+  const [search, setSearch] = useState('')
+  const sel = useSelection()
+  const [dialog, setDialog] = useState<{ mode: 'new' | 'edit'; cat?: Category } | null>(null)
+  const [name, setName] = useState('')
+  const [color, setColor] = useState(PALETTE[0])
+  const [saving, setSaving] = useState(false)
+
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const filtered = q ? categories.filter((c) => c.name.toLowerCase().includes(q)) : categories
+    return [...filtered].sort((a, b) => (sort === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)))
+  }, [categories, search, sort])
+
+  const rowIds = rows.map((r) => r.id)
+  const allChecked = sel.allSelected(rowIds)
+  const toggleAll = () => sel.toggleAll(rowIds)
+  const toggle = (id: string) => sel.toggle(id)
+
+  const openNew = () => {
+    setName('')
+    setColor(PALETTE[categories.length % PALETTE.length])
+    setDialog({ mode: 'new' })
+  }
+  const openEdit = (cat: Category) => {
+    setName(cat.name)
+    setColor(cat.color)
+    setDialog({ mode: 'edit', cat })
+  }
+
+  const save = async () => {
+    if (!name.trim()) {
+      toast.error(t('settings.tagsManagement.toast.nameRequired'))
+      return
+    }
+    setSaving(true)
+    try {
+      if (dialog?.mode === 'edit' && dialog.cat) {
+        await updateTagGroup(dialog.cat.id, { name: name.trim(), color })
+      } else {
+        await createTagGroup({ name: name.trim(), color })
+      }
+      toast.success(
+        dialog?.mode === 'edit'
+          ? t('settings.tagsManagement.toast.updated')
+          : t('settings.tagsManagement.toast.created'),
+      )
+      setDialog(null)
+      onChanged()
+    } catch {
+      toast.error(t('settings.tagsManagement.toast.saveError'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const remove = async (cat: Category) => {
+    const ok = await confirm({
+      title: t('settings.tagsManagement.rowMenu.delete'),
+      message: tRich('settings.tagsManagement.confirmDeleteCategory', { name: cat.name }),
+      confirmLabel: t('common.delete'),
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await deleteTagGroup(cat.id)
+      toast.success(t('settings.tagsManagement.toast.deleted'))
+      onChanged()
+    } catch {
+      toast.error(t('settings.tagsManagement.toast.deleteError'))
+    }
+  }
+
+  const bulkDelete = async () => {
+    const ok = await confirm({
+      title: t('settings.tagsManagement.rowMenu.delete'),
+      message: tRich('settings.tagsManagement.confirmBulkCategories', { count: sel.size }),
+      confirmLabel: t('common.delete'),
+      danger: true,
+    })
+    if (!ok) return
+    try {
+      await Promise.all(sel.ids.map((id) => deleteTagGroup(id)))
+      toast.success(t('settings.tagsManagement.toast.deleted'))
+      sel.clear()
+      onChanged()
+    } catch {
+      toast.error(t('settings.tagsManagement.toast.deleteError'))
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-border bg-card">
+      <div className="border-b border-border px-5 py-4">
+        <h2 className="text-base font-semibold tracking-tight">{t('settings.tagsManagement.categoriesTitle')}</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">{t('settings.tagsManagement.categoriesSubtitle')}</p>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-muted-foreground">{t('settings.tagsManagement.sortBy')}</span>
+          <Select
+            value={sort}
+            onValueChange={(v) => setSort(v as 'asc' | 'desc')}
+            className="h-9 w-36"
+            options={[
+              { value: 'asc', label: t('settings.tagsManagement.sortNameAsc') },
+              { value: 'desc', label: t('settings.tagsManagement.sortNameDesc') },
+            ]}
+          />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {sel.size > 0 && (
+            <button
+              onClick={bulkDelete}
+              className="flex shrink-0 items-center gap-1.5 rounded-md border border-loss/40 px-3 py-2 text-sm text-loss transition-colors hover:bg-loss/10"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="hidden sm:inline">{t('settings.tagsManagement.bulkDelete', { count: sel.size })}</span>
+            </button>
+          )}
+          <div className="relative flex-1 sm:flex-none">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('settings.tagsManagement.searchCategory')}
+              className="w-full sm:w-56 rounded-md border border-border bg-input/40 py-2 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+            />
+          </div>
+          <button
+            onClick={openNew}
+            className="flex shrink-0 items-center gap-2 rounded-md bg-primary px-3 sm:px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">{t('settings.tagsManagement.addCategory')}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-y border-border bg-muted/30 text-xs text-muted-foreground">
+              <th className="w-12 px-5 py-3 text-left">
+                <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-primary" />
+              </th>
+              <th className="px-3 py-3 text-left font-medium">{t('settings.tagsManagement.col.categoryName')}</th>
+              <th className="px-3 py-3 text-left font-medium">{t('settings.tagsManagement.col.color')}</th>
+              <th className="w-12 px-5 py-3" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr key={c.id} className="border-b border-border/60 transition-colors hover:bg-accent/40 last:border-0">
+                <td className="px-5 py-3">
+                  <input
+                    type="checkbox"
+                    checked={sel.has(c.id)}
+                    onChange={() => toggle(c.id)}
+                    className="accent-primary"
+                  />
+                </td>
+                <td className="px-3 py-3 font-medium text-foreground">{c.name}</td>
+                <td className="px-3 py-3">
+                  <span className="inline-block h-5 w-5 rounded-full" style={{ backgroundColor: c.color }} />
+                </td>
+                <td className="px-5 py-3">
+                  <div className="flex justify-end">
+                    <ActionMenu
+                      width={168}
+                      items={[
+                        { key: 'edit', label: t('settings.tagsManagement.rowMenu.edit'), icon: Pencil },
+                        {
+                          key: 'delete',
+                          label: t('settings.tagsManagement.rowMenu.delete'),
+                          icon: Trash2,
+                          danger: true,
+                        },
+                      ]}
+                      onSelect={(k) => (k === 'edit' ? openEdit(c) : remove(c))}
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && (
+          <div className="px-5 py-12 text-center text-sm text-muted-foreground">
+            {t('settings.tagsManagement.emptyCategories')}
+          </div>
+        )}
+      </div>
+
+      {dialog && (
+        <Modal
+          title={t(
+            dialog.mode === 'edit'
+              ? 'settings.tagsManagement.editCategoryTitle'
+              : 'settings.tagsManagement.newCategoryTitle',
+          )}
+          onClose={() => setDialog(null)}
+          onSave={save}
+          saving={saving}
+        >
+          <div>
+            <label className={labelClass}>{t('settings.tagsManagement.nameLabel')}</label>
+            <input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && save()}
+              placeholder={t('settings.tagsManagement.namePlaceholder')}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>{t('settings.tagsManagement.colorLabel')}</label>
+            <ColorPicker value={color} onChange={setColor} />
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}

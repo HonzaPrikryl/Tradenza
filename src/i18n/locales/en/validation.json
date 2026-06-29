@@ -1,0 +1,22 @@
+{
+  "nameRequired": "Name is required",
+  "invalidColor": "Invalid color",
+  "symbolRequired": "Symbol is required",
+  "entryPricePositive": "Entry price must be positive",
+  "qtyPositive": "Quantity must be positive",
+  "entryDateRequired": "Entry date is required",
+  "genericAccount": "Generic account",
+  "mainAccount": "Main account",
+  "wizard": {
+    "accountNotFound": "Account not found",
+    "invalidExecutionDate": "One of the executions has an invalid date"
+  },
+  "import": {
+    "missingSymbol": "Row {row}: missing Symbol",
+    "invalidEntryPrice": "Row {row}: invalid Entry Price",
+    "invalidEntryDate": "Row {row}: invalid entry date",
+    "unknownError": "Row {row}: {error}",
+    "unknownErrorShort": "unknown error",
+    "logNotFound": "Import not found"
+  }
+}

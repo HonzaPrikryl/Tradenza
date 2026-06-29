@@ -1,0 +1,135 @@
+{
+  "title": "Settings",
+  "sectionUser": "User",
+  "sectionGeneral": "General",
+  "nav": {
+    "profile": "Profile",
+    "security": "Security",
+    "subscription": "Subscription",
+    "accounts": "Accounts",
+    "ptSl": "PT / SL settings",
+    "commissions": "Commissions & fees",
+    "tradeSettings": "Trade settings",
+    "globalSettings": "Global settings",
+    "editor": "Editor",
+    "tags": "Tags management",
+    "importHistory": "Import history",
+    "logHistory": "Log history",
+    "reportSubscriptions": "Report subscriptions",
+    "supportAccess": "Support access"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "learnMore": "Learn more",
+    "subtitle": "You can have unlimited active accounts"
+  },
+  "trade": {
+    "title": "Trade settings",
+    "subtitle": "Preferences applied to how trades are evaluated."
+  },
+  "global": {
+    "title": "Global settings",
+    "subtitle": "Display preferences applied across the app.",
+    "timezone": "Time zone",
+    "timezoneHint": "Used to display trade dates and times.",
+    "currency": "Display currency",
+    "saved": "Settings saved",
+    "breakeven": "Breakeven offset",
+    "breakevenHint": "Set the range of values for a trade to be considered breakeven.",
+    "breakevenFrom": "From",
+    "breakevenTo": "To",
+    "breakevenModeDollar": "Amount ($)",
+    "breakevenModePercent": "Percent (%)",
+    "breakevenReset": "Reset"
+  },
+  "importHistory": {
+    "title": "Import history",
+    "subtitle": "Imports from the last month.",
+    "empty": "No imports in the last month.",
+    "col": {
+      "account": "Account",
+      "broker": "Broker name",
+      "uploadDate": "Upload date",
+      "transactions": "Transactions",
+      "trades": "Trades",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "completed": "Completed",
+      "partial": "Partial",
+      "failed": "Failed"
+    },
+    "delete": "Delete import",
+    "deleteConfirm": {
+      "title": "Delete this import?",
+      "message": "This permanently removes the import {filename} and all {count} trades created by it. This action cannot be undone.",
+      "messageNoTrades": "This permanently removes the import {filename}. No trades from it remain to delete. This action cannot be undone.",
+      "confirmLabel": "Delete import"
+    },
+    "toast": {
+      "deleted": "Import deleted ({count} trades removed)",
+      "deleteFailed": "Failed to delete import"
+    }
+  },
+  "tagsManagement": {
+    "learnMore": "Learn more",
+    "categoriesTab": "Categories",
+    "tagsTab": "Tags",
+    "categoriesTitle": "Categories management",
+    "categoriesSubtitle": "You can create a category which can be assigned tags",
+    "tagsTitle": "Tags management",
+    "tagsSubtitle": "You can customize your tags by clicking on the inputs from setups, mistakes, and custom tabs here.",
+    "sortBy": "Sort by",
+    "sortNameAsc": "Name A-Z",
+    "sortNameDesc": "Name Z-A",
+    "filterByCategory": "Filter by category",
+    "allCategories": "All",
+    "searchCategory": "Search tag category",
+    "searchTags": "Search Tags",
+    "addCategory": "Add category",
+    "addTag": "Add tag",
+    "ungrouped": "Ungrouped",
+    "col": {
+      "categoryName": "Category name",
+      "color": "Color",
+      "tagName": "Tag name",
+      "category": "Category",
+      "used": "Used",
+      "actions": "Actions"
+    },
+    "rowMenu": {
+      "edit": "Edit",
+      "delete": "Delete"
+    },
+    "bulkDelete": "Delete selected ({count})",
+    "emptyCategories": "No categories yet.",
+    "emptyTags": "No tags yet.",
+    "newCategoryTitle": "New category",
+    "editCategoryTitle": "Edit category",
+    "newTagTitle": "New tag",
+    "editTagTitle": "Edit tag",
+    "nameLabel": "Name",
+    "colorLabel": "Color",
+    "customColor": "Custom color",
+    "categoryLabel": "Category",
+    "namePlaceholder": "e.g. Setup type",
+    "tagNamePlaceholder": "e.g. True breakout",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "manageTags": "Manage tags",
+    "confirmDeleteCategory": "Delete category {name} and all its tags?",
+    "confirmDeleteTag": "Delete tag {name}?",
+    "confirmBulkCategories": "Delete {count} categories and all their tags?",
+    "confirmBulkTags": "Delete {count} tags?",
+    "toast": {
+      "created": "Created",
+      "updated": "Updated",
+      "deleted": "Deleted",
+      "saveError": "Could not save",
+      "deleteError": "Could not delete",
+      "nameRequired": "Name is required"
+    }
+  }
+}

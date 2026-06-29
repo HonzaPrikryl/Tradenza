@@ -1,0 +1,17 @@
+{
+  "title": "Something went wrong",
+  "desc": "An unexpected error occurred while loading this page. You can try again.",
+  "retry": "Try again",
+  "back": "← Back to dashboard",
+  "chart": "Chart failed to load",
+  "global": {
+    "title": "Something went wrong",
+    "desc": "The application ran into an unexpected error.",
+    "retry": "Try again"
+  },
+  "notfound": {
+    "title": "Page not found",
+    "desc": "This page does not exist or has been removed.",
+    "back": "← Back to dashboard"
+  }
+}

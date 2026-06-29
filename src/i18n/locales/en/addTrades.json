@@ -1,0 +1,176 @@
+{
+  "eyebrow": "Add Trades",
+  "common": {
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "back": "Back",
+    "close": "Close"
+  },
+  "steps": {
+    "broker": "Broker",
+    "account": "Account",
+    "method": "Method",
+    "trades": "Trades"
+  },
+  "broker": {
+    "title": "Choose Broker, Prop Firm or Trading Platform",
+    "searchPlaceholder": "Start typing the broker, prop firm or trading platform",
+    "popular": "Popular Brokers",
+    "noResults": "Can't find your broker",
+    "noResultsHint": "Use generic template or add trades manually",
+    "useGeneric": "Use generic template"
+  },
+  "account": {
+    "title": "Create Trading Account",
+    "subtitle": "Set up the new account your trades will belong to.",
+    "createAndContinue": "Create account & continue",
+    "created": "Account created"
+  },
+  "method": {
+    "title": "Select Import Method",
+    "linking": "You're linking",
+    "brokerOutOfList": "Broker out of the list",
+    "changeBroker": "Change broker",
+    "supportedAssets": "Supported Asset Types:",
+    "autoSync": {
+      "badge": "Not available",
+      "title": "Auto-sync",
+      "desc": "Not available yet - request it!",
+      "cta": "Request a broker"
+    },
+    "fileUpload": {
+      "badge": "Recommended",
+      "title": "File upload",
+      "desc": "Upload broker-provided file with your trading history",
+      "notFutures": "Available for futures brokers only"
+    },
+    "manual": {
+      "title": "Add manually",
+      "desc": "Add your trades one by one with our interface"
+    }
+  },
+  "upload": {
+    "title": "Upload file",
+    "yourFile": "Upload your file",
+    "timeZone": "Time zone",
+    "timeZoneHint": "Please select the file time zone. If you want to see data in a different time zone please update it in your settings.",
+    "dropHere": "Drag and drop your CSV or TXT file here",
+    "dropActive": "Drop the file to parse it",
+    "uploadButton": "Upload file",
+    "emptyFile": "The file is empty or has no readable rows.",
+    "parseError": "The file could not be parsed. Make sure it's a valid CSV.",
+    "rowsDetected": "{count} rows detected",
+    "columnsOk": "{count} columns recognized — ready to import",
+    "missingColumns": "Required columns not found: {cols}. Check your export settings.",
+    "importButton": "Import {count} rows",
+    "importing": "Importing…",
+    "importedToast": "{count} trades imported",
+    "importError": "Import failed",
+    "resultTitle": "{count} trades imported",
+    "resultTitleNone": "Nothing was imported",
+    "resultDetail": "{total} rows processed · {imported} imported · {skipped} skipped",
+    "showErrors": "Show {count} issues",
+    "importAnother": "Import another file",
+    "viewTrades": "View trades",
+    "supportedAssets": "Supported Asset Types:",
+    "howTo": "How to import trades from {broker}",
+    "integrationGuide": "Integration Guide",
+    "expand": "Expand whole instructions",
+    "steps": {
+      "1": "Export your trading history from your broker or platform as a CSV file.",
+      "2": "Make sure the export includes at least: symbol, side, quantity, entry price and entry time.",
+      "3": "Select the time zone the file was exported in, then drop the file here.",
+      "4": "Review the recognized columns and click Import — duplicates are skipped automatically."
+    },
+    "mapping": {
+      "title": "Map columns",
+      "subtitle": "We auto-detected the columns from your file. Review and adjust if needed, then import. If date and time are in one column, map it to \"Entry/Exit date / time\" and leave the time field empty.",
+      "none": "— not mapped —",
+      "missing": "Map the required fields first: {cols}"
+    },
+    "mode": {
+      "label": "What's in this file?",
+      "trades": "Trade list",
+      "fills": "Order / fill log",
+      "tradesHint": "Each row is one finished trade (entry + exit).",
+      "fillsHint": "Each row is a single order/fill (e.g. Rithmic order history). We'll group fills into round-trip trades per symbol."
+    },
+    "fields": {
+      "symbol": "Symbol",
+      "side": "Side",
+      "quantity": "Quantity",
+      "price": "Fill price",
+      "datetime": "Date & time",
+      "status": "Status",
+      "entryPrice": "Entry price",
+      "exitPrice": "Exit price",
+      "entryDate": "Entry date / time",
+      "entryTime": "Entry time (if separate column)",
+      "exitDate": "Exit date / time",
+      "exitTime": "Exit time (if separate column)",
+      "fees": "Commission / Fees",
+      "commission": "Commission",
+      "grossPnl": "Gross P&L",
+      "netPnl": "Net P&L",
+      "setupName": "Setup",
+      "notes": "Notes"
+    }
+  },
+  "manual": {
+    "title": "Add manually",
+    "details": "Trade Details",
+    "intoAccount": "Adding into account",
+    "timezoneNote": "Times are entered in your local time zone",
+    "type": "Type",
+    "symbol": "Symbol",
+    "symbolPlaceholder": "e.g. NQ",
+    "symbolFirst": "Enter a symbol to start adding executions.",
+    "createExecution": "Create new execution",
+    "removeExecution": "Remove execution",
+    "buy": "Buy",
+    "sell": "Sell",
+    "save": "Save Trade",
+    "saveAndNext": "Save & add next",
+    "saved": "Trade {symbol} saved",
+    "saveError": "Failed to save the trade",
+    "summary": {
+      "direction": "Direction",
+      "avgEntry": "Avg entry",
+      "avgExit": "Avg exit",
+      "fees": "Fees",
+      "status": "Status",
+      "open": "Open",
+      "closed": "Closed",
+      "netPnl": "Net P&L"
+    },
+    "col": {
+      "dateTime": "Date & Time",
+      "expDate": "Exp Date",
+      "multiplier": "Contract Multiplier",
+      "contracts": "Number of contracts",
+      "qty": "Qty",
+      "side": "Side",
+      "price": "Price, $",
+      "comm": "Comm, $",
+      "fee": "Fee, $"
+    }
+  },
+  "assets": {
+    "stocks": "Stocks",
+    "futures": "Futures",
+    "options": "Options",
+    "forex": "Forex",
+    "crypto": "Crypto",
+    "cfd": "Cfd",
+    "other": "Other"
+  },
+  "tradeTypes": {
+    "stock": "Stock",
+    "option": "Option",
+    "future": "Future",
+    "futureOption": "Future Option",
+    "forex": "Forex",
+    "crypto": "Crypto",
+    "cfd": "CFD"
+  }
+}

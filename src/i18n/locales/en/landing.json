@@ -1,0 +1,174 @@
+{
+  "nav": {
+    "signIn": "Sign in",
+    "startFree": "Start free",
+    "goToDashboard": "Go to dashboard",
+    "github": "GitHub"
+  },
+  "hero": {
+    "badge": "Open source · Free to use",
+    "title1": "Improve your trades",
+    "title2": "with data, not feelings",
+    "subtitle": "Tradenza is a modern, open-source trading journal. Import your trades, review every execution, and turn your history into an edge — all in one calm, focused place.",
+    "ctaPrimary": "Start free",
+    "ctaSecondary": "View on GitHub",
+    "note": "No credit card — use it free in your browser, or self-host.",
+    "scrollCue": "Explore"
+  },
+  "trust": {
+    "openSource": "Open source",
+    "selfHost": "Self-hostable",
+    "ownData": "Your data stays yours",
+    "free": "Free to use"
+  },
+  "mockup": {
+    "netPnl": "Net P&L",
+    "winRate": "Win rate",
+    "profitFactor": "Profit factor",
+    "equity": "Cumulative P&L",
+    "calendar": "This month"
+  },
+  "features": {
+    "kicker": "And more",
+    "heading": "Everything else you'd expect",
+    "subheading": "Beyond the dashboard, journal and discipline tracker — the tooling that makes daily logging fast and keeps your data yours.",
+    "stats": {
+      "title": "Deep statistics",
+      "desc": "Win rate by direction, profit factor, expectancy, MAE / MFE, planned vs. realized R, hold-time analysis and win/loss streaks."
+    },
+    "import": {
+      "title": "Flexible import",
+      "desc": "A guided wizard imports CSV exports from a broad catalog of brokers — with automatic de-duplication and a full import history."
+    },
+    "accounts": {
+      "title": "Trading accounts",
+      "desc": "Built for the prop-firm workflow: track firms, phases, account sizes and currencies, and filter everything by account."
+    },
+    "tags": {
+      "title": "Tags & categories",
+      "desc": "Color-coded tags grouped into categories — label setups, mistakes and conditions, then filter and analyze by them."
+    },
+    "responsibility": {
+      "title": "Responsive app",
+      "desc": "Designed to work across desktop, tablet and mobile screens, so you can review trades and check your journal wherever you are."
+    },
+    "filters": {
+      "title": "Global filters",
+      "desc": "One header to switch accounts, pick a date range with presets, toggle $ / R and more — applied across every screen."
+    }
+  },
+  "showcase": {
+    "kicker": "A closer look",
+    "heading": "Real screens, real workflow",
+    "subheading": "Here's how a trading session comes together.",
+    "dashboard": {
+      "title": "See your whole edge at a glance",
+      "desc": "A customizable widget dashboard with the metrics that actually move the needle — net P&L, win rate, profit factor, a trade score, your equity curve and a P&L calendar.",
+      "points": [
+        "Drag-and-drop widgets and saved layout templates",
+        "Equity curve, P&L calendar and KPI tiles",
+        "Filter by account, date range, $ / R and more"
+      ]
+    },
+    "trade": {
+      "title": "Review every trade like a pro",
+      "desc": "Open any trade on a full price chart with your executions marked, watch the running P&L build, rate your execution and journal the setup, emotions, mistakes and lessons.",
+      "points": [
+        "Chart with entries, exits and running P&L",
+        "Multi-execution and multi-leg support",
+        "Structured notes, tags, screenshots, star rating and more"
+      ]
+    },
+    "discipline": {
+      "title": "Process over P&L",
+      "desc": "Define your trading rules, check them off each day and build streaks. A year-long heatmap and consistency stats keep you honest about how you actually traded — not just what you made.",
+      "points": [
+        "Daily rule check-ins and perfect-day streaks",
+        "Year heatmap and discipline trend",
+        "Rule consistency by rule and by weekday"
+      ]
+    }
+  },
+  "how": {
+    "kicker": "How it works",
+    "heading": "From raw trades to a real edge",
+    "step1": {
+      "title": "Import or log your trades",
+      "desc": "Bring in a CSV from your broker, or add trades manually."
+    },
+    "step2": {
+      "title": "Review & journal",
+      "desc": "Open each trade on the chart, grade your execution, and capture the setup, emotions and lessons while they're fresh."
+    },
+    "step3": {
+      "title": "Improve with data",
+      "desc": "Watch your statistics and discipline streaks, find your edge — and your leaks — and trade the plan, not the feeling."
+    }
+  },
+  "oss": {
+    "badge": "Open source",
+    "heading": "Free, open, and yours to keep",
+    "desc": "Tradenza is free and open source. Use it however you like, self-host it on your own infrastructure, read every line, and contribute if you'd like. There's no paywall and no lock-in — your trading data is yours.",
+    "ctaStar": "Star on GitHub",
+    "ctaContribute": "Contribute",
+    "tipLead": "If it helps your trading, a voluntary tip keeps it going — entirely optional.",
+    "ctaCoffee": "Buy me a coffee",
+    "ctaSponsor": "Sponsor"
+  },
+  "faq": {
+    "kicker": "FAQ",
+    "heading": "Questions, answered",
+    "items": [
+      {
+        "q": "Is Tradenza really free?",
+        "a": "Yes. Sign up and use the hosted app for free, and the whole project is open source under AGPL-3.0 so you can self-host it too. No paywalled features and no trial that expires. If it helps your trading, a voluntary tip is welcome — but never required."
+      },
+      {
+        "q": "Hosted or self-hosted — what's the difference?",
+        "a": "Two ways to run Tradenza, both free. Use the hosted app right here — sign up and start journaling, with nothing to install or maintain. Or, because it's open source, deploy your own instance and keep everything on your own infrastructure. Same app either way; pick whatever you prefer."
+      },
+      {
+        "q": "Do I need to be a developer to use it?",
+        "a": "Not at all. Just sign up and use Tradenza in your browser — there's nothing to install. If you're technical and want full control, the project is open source and self-hostable; the README walks through it step by step."
+      },
+      {
+        "q": "Where is my trading data stored?",
+        "a": "On the hosted app your trades live in a secure managed database, tied to your account — you can export or delete them at any time, and your data is never sold. Prefer full control? Self-host and your data never leaves your own infrastructure."
+      },
+      {
+        "q": "Which brokers and instruments are supported?",
+        "a": "Import works from Tradezella and a broad catalog of broker CSV exports, with automatic de-duplication. Stocks, futures, forex, crypto and options are supported, and futures P&L uses built-in contract multipliers so the numbers are correct per instrument."
+      },
+      {
+        "q": "Can I contribute or request features?",
+        "a": "Absolutely. It's open source and built in the open — open an issue for bugs or ideas, or send a pull request. See CONTRIBUTING.md to get started."
+      },
+      {
+        "q": "Does Tradenza connect to my broker or place trades?",
+        "a": "No. Tradenza is a journaling and analytics tool only. It never connects to live brokerage accounts, never places trades and never moves money — you stay fully in control."
+      }
+    ]
+  },
+  "finalCta": {
+    "kicker": "Get started",
+    "heading": "Start journaling today",
+    "subheading": "Build the habit that compounds. Your future self will thank you.",
+    "cta": "Start free →"
+  },
+  "footer": {
+    "tagline": "A modern, open-source trading journal.",
+    "product": "Product",
+    "features": "Features",
+    "howItWorks": "How it works",
+    "faq": "FAQ",
+    "resources": "Resources",
+    "docs": "Documentation",
+    "license": "License",
+    "github": "GitHub",
+    "support": "Support",
+    "sponsor": "Sponsor",
+    "coffee": "Buy me a coffee",
+    "rights": "© 2026 Tradenza · Free & open source · AGPL-3.0 License",
+    "disclaimer": "Tradenza is a journaling and analytics tool. It does not place trades or provide financial advice. Trading involves risk."
+  }
+}

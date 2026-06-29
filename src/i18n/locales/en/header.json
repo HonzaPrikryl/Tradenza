@@ -1,0 +1,21 @@
+{
+  "allAccounts": "All accounts",
+  "accountsCount": "{count} accounts",
+  "manageAccounts": "Manage accounts",
+  "noAccounts": "No accounts yet.",
+  "wholePeriod": "Whole period",
+  "filters": "Filters",
+  "direction": "Direction",
+  "status": "Status",
+  "assetClass": "Asset class",
+  "tag": "Tag",
+  "clearFilters": "Clear filters",
+  "clearDate": "Clear date range",
+  "noTags": "No tags",
+  "unitDollar": "Dollars ($)",
+  "unitR": "R-multiple",
+  "filtersAndActions": "Filters and actions",
+  "accountsAria": "Accounts",
+  "clearDateShort": "Clear date",
+  "rMultipleInfo": "It is shown for trades with entered initial risk only."
+}

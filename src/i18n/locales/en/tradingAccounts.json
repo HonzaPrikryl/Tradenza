@@ -1,0 +1,55 @@
+{
+  "pageTitle": "My Trading Accounts",
+  "pageSubtitle": "Pick an account to add a trade, or manage your accounts.",
+  "cardTitle": "Active accounts",
+  "learnMore": "Learn more",
+  "addAccount": "Add new account",
+  "manageAccounts": "Manage accounts",
+  "showArchived": "Show archived",
+  "hideArchived": "Hide archived",
+  "archived": "Archived",
+  "col": {
+    "name": "Account name",
+    "broker": "Broker",
+    "balance": "Balance",
+    "lastUpdate": "Last update",
+    "type": "Type",
+    "actions": "Actions"
+  },
+  "type": {
+    "manual": "Manual",
+    "fileUpload": "File upload"
+  },
+  "addTrade": "Add trade",
+  "genericBroker": "Generic Template",
+  "confirmClear": "Delete all trades on account {name}? This cannot be undone.",
+  "lastAccountNote": "This is your only active account, so a new empty generic account will be created automatically to replace it.",
+  "confirmArchiveTitle": "Archive account",
+  "confirmArchiveLast": "Archive {name}? Its trades will be hidden from your dashboard and stats until you restore it.",
+  "transfer": {
+    "title": "Transfer data",
+    "description": "Move all trades from {name} ({count}) to another account.",
+    "targetLabel": "Move to account",
+    "targetPlaceholder": "Select target account",
+    "noTargets": "No other account available. Create another account first.",
+    "submit": "Transfer",
+    "submitting": "Transferring…"
+  },
+  "toast": {
+    "cleared": "Account trades cleared",
+    "transferred": "Moved {count} trades to {name}",
+    "transferFailed": "Could not transfer trades"
+  },
+  "rowMenu": {
+    "edit": "Edit",
+    "fileUpload": "File upload",
+    "manualUpload": "Manual upload",
+    "editBalance": "Edit balance",
+    "transferData": "Transfer data",
+    "archiveAccount": "Archive account",
+    "restoreAccount": "Restore account",
+    "clearTrades": "Clear trades",
+    "deleteAccount": "Delete account"
+  },
+  "empty": "No accounts yet."
+}

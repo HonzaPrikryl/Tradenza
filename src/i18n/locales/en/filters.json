@@ -1,0 +1,61 @@
+{
+  "title": "Filters",
+  "categories": {
+    "general": "General",
+    "tags": "Tags",
+    "dayTime": "Day & Time",
+    "strategy": "Strategy",
+    "insights": "Zella Insights"
+  },
+  "comingSoon": "Coming soon",
+  "general": {
+    "side": "Side",
+    "status": "Status",
+    "openClosed": "Open/Closed",
+    "instrument": "Instrument",
+    "symbol": "Symbol",
+    "rating": "Trade rating",
+    "rMultiple": "R-Multiple",
+    "any": "Any",
+    "selectAll": "Select all",
+    "win": "Win",
+    "loss": "Loss",
+    "breakeven": "Break even",
+    "include": "Include",
+    "exclude": "Exclude",
+    "min": "Min",
+    "max": "Max",
+    "none": "None",
+    "symbolPlaceholder": "e.g. AAPL"
+  },
+  "dayTime": {
+    "dayOfWeek": "Day of the week",
+    "month": "Month",
+    "duration": "Duration (minutes)",
+    "entryTime": "Entry time",
+    "exitTime": "Exit time",
+    "min": "Min",
+    "max": "Max",
+    "from": "From",
+    "to": "To",
+    "addAnother": "Add another",
+    "days": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+  },
+  "tags": {
+    "include": "Include tags",
+    "exclude": "Exclude tags",
+    "matchAll": "Only show those that match all",
+    "searchPlaceholder": "Search tags…",
+    "noResults": "No tags found",
+    "noTags": "No tag categories yet. Create them when adding a trade.",
+    "selectAll": "Select all",
+    "selected": "{count} selected",
+    "placeholder": "Select values",
+    "noValues": "No values",
+    "modeInclude": "Include",
+    "modeExclude": "Exclude"
+  },
+  "reset": "Reset all",
+  "cancel": "Cancel",
+  "apply": "Apply filters"
+}

@@ -1,0 +1,116 @@
+{
+  "title": "Discipline",
+  "subtitle": "Track your rules and habits — process over P&L.",
+  "tabs": {
+    "overview": "Overview",
+    "rules": "Rules"
+  },
+  "today": "Today",
+  "process": {
+    "headline": "Process over P&L",
+    "perfect": "Perfect day — you followed every rule you set.",
+    "partial": "{completed} of {total} rules followed. Keep stacking.",
+    "none": "No rules logged yet for this day.",
+    "noTrade": "No trade today? If you stuck to your rules, that's still a win."
+  },
+  "stats": {
+    "currentStreak": "Current streak",
+    "bestStreak": "Best streak",
+    "perfectDays": "Perfect days",
+    "discipline30": "30-day discipline",
+    "days": "days",
+    "day": "day",
+    "noRulesYet": "Define your first rule to start tracking your discipline.",
+    "trendTitle": "Discipline trend",
+    "trendSub": "Daily rule completion · last 30 days",
+    "perRuleTitle": "Rule consistency",
+    "perRuleSub": "Completion rate · last 30 days",
+    "weekdayTitle": "By weekday",
+    "weekdaySub": "Average completion · last 12 weeks",
+    "weekdayTip": "{pct}% average completion",
+    "noData": "No data yet"
+  },
+  "day": {
+    "rulesTitle": "Rules for this day",
+    "noteTitle": "Notes & reflection",
+    "notePlaceholder": "How did the session go? What did you do well? What to improve…",
+    "noteSaved": "Note saved",
+    "allDone": "All rules followed",
+    "completedOf": "{completed} / {total} followed",
+    "noActiveRules": "No active rules. Add rules in the Rules tab.",
+    "selectDay": "Select a day on the calendar to track your rules.",
+    "viewDay": "View day",
+    "moreRules": "+{count} more"
+  },
+  "dayReview": {
+    "back": "Back to Discipline",
+    "discipline": "Discipline",
+    "netPnl": "Net P&L",
+    "grossPnl": "Gross P&L",
+    "winRate": "Win rate",
+    "trades": "Trades",
+    "profitFactor": "Profit factor",
+    "winners": "Winners / Losers",
+    "commissions": "Commissions",
+    "volume": "Volume",
+    "runningPnl": "Running P&L",
+    "noTrades": "No trades on this day.",
+    "tradesTitle": "Trades ({count})",
+    "symbol": "Symbol",
+    "time": "Time",
+    "rulesTitle": "Rules",
+    "readOnly": "Rules can only be edited on the current day.",
+    "tradeNote": "Trade note",
+    "dailyNote": "Daily note",
+    "dailyNotePlaceholder": "Reflection for the whole day — shared across all trades on this day…"
+  },
+  "calendar": {
+    "thisMonth": "This month",
+    "perfect": "perfect",
+    "logged": "logged",
+    "avg": "avg",
+    "legendLess": "Less",
+    "legendMore": "More",
+    "legendPerfect": "Perfect",
+    "tipRules": "{completed}/{total} rules followed",
+    "tipPerfect": "Perfect day — all {total} rules",
+    "tipNoRecord": "No record"
+  },
+  "rules": {
+    "title": "Your rules",
+    "subtitle": "Define the rules and habits you want to follow. Drag to reorder.",
+    "add": "Add rule",
+    "newTitle": "New rule",
+    "editTitle": "Edit rule",
+    "nameLabel": "Rule",
+    "namePlaceholder": "e.g. No trading before the open",
+    "descLabel": "Description",
+    "descPlaceholder": "Optional — why this rule matters",
+    "active": "Active",
+    "inactive": "Inactive",
+    "activeHint": "Inactive rules are hidden from daily tracking but keep their history.",
+    "empty": "No rules yet. Add your first rule to start tracking.",
+    "col": {
+      "rule": "Rule",
+      "status": "Status",
+      "color": "Color"
+    },
+    "menu": {
+      "edit": "Edit",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "delete": "Delete"
+    },
+    "confirmDelete": "Delete rule \"{name}\"? Its tracking history will be removed.",
+    "toast": {
+      "created": "Rule created",
+      "updated": "Rule updated",
+      "deleted": "Rule deleted",
+      "saveError": "Could not save rule",
+      "deleteError": "Could not delete rule"
+    }
+  },
+  "cancel": "Cancel",
+  "save": "Save",
+  "saving": "Saving…"
+}

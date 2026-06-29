@@ -1,0 +1,22 @@
+{
+  "appName": "Tradenza",
+  "dashboard": "Dashboard",
+  "stats": "Statistics",
+  "progress": "Discipline",
+  "import": "Import / Export",
+  "accounts": "Accounts",
+  "tradingAccounts": "My Trading Accounts",
+  "settings": "Settings",
+  "settingsAccounts": "Accounts · Settings",
+  "settingsTrade": "Trade settings · Settings",
+  "settingsTags": "Tags · Settings",
+  "settingsGlobal": "Global settings · Settings",
+  "settingsImportHistory": "Import history · Settings",
+  "trades": "Trades",
+  "tradeNotFound": "Trade not found",
+  "appDescription": "Professional trading journal. Track your trades and analyze performance.",
+  "manifestDescription": "Tradenza – trading journal and statistics",
+  "title": "Tradenza — Open-source trading journal",
+  "ogTitle": "Improve your trades with data, not feelings",
+  "ogDescription": "A modern, open-source, self-hostable trading journal. Import your trades, review every execution, analyze your statistics and build discipline."
+}

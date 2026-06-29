@@ -1,0 +1,9 @@
+# GitHub "Sponsor" button configuration.
+# Replace the placeholders below with your real handles, then remove these
+# comments. See https://docs.github.com/sponsors/integrating-with-github-sponsors
+
+# Your GitHub username (enables the native Sponsor button on the repo).
+github: [HonzaPrikryl]
+
+# Your Buy Me a Coffee slug (the part after buymeacoffee.com/).
+custom: ['https://www.buymeacoffee.com/HonzaPrikryl']

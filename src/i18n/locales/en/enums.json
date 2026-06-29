@@ -1,0 +1,19 @@
+{
+  "direction": {
+    "long": "Long",
+    "short": "Short"
+  },
+  "status": {
+    "open": "Open",
+    "closed": "Closed",
+    "cancelled": "Cancelled"
+  },
+  "asset": {
+    "stocks": "Stocks",
+    "futures": "Futures",
+    "forex": "Forex",
+    "crypto": "Crypto",
+    "options": "Options",
+    "other": "Other"
+  }
+}

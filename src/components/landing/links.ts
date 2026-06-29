@@ -1,0 +1,7 @@
+export const GITHUB_URL = 'https://github.com/HonzaPrikryl/tradenza'
+export const SPONSOR_URL = 'https://github.com/sponsors/HonzaPrikryl'
+export const COFFEE_URL = 'https://www.buymeacoffee.com/HonzaPrikryl'
+export const DOCS_URL = 'https://github.com/HonzaPrikryl/tradenza/blob/main/docs/UX_UI.md'
+export const LICENSE_URL = 'https://github.com/HonzaPrikryl/tradenza/blob/main/LICENSE'
+export const CONTRIBUTE_URL = 'https://github.com/HonzaPrikryl/tradenza/blob/main/CONTRIBUTING.md'
+export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://tradenza.app'
