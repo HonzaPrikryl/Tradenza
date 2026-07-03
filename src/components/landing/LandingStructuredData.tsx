@@ -16,7 +16,7 @@ const JSON_LD = {
   operatingSystem: 'Web',
   description: t('meta.ogDescription'),
   url: SITE_URL,
-  image: `${SITE_URL}/opengraph-image`,
+  image: `${SITE_URL}/opengraph-image.png`,
   license: 'https://www.gnu.org/licenses/agpl-3.0.html',
   isAccessibleForFree: true,
   offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },

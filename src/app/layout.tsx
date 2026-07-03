@@ -10,12 +10,12 @@ import ThemeProvider, { ThemeScript } from '@/components/providers/ThemeProvider
 import ConfirmProvider from '@/components/providers/ConfirmProvider'
 import './globals.css'
 
-const SITE_URL = process.env.NEXT_PUBLIC_MARKETING_URL
+const SITE_URL = process.env.NEXT_PUBLIC_MARKETING_URL || 'https://tradenza.dev'
 const SOCIAL_DESCRIPTION =
   'Open-source trading journal for importing trades, reviewing executions, tracking stats and building discipline.'
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL!),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: t('meta.title'),
     template: '%s · Tradenza',
