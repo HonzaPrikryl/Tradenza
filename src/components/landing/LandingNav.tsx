@@ -4,7 +4,7 @@ import { ArrowRight, Github } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import ThemeToggle from '@/components/ui/ThemeToggle'
 import { t } from '@/i18n'
-import { GITHUB_URL } from './links'
+import { GITHUB_URL, appUrl } from './links'
 
 export default function LandingNav() {
   return (
@@ -25,27 +25,27 @@ export default function LandingNav() {
             {t('landing.nav.github')}
           </a>
           <SignedOut>
-            <Link
-              href="/sign-in"
+            <a
+              href={appUrl('/sign-in')}
               className="hidden rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
             >
               {t('landing.nav.signIn')}
-            </Link>
-            <Link
-              href="/sign-up"
+            </a>
+            <a
+              href={appUrl('/sign-up')}
               className="inline-flex rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               {t('landing.nav.startFree')}
-            </Link>
+            </a>
           </SignedOut>
           <SignedIn>
-            <Link
-              href="/dashboard"
+            <a
+              href={appUrl('/dashboard')}
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               {t('landing.nav.goToDashboard')}
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </a>
           </SignedIn>
         </div>
       </div>

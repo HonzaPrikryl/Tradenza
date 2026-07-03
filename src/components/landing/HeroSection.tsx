@@ -1,9 +1,8 @@
-import Link from 'next/link'
 import { ArrowRight, ChevronDown, Github, Sparkles } from 'lucide-react'
 import { t } from '@/i18n'
 import DashboardPreview from './DashboardPreview'
 import Blob from './Blob'
-import { GITHUB_URL } from './links'
+import { GITHUB_URL, appUrl } from './links'
 
 export default function HeroSection() {
   return (
@@ -52,13 +51,13 @@ export default function HeroSection() {
                 className="hidden animate-enter flex-col items-center gap-3 sm:flex sm:flex-row lg:justify-start"
                 style={{ animationDelay: '240ms' }}
               >
-                <Link
-                  href="/sign-up"
+                <a
+                  href={appUrl('/sign-up')}
                   className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30"
                 >
                   {t('landing.hero.ctaPrimary')}
                   <ArrowRight className="h-4 w-4" />
-                </Link>
+                </a>
                 <a
                   href={GITHUB_URL}
                   target="_blank"

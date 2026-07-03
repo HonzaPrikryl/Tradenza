@@ -1,7 +1,7 @@
-import Link from 'next/link'
 import { t } from '@/i18n'
 import Blob from './Blob'
 import Reveal from './Reveal'
+import { appUrl } from './links'
 
 export default function FinalCtaSection() {
   return (
@@ -16,12 +16,12 @@ export default function FinalCtaSection() {
             </p>
             <h2 className="mb-4 text-3xl font-semibold tracking-tight sm:text-4xl">{t('landing.finalCta.heading')}</h2>
             <p className="mx-auto mb-9 max-w-md text-muted-foreground">{t('landing.finalCta.subheading')}</p>
-            <Link
-              href="/sign-up"
+            <a
+              href={appUrl('/sign-up')}
               className="inline-flex items-center gap-2 rounded-md bg-primary px-7 py-3.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30"
             >
               {t('landing.finalCta.cta')}
-            </Link>
+            </a>
           </div>
         </div>
       </Reveal>
