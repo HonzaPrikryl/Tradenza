@@ -10,7 +10,9 @@ import ThemeProvider, { ThemeScript } from '@/components/providers/ThemeProvider
 import ConfirmProvider from '@/components/providers/ConfirmProvider'
 import './globals.css'
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://tradenza.app'
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.tradenza.dev'
+const SOCIAL_DESCRIPTION =
+  'Open-source trading journal for importing trades, reviewing executions, tracking stats and building discipline.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -65,14 +67,14 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'Tradenza',
     title: `Tradenza — ${t('meta.ogTitle')}`,
-    description: t('meta.ogDescription'),
+    description: SOCIAL_DESCRIPTION,
     url: SITE_URL,
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
     title: `Tradenza — ${t('meta.ogTitle')}`,
-    description: t('meta.ogDescription'),
+    description: SOCIAL_DESCRIPTION,
   },
   robots: {
     index: true,
