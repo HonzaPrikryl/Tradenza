@@ -104,10 +104,7 @@ export default function ProgressClient({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Target className="h-5 w-5 text-primary" />
-            {t('progress.title')}
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">{t('progress.title')}</h1>
           <p className="mt-0.5 text-sm text-muted-foreground">{t('progress.subtitle')}</p>
         </div>
         <div className="inline-flex rounded-lg border border-border bg-card p-1">

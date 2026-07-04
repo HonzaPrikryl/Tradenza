@@ -9,7 +9,6 @@ import {
   Tags,
   History,
   SlidersHorizontal,
-  Settings2,
   ChevronLeft,
   ChevronRight,
   type LucideIcon,
@@ -116,10 +115,7 @@ export default function SettingsSidebar() {
   return (
     <aside className="w-full lg:w-60 lg:shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card/40 lg:overflow-y-auto">
       <div className="hidden lg:block px-5 py-5 border-b border-border">
-        <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
-          <Settings2 className="w-5 h-5" />
-          {t('settings.title')}
-        </h2>
+        <h2 className="text-base font-semibold tracking-tight">{t('settings.title')}</h2>
       </div>
 
       <nav className="px-3 py-3 lg:py-4 lg:space-y-6">

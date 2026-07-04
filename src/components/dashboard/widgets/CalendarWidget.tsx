@@ -23,7 +23,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 const WEEKDAYS = tList('datepicker.weekdaysShort')
 
 const TXT_PNL = 'text-[clamp(0.72rem,2.3vw,0.9rem)]'
-const TXT_SUB = 'text-[clamp(0.4rem,1.9vw,0.6rem)]'
+const TXT_SUB = 'text-[clamp(0.4rem,1.9vw,0.6rem)] 2xl:text-[clamp(0.55rem,1.9vw,0.8rem)]'
 const TXT_DAY = 'text-[clamp(0.62rem,1.9vw,0.78rem)]'
 
 type WeekSum = { netPnl: number; tradingDays: number; trades: number }
