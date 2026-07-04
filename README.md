@@ -116,6 +116,7 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 | `CLERK_SECRET_KEY`                                        |    ✅    | Clerk secret key                                                                             |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `..._SIGN_UP_URL`       |    ✅    | Auth route paths (`/sign-in`, `/sign-up`)                                                    |
 | `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` / `..._SIGN_UP_URL` |    ✅    | Post-auth redirect (`/dashboard`)                                                            |
+| `CLERK_WEBHOOK_SIGNING_SECRET`                            |    ▫️    | Verifies the Clerk `user.deleted` webhook that erases a deleted user's data (see below)      |
 | `NEXT_PUBLIC_APP_URL`                                     |    ▫️    | Production app host (post-login). Enables host-based routing + Server Actions behind a proxy |
 | `NEXT_PUBLIC_MARKETING_URL`                               |    ▫️    | Production marketing/landing host. Pairs with `NEXT_PUBLIC_APP_URL` for the domain split     |
 | `DATABENTO_API_KEY`                                       |    ▫️    | Enables historical candle charts on the trade detail page                                    |
@@ -136,6 +137,10 @@ Only write actions are limited; browsing and reading are never throttled. If som
 | Candle charts            | 10 / min · 100 / day |
 | CSV / manual import      | 5 / min              |
 | Create / update / delete | 60 / min             |
+
+## Account & data deletion
+
+Users can permanently delete their account and all associated data from **Settings → Global settings → Delete account** (trades, journal, tags, accounts, discipline history, and uploaded images).
 
 ## Environments
 

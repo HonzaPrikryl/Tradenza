@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 
 // Cloudflare R2 is S3-compatible, so we talk to it with the AWS S3 SDK pointed
 // at the R2 endpoint. Used server-side to store binary uploads (e.g. note
@@ -48,4 +48,27 @@ export async function uploadToR2(key: string, body: Uint8Array, contentType: str
   )
   const base = (process.env.R2_PUBLIC_URL as string).replace(/\/$/, '')
   return `${base}/${key}`
+}
+
+/**
+ * Delete every object under a key prefix (paginated). Used to remove a user's
+ * uploaded images when their account is deleted. Returns the number of objects
+ * removed.
+ */
+export async function deleteR2Prefix(prefix: string): Promise<number> {
+  const Bucket = process.env.R2_BUCKET_NAME
+  let deleted = 0
+  let ContinuationToken: string | undefined
+
+  do {
+    const list = await client().send(new ListObjectsV2Command({ Bucket, Prefix: prefix, ContinuationToken }))
+    const objects = (list.Contents ?? []).flatMap((o) => (o.Key ? [{ Key: o.Key }] : []))
+    if (objects.length > 0) {
+      await client().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: objects, Quiet: true } }))
+      deleted += objects.length
+    }
+    ContinuationToken = list.IsTruncated ? list.NextContinuationToken : undefined
+  } while (ContinuationToken)
+
+  return deleted
 }

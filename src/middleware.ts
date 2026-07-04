@@ -2,7 +2,13 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 
 // Routes that require authentication are everything NOT listed here.
-const isPublicRoute = createRouteMatcher(['/', '/sign-in(.*)', '/sign-up(.*)', '/opengraph-image(.*)'])
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/opengraph-image(.*)',
+  '/api/webhooks(.*)',
+])
 
 // Paths that are allowed to live on the marketing domain (tradenza.dev).
 // Everything else on that host is redirected to the app domain.
@@ -15,6 +21,7 @@ const isMarketingRoute = createRouteMatcher([
   '/favicon.ico',
   '/robots.txt',
   '/sitemap.xml',
+  '/api/webhooks(.*)',
 ])
 
 function hostOf(url?: string) {
