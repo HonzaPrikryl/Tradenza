@@ -1,16 +1,16 @@
-// Vyprázdní cache svíček, aby se grafy znovu natáhly s novým oknem
-// (1m → 2 h, 30m → 8 h, 1h → 24 h na každou stranu).
+// Empties the candle cache so charts are re-fetched with the new window
+// (1m → 2 h, 30m → 8 h, 1h → 24 h on each side).
 //
-// Cache se naplní znovu automaticky při příštím otevření detailu tradu.
+// The cache repopulates automatically the next time a trade detail is opened.
 //
-// Spuštění:
+// Run:
 //   node --env-file=.env.local scripts/clear-candle-cache.mjs
 
 import { neon } from '@neondatabase/serverless'
 
 const url = process.env.DATABASE_URL
 if (!url) {
-  console.error('❌ Chybí DATABASE_URL (spusť s: node --env-file=.env.local scripts/clear-candle-cache.mjs)')
+  console.error('❌ Missing DATABASE_URL (run with: node --env-file=.env.local scripts/clear-candle-cache.mjs)')
   process.exit(1)
 }
 
@@ -18,4 +18,4 @@ const sql = neon(url)
 
 const before = await sql`SELECT count(*)::int AS n FROM candle_cache`
 await sql`DELETE FROM candle_cache`
-console.log(`✓ Smazáno ${before[0].n} záznamů z candle_cache. Grafy se natáhnou znovu při příštím zobrazení.`)
+console.log(`✓ Deleted ${before[0].n} rows from candle_cache. Charts will re-fetch on next view.`)

@@ -18,7 +18,7 @@ git clone https://github.com/HonzaPrikryl/tradenza.git
 cd tradenza
 npm install
 cp .env.example .env.local   # fill in DATABASE_URL + Clerk keys
-npm run db:push
+npm run db:migrate
 npm run dev
 ```
 
@@ -28,7 +28,7 @@ npm run dev
 - **Business logic is pure and tested.** Calculation logic (statistics, P&L, futures, breakeven, dates) lives in pure functions under `src/lib/*` with Vitest tests next to them (`*.test.ts`). If you touch this logic, add or update a test.
 - **UI text goes through i18n.** User-facing strings live in `src/i18n/locales/en/*.json` and are read via the `t()` helper — please don't hardcode display strings in components.
 - **Styling** uses Tailwind with the design tokens defined in `src/app/globals.css` (e.g. `bg-card`, `text-profit`, `text-loss`). Reuse the tokens instead of hardcoding colors so both dark and light themes keep working.
-- **Database changes:** edit `src/lib/db/schema.ts`, then either run `npm run db:push` or add an idempotent SQL file under `drizzle/`. See the [Database & migrations](README.md#database--migrations) section.
+- **Database changes:** edit `src/lib/db/schema.ts`, then generate a migration with `npm run db:generate -- --name my_change`, review the SQL in `drizzle/`, and apply it with `npm run db:migrate`. Do **not** use `db:push`. See the [Database & migrations](README.md#database--migrations) section.
 
 ## Before you open a pull request
 

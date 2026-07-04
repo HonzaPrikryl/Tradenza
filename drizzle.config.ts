@@ -1,8 +1,8 @@
 import type { Config } from 'drizzle-kit'
 import { loadEnvConfig } from '@next/env'
 
-// drizzle-kit je samostatné CLI a nenačítá .env.local automaticky,
-// proto ho načteme stejně jako to dělá Next.js
+// drizzle-kit is a standalone CLI and does not load .env.local automatically,
+// so we load it the same way Next.js does
 loadEnvConfig(process.cwd())
 
 export default {

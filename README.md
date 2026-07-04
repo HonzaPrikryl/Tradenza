@@ -89,14 +89,14 @@ For local development use your **Clerk _Development_ instance** keys (`pk_test_�
 
 ### 3. Set up the database
 
-Push the schema straight from `schema.ts` to your database:
+Apply the versioned migrations to your database:
 
 ```bash
-npm run db:push      # sync schema → DB
+npm run db:migrate   # apply migrations in drizzle/ → DB
 npm run db:studio    # (optional) open Drizzle Studio to inspect data
 ```
 
-> If `db:push` fails on an existing database (drizzle-kit may try to regenerate a primary key and error with `42P16`), apply the versioned SQL in [`drizzle/`](drizzle/) instead — see [Database & migrations](#database--migrations).
+On a **fresh, empty** database this runs `drizzle/0000_baseline.sql` and builds the full schema. On an **existing** database (already populated) do the one-time baseline adoption first — see [Database & migrations](#database--migrations).
 
 ### 4. Run
 
@@ -174,23 +174,27 @@ src/
 ├── hooks/                      # Reusable React hooks
 └── middleware.ts               # Clerk auth middleware
 
-drizzle/      # Versioned, idempotent SQL schema files
-scripts/      # Idempotent maintenance / migration scripts
+drizzle/      # Versioned migrations (generate + migrate) + MIGRATIONS.md
+scripts/      # Maintenance utilities (cache clear, git-hook setup)
 .github/      # CI workflow + funding config
 ```
 
 ## Database & migrations
 
-The primary workflow is **`npm run db:push`** — drizzle-kit diffs `src/lib/db/schema.ts` against the database and applies the difference.
+The project uses **versioned migrations** (`drizzle-kit generate` + `migrate`). `db:push` is **not** used — on this database it errors with `42P16` because push tries to regenerate a primary key on a full-schema diff.
 
-For databases where a full diff is problematic, [`drizzle/`](drizzle/) contains **versioned, idempotent SQL** (`IF NOT EXISTS`, guarded enums) that is safe to apply to both fresh and existing databases:
+Everyday workflow:
 
 ```bash
-psql "$DATABASE_URL" -f drizzle/0000_init.sql                  # full baseline
-psql "$DATABASE_URL" -f drizzle/0002_progress_rule_archive.sql # incremental
+# 1) edit src/lib/db/schema.ts
+npm run db:generate -- --name my_change   # writes drizzle/000X_my_change.sql + meta snapshot
+# 2) review & commit the generated SQL, then:
+npm run db:migrate                         # applies pending migrations, records them in drizzle.__drizzle_migrations
 ```
 
-Targeted maintenance scripts live in [`scripts/`](scripts/) (e.g. `add-archived-at.mjs`, `clear-candle-cache.mjs`, `reset-db.mjs`) for one-off changes that bypass a destructive diff.
+Migrations are applied per environment by running `db:migrate` with that environment's `DATABASE_URL` (local dev DB, then production — see [Deployment](#deployment)).
+
+Adopting migrations on an **existing** database (already has the tables but no migration journal) needs a **one-time baseline seed** so `migrate` doesn't try to recreate existing tables. The full procedure — including the production step — is documented in [`drizzle/MIGRATIONS.md`](drizzle/MIGRATIONS.md).
 
 ### Schema overview
 
@@ -222,7 +226,7 @@ Manual single-trade entry is also available for trades you don't import.
 npx vercel
 ```
 
-Add the environment variables in the Vercel dashboard and sync the schema against your production database (`npm run db:push`, or apply `drizzle/0000_init.sql` with `psql`). The app is a standard Next.js project and will run on any platform that supports Next.js 15 (Vercel, Netlify, Fly.io, a Docker container, …).
+Add the environment variables in the Vercel dashboard, then apply migrations to your production database with `db:migrate` pointed at the production `DATABASE_URL` (`vercel env pull`, then `dotenv -e .env.production.local -- npm run db:migrate`). Adopting an already-populated production DB requires the one-time baseline seed in [`drizzle/MIGRATIONS.md`](drizzle/MIGRATIONS.md) first. The app is a standard Next.js project and will run on any platform that supports Next.js 15 (Vercel, Netlify, Fly.io, a Docker container, …).
 
 A Content-Security-Policy is shipped in **Report-Only** mode in `next.config.js`; verify it against your deployment, then switch the header to `Content-Security-Policy` to enforce it.
 
