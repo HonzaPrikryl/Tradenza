@@ -48,7 +48,13 @@ const emptyDay = (date: string): DayProgress => ({
   totalCount: 0,
 })
 
-export default async function ProgressPage() {
+export default async function ProgressPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
+  const sp = await searchParams
+  const initialTab = sp.tab === 'rules' ? 'rules' : 'overview'
   const today = await getTodayKey()
   const currentYear = Number(today.slice(0, 4))
   const rules = await getRules()
@@ -64,6 +70,7 @@ export default async function ProgressPage() {
           initialYearData={emptyYearData(currentYear)}
           initialStats={EMPTY_STATS}
           initialDay={emptyDay(today)}
+          initialTab={initialTab}
         />
       </div>
     )
@@ -72,7 +79,7 @@ export default async function ProgressPage() {
   return (
     <div className="p-4 sm:p-6 animate-in">
       <Suspense fallback={<DisciplineLayoutSkeleton />}>
-        <ProgressOverview rules={rules} today={today} currentYear={currentYear} />
+        <ProgressOverview rules={rules} today={today} currentYear={currentYear} initialTab={initialTab} />
       </Suspense>
     </div>
   )
@@ -82,10 +89,12 @@ async function ProgressOverview({
   rules,
   today,
   currentYear,
+  initialTab,
 }: {
   rules: ProgressRule[]
   today: string
   currentYear: number
+  initialTab: 'overview' | 'rules'
 }) {
   const [years, yearData, stats, day] = await Promise.all([
     getProgressYears(),
@@ -103,6 +112,7 @@ async function ProgressOverview({
       initialYearData={yearData}
       initialStats={stats}
       initialDay={day}
+      initialTab={initialTab}
     />
   )
 }

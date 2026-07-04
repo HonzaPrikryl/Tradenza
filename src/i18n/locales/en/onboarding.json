@@ -1,0 +1,34 @@
+{
+  "demo": {
+    "badge": "Demo data",
+    "dashboard": {
+      "title": "Here's what your dashboard will look like",
+      "subtitle": "You're viewing demo data. Add your first trade to start tracking your own performance."
+    },
+    "trades": {
+      "title": "These are demo trades",
+      "subtitle": "You're viewing example trades. Add your own to replace them."
+    },
+    "stats": {
+      "title": "Here's what your statistics will look like",
+      "subtitle": "You're viewing demo data. Add your first trade to see your own statistics."
+    },
+    "tradeDetail": {
+      "title": "Demo trade",
+      "subtitle": "You're viewing demo data. The full trade detail opens for your own trades — add your first trade to explore it.",
+      "back": "Back to trades"
+    },
+    "addTrade": "Add trade"
+  },
+  "gettingStarted": {
+    "title": "Getting started",
+    "progress": "{done} of {total} done",
+    "demoNote": "The dashboard below shows demo data until you add your first trade.",
+    "dismiss": "Dismiss",
+    "steps": {
+      "trade": { "label": "Add your first trade", "cta": "Add trade" },
+      "tags": { "label": "Set up tags to categorize your trades", "cta": "Add tags" },
+      "discipline": { "label": "Define your first discipline rule", "cta": "Add rule" }
+    }
+  }
+}

@@ -10,6 +10,8 @@ import { readGlobalSettings } from '@/lib/global-settings'
 import { generalConditions } from './filter-sql'
 import { computeBundle, type TradeRow } from '@/lib/stats-compute'
 import { classifyOutcome, tradeNotional, multiplierFor, outcomeSign } from '@/lib/breakeven'
+import { getDemoTrades } from '@/lib/demo/trades'
+import { userHasTrades } from '@/lib/demo/detect'
 import { format } from 'date-fns'
 
 async function getUserId() {
@@ -35,19 +37,21 @@ export async function getDashboardStats(dateFrom?: Date, dateTo?: Date): Promise
 
   const cfg = (await readGlobalSettings()).breakeven
 
-  const rows = await db.query.trades.findMany({
-    where: and(...conditions),
-    columns: {
-      netPnl: true,
-      grossPnl: true,
-      fees: true,
-      riskRewardRatio: true,
-      symbol: true,
-      entryPrice: true,
-      entryQuantity: true,
-      extra: true,
-    },
-  })
+  const rows = (await userHasTrades(userId))
+    ? await db.query.trades.findMany({
+        where: and(...conditions),
+        columns: {
+          netPnl: true,
+          grossPnl: true,
+          fees: true,
+          riskRewardRatio: true,
+          symbol: true,
+          entryPrice: true,
+          entryQuantity: true,
+          extra: true,
+        },
+      })
+    : getDemoTrades()
 
   if (rows.length === 0) {
     return {
@@ -142,11 +146,13 @@ export async function getPnlCurve(dateFrom?: Date, dateTo?: Date): Promise<PnlDa
   if (dateFrom) conditions.push(gte(trades.entryDatetime, dateFrom))
   if (dateTo) conditions.push(lte(trades.entryDatetime, dateTo))
 
-  const rows = await db.query.trades.findMany({
-    where: and(...conditions),
-    columns: { entryDatetime: true, netPnl: true },
-    orderBy: (t, { asc }) => [asc(t.entryDatetime)],
-  })
+  const rows = (await userHasTrades(userId))
+    ? await db.query.trades.findMany({
+        where: and(...conditions),
+        columns: { entryDatetime: true, netPnl: true },
+        orderBy: (t, { asc }) => [asc(t.entryDatetime)],
+      })
+    : getDemoTrades()
 
   // Aggregate by day
   const byDay = new Map<string, { pnl: number; trades: number }>()
@@ -208,30 +214,37 @@ export async function getTradeStats(): Promise<StatsData> {
 
   const baseConditions = [eq(trades.userId, userId), ...generalConditions(gf, { includeStatus: false, breakeven: cfg })]
 
-  const rows = await db.query.trades.findMany({
-    where: and(eq(trades.status, 'closed'), ...baseConditions),
-    columns: {
-      netPnl: true,
-      grossPnl: true,
-      fees: true,
-      direction: true,
-      entryDatetime: true,
-      exitDatetime: true,
-      riskAmount: true,
-      riskRewardRatio: true,
-      notes: true,
-      symbol: true,
-      entryPrice: true,
-      entryQuantity: true,
-      extra: true,
-    },
-  })
+  const demo = !(await userHasTrades(userId))
 
-  const openRows = await db
-    .select({ c: sql<number>`count(*)::int` })
-    .from(trades)
-    .where(and(eq(trades.status, 'open'), ...baseConditions))
-  const openTrades = openRows[0]?.c ?? 0
+  const rows = demo
+    ? getDemoTrades()
+    : await db.query.trades.findMany({
+        where: and(eq(trades.status, 'closed'), ...baseConditions),
+        columns: {
+          netPnl: true,
+          grossPnl: true,
+          fees: true,
+          direction: true,
+          entryDatetime: true,
+          exitDatetime: true,
+          riskAmount: true,
+          riskRewardRatio: true,
+          notes: true,
+          symbol: true,
+          entryPrice: true,
+          entryQuantity: true,
+          extra: true,
+        },
+      })
+
+  const openTrades = demo
+    ? 0
+    : ((
+        await db
+          .select({ c: sql<number>`count(*)::int` })
+          .from(trades)
+          .where(and(eq(trades.status, 'open'), ...baseConditions))
+      )[0]?.c ?? 0)
 
   const mapped: TradeRow[] = rows.map((r) => ({
     netPnl: Number(r.netPnl ?? 0),

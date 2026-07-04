@@ -1,18 +1,22 @@
 import { Suspense } from 'react'
 import { getTradeStats } from '@/lib/actions/stats'
+import { hasAnyTrades } from '@/lib/actions/trades'
 import StatsClient from '@/components/stats/StatsClient'
+import DemoNotice from '@/components/onboarding/DemoNotice'
 import { t } from '@/i18n'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: t('meta.stats') }
 
 export default async function StatsPage() {
+  const hasTrades = await hasAnyTrades()
   return (
     <div className="p-4 sm:p-6 w-full animate-in">
       <div className="mb-6">
         <h1 className="text-xl font-semibold tracking-tight">{t('stats.title')}</h1>
         <p className="text-sm text-muted-foreground mt-0.5">{t('stats.subtitle')}</p>
       </div>
+      {!hasTrades && <DemoNotice context="stats" />}
       <Suspense fallback={<StatsSkeleton />}>
         <StatsContent />
       </Suspense>

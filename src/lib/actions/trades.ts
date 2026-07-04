@@ -11,6 +11,8 @@ import { contractMultiplier } from '@/lib/futures'
 import { readGlobalFilters } from '@/lib/global-filters'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { generalConditions } from './filter-sql'
+import { getDemoTrades } from '@/lib/demo/trades'
+import { userHasTrades } from '@/lib/demo/detect'
 import { z } from 'zod'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -447,10 +449,38 @@ export async function getTradeSymbols(): Promise<string[]> {
   return rows.map((r) => r.symbol)
 }
 
+/** True once the user has at least one trade — used to toggle demo/onboarding. */
+export async function hasAnyTrades(): Promise<boolean> {
+  const userId = await getAuthenticatedUserId()
+  return userHasTrades(userId)
+}
+
 export async function getTrades(filters: TradeFilters = {}) {
   const userId = await getAuthenticatedUserId()
 
   const { page = 1, pageSize = 25, sortBy = 'entryDatetime', sortOrder = 'desc' } = filters
+
+  // New user with no trades: serve the sample dataset (sorted + paginated the
+  // same way) so the table shows a realistic preview instead of an empty state.
+  if (!(await userHasTrades(userId))) {
+    const all = [...getDemoTrades()]
+    all.sort((a, b) => {
+      let cmp: number
+      if (sortBy === 'netPnl') cmp = Number(a.netPnl ?? 0) - Number(b.netPnl ?? 0)
+      else if (sortBy === 'symbol') cmp = a.symbol.localeCompare(b.symbol)
+      else cmp = a.entryDatetime.getTime() - b.entryDatetime.getTime()
+      return sortOrder === 'asc' ? cmp : -cmp
+    })
+    const total = all.length
+    const start = (page - 1) * pageSize
+    return {
+      trades: all.slice(start, start + pageSize).map((t) => ({ ...t, tradeTags: [], screenshots: [] })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    }
+  }
 
   const conditions = await buildTradeConditions(userId, filters)
 

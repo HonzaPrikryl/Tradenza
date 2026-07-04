@@ -20,6 +20,7 @@ import validation from './locales/en/validation.json'
 import filters from './locales/en/filters.json'
 import editor from './locales/en/editor.json'
 import progress from './locales/en/progress.json'
+import onboarding from './locales/en/onboarding.json'
 
 const en = {
   common,
@@ -42,6 +43,7 @@ const en = {
   filters,
   editor,
   progress,
+  onboarding,
 } as const
 
 type Messages = typeof en

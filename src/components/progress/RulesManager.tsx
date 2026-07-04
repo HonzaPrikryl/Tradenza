@@ -9,19 +9,8 @@ import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import SortableList from '@/components/ui/SortableList'
 import Tooltip from '@/components/ui/Tooltip'
-import Modal from '@/components/ui/Modal'
-import {
-  createRule,
-  updateRule,
-  deleteRule,
-  toggleRuleActive,
-  reorderRules,
-  type ProgressRule,
-} from '@/lib/actions/progress'
-
-const inputClass =
-  'w-full rounded-md border border-border bg-input/40 px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
-const labelClass = 'mb-1.5 block text-xs font-medium text-muted-foreground'
+import RuleDialog from './RuleDialog'
+import { deleteRule, toggleRuleActive, reorderRules, type ProgressRule } from '@/lib/actions/progress'
 
 interface Dialog {
   mode: 'new' | 'edit'
@@ -33,44 +22,13 @@ export default function RulesManager({ rules }: { rules: ProgressRule[] }) {
   const confirm = useConfirm()
   const [items, setItems] = useState(rules)
   const [dialog, setDialog] = useState<Dialog | null>(null)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     setItems(rules)
   }, [rules])
 
-  const openNew = () => {
-    setName('')
-    setDescription('')
-    setDialog({ mode: 'new' })
-  }
-  const openEdit = (rule: ProgressRule) => {
-    setName(rule.name)
-    setDescription(rule.description ?? '')
-    setDialog({ mode: 'edit', rule })
-  }
-
-  const save = async () => {
-    if (!name.trim()) {
-      toast.error(t('validation.nameRequired'))
-      return
-    }
-    setSaving(true)
-    try {
-      const payload = { name: name.trim(), description: description.trim() || null }
-      if (dialog?.mode === 'edit' && dialog.rule) await updateRule(dialog.rule.id, payload)
-      else await createRule(payload)
-      toast.success(dialog?.mode === 'edit' ? t('progress.rules.toast.updated') : t('progress.rules.toast.created'))
-      setDialog(null)
-      router.refresh()
-    } catch {
-      toast.error(t('progress.rules.toast.saveError'))
-    } finally {
-      setSaving(false)
-    }
-  }
+  const openNew = () => setDialog({ mode: 'new' })
+  const openEdit = (rule: ProgressRule) => setDialog({ mode: 'edit', rule })
 
   const toggleActive = async (rule: ProgressRule) => {
     // Optimistic
@@ -203,35 +161,12 @@ export default function RulesManager({ rules }: { rules: ProgressRule[] }) {
       </div>
 
       {dialog && (
-        <Modal
-          title={t(dialog.mode === 'edit' ? 'progress.rules.editTitle' : 'progress.rules.newTitle')}
+        <RuleDialog
+          mode={dialog.mode}
+          rule={dialog.rule}
           onClose={() => setDialog(null)}
-          onConfirm={save}
-          confirmLabel={saving ? t('progress.saving') : t('progress.save')}
-          confirmDisabled={saving}
-          cancelLabel={t('progress.cancel')}
-        >
-          <div>
-            <label className={labelClass}>{t('progress.rules.nameLabel')}</label>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && save()}
-              placeholder={t('progress.rules.namePlaceholder')}
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>{t('progress.rules.descLabel')}</label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={t('progress.rules.descPlaceholder')}
-              className={inputClass}
-            />
-          </div>
-        </Modal>
+          onSaved={() => router.refresh()}
+        />
       )}
     </div>
   )

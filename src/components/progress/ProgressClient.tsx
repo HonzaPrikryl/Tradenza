@@ -20,6 +20,7 @@ import ProgressYearHeatmap from './ProgressYearHeatmap'
 import DaySummaryPanel from './DaySummaryPanel'
 import ProgressStatsView from './ProgressStats'
 import RulesManager from './RulesManager'
+import RuleDialog from './RuleDialog'
 
 type Tab = 'overview' | 'rules'
 
@@ -31,6 +32,7 @@ export default function ProgressClient({
   initialYearData,
   initialStats,
   initialDay,
+  initialTab = 'overview',
 }: {
   rules: ProgressRule[]
   today: string
@@ -39,9 +41,11 @@ export default function ProgressClient({
   initialYearData: ProgressYearData
   initialStats: ProgressStats
   initialDay: DayProgress
+  initialTab?: Tab
 }) {
   const router = useRouter()
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>(initialTab)
+  const [showNewRule, setShowNewRule] = useState(false)
   const [year, setYear] = useState(initialYear)
   const [yearData, setYearData] = useState(initialYearData)
   const [stats, setStats] = useState(initialStats)
@@ -125,7 +129,7 @@ export default function ProgressClient({
 
       {tab === 'overview' ? (
         rules.filter((r) => r.active).length === 0 ? (
-          <EmptyState onAddRules={() => setTab('rules')} />
+          <EmptyState onAddRules={() => setShowNewRule(true)} />
         ) : (
           <div className="space-y-5">
             <ProgressStatsView stats={stats} section="cards" />
@@ -160,6 +164,8 @@ export default function ProgressClient({
       ) : (
         <RulesManager rules={rules} />
       )}
+
+      {showNewRule && <RuleDialog mode="new" onClose={() => setShowNewRule(false)} onSaved={() => router.refresh()} />}
     </div>
   )
 }

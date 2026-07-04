@@ -21,6 +21,8 @@ import type {
 } from '@/lib/dashboard/types'
 import { DEFAULT_LAYOUT, PRESET_TEMPLATES } from '@/lib/dashboard/default-template'
 import { buildWidgetData } from '@/lib/dashboard/compute'
+import { getDemoTrades } from '@/lib/demo/trades'
+import { userHasTrades } from '@/lib/demo/detect'
 import { dayKeyInTz, timeLabelInTz } from '@/lib/date-tz'
 import { classifyOutcome, classifyMeasure, outcomeMeasure, tradeNotional, multiplierFor } from '@/lib/breakeven'
 import { revalidatePath } from 'next/cache'
@@ -41,6 +43,11 @@ export async function getDashboardWidgetData(): Promise<DashboardWidgetData> {
   const userId = await getUserId()
   const { timezone, breakeven } = await readGlobalSettings()
   const unit = (await readGlobalFilters()).unit
+
+  // Brand-new users (no trades yet) see a sample dashboard instead of zeros.
+  if (!(await userHasTrades(userId))) {
+    return buildWidgetData(getDemoTrades(), timezone, unit, breakeven)
+  }
 
   const rows = await db.query.trades.findMany({
     where: and(eq(trades.userId, userId), eq(trades.status, 'closed'), ...(await globalConditions())),
@@ -68,18 +75,20 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
   const { timezone, breakeven } = await readGlobalSettings()
   const unit = (await readGlobalFilters()).unit
 
-  const rows = await db.query.trades.findMany({
-    where: and(eq(trades.userId, userId), eq(trades.status, 'closed'), ...(await globalConditions())),
-    columns: {
-      netPnl: true,
-      entryDatetime: true,
-      riskAmount: true,
-      symbol: true,
-      entryPrice: true,
-      entryQuantity: true,
-      extra: true,
-    },
-  })
+  const rows = (await userHasTrades(userId))
+    ? await db.query.trades.findMany({
+        where: and(eq(trades.userId, userId), eq(trades.status, 'closed'), ...(await globalConditions())),
+        columns: {
+          netPnl: true,
+          entryDatetime: true,
+          riskAmount: true,
+          symbol: true,
+          entryPrice: true,
+          entryQuantity: true,
+          extra: true,
+        },
+      })
+    : getDemoTrades()
 
   const prefix = `${year}-${String(month).padStart(2, '0')}`
   const byDay = new Map<
@@ -167,23 +176,25 @@ export async function getDayDetail(date: string): Promise<DayDetail> {
   const userId = await getUserId()
   const { timezone, breakeven } = await readGlobalSettings()
 
-  const rows = await db.query.trades.findMany({
-    where: and(eq(trades.userId, userId), eq(trades.status, 'closed'), ...(await globalConditions())),
-    columns: {
-      id: true,
-      symbol: true,
-      direction: true,
-      netPnl: true,
-      entryDatetime: true,
-      grossPnl: true,
-      fees: true,
-      entryPrice: true,
-      entryQuantity: true,
-      riskAmount: true,
-      extra: true,
-    },
-    orderBy: (t, { asc }) => [asc(t.entryDatetime)],
-  })
+  const rows = (await userHasTrades(userId))
+    ? await db.query.trades.findMany({
+        where: and(eq(trades.userId, userId), eq(trades.status, 'closed'), ...(await globalConditions())),
+        columns: {
+          id: true,
+          symbol: true,
+          direction: true,
+          netPnl: true,
+          entryDatetime: true,
+          grossPnl: true,
+          fees: true,
+          entryPrice: true,
+          entryQuantity: true,
+          riskAmount: true,
+          extra: true,
+        },
+        orderBy: (t, { asc }) => [asc(t.entryDatetime)],
+      })
+    : getDemoTrades()
 
   const dayRows = rows.filter((r) => dayKeyInTz(r.entryDatetime, timezone) === date)
 

@@ -1,5 +1,5 @@
 import { Suspense } from 'react'
-import { getTrades } from '@/lib/actions/trades'
+import { getTrades, hasAnyTrades } from '@/lib/actions/trades'
 import { getAccounts } from '@/lib/actions/accounts'
 import { getTagGroups } from '@/lib/actions/tags'
 import { getDashboardStats, getPnlCurve } from '@/lib/actions/stats'
@@ -7,6 +7,7 @@ import { readGlobalSettings } from '@/lib/global-settings'
 import TradesTable from '@/components/trades/TradesTable'
 import TradesHeader from '@/components/trades/TradesHeader'
 import TradesStatsCards from '@/components/trades/TradesStatsCards'
+import DemoNotice from '@/components/onboarding/DemoNotice'
 import type { TradeFilters } from '@/types'
 import { t } from '@/i18n'
 import type { Metadata } from 'next'
@@ -40,23 +41,21 @@ export default async function TradesPage({
     sortOrder: sp.sortOrder as TradeFilters['sortOrder'],
   }
 
-  const [result, accounts, tagGroups, stats, curve, settings] = await Promise.all([
+  const [result, accounts, tagGroups, stats, curve, settings, hasTrades] = await Promise.all([
     getTrades(filters),
     getAccounts(),
     getTagGroups(),
     getDashboardStats(),
     getPnlCurve(),
     readGlobalSettings(),
+    hasAnyTrades(),
   ])
 
   return (
     <div className="p-4 sm:p-6 animate-in">
       <TradesHeader total={result.total} />
+      {!hasTrades && <DemoNotice context="trades" />}
       <TradesStatsCards stats={stats} curve={curve} />
-      {/* Boundary required for useSearchParams in TradesTable. The route-level
-          loading.tsx already covers the initial skeleton, so this renders null
-          to avoid a second, stacked skeleton; filter/pagination changes show
-          their pending state on the toolbar controls instead. */}
       <Suspense fallback={null}>
         <TradesTable
           trades={result.trades}
