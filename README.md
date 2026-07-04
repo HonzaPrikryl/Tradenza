@@ -85,6 +85,8 @@ cp .env.example .env.local
 
 The only **required** variables are the database URL and the Clerk keys; everything else is optional and unlocks extra features (see [Environment variables](#environment-variables)).
 
+For local development use your **Clerk _Development_ instance** keys (`pk_test_…` / `sk_test_…`) — production (live) keys are locked to the production domain and error on `localhost`. See [Environments](#environments) for the full local/preview/production split.
+
 ### 3. Set up the database
 
 Push the schema straight from `schema.ts` to your database:
@@ -106,19 +108,38 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 
 ## Environment variables
 
-| Variable                                                  | Required | Purpose                                                                       |
-| --------------------------------------------------------- | :------: | ----------------------------------------------------------------------------- |
-| `DATABASE_URL`                                            |    ✅    | Neon / PostgreSQL connection string                                           |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                       |    ✅    | Clerk publishable key                                                         |
-| `CLERK_SECRET_KEY`                                        |    ✅    | Clerk secret key                                                              |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `..._SIGN_UP_URL`       |    ✅    | Auth route paths (`/sign-in`, `/sign-up`)                                     |
-| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` / `..._SIGN_UP_URL` |    ✅    | Post-auth redirect (`/dashboard`)                                             |
-| `NEXT_PUBLIC_APP_URL`                                     |    ▫️    | Canonical production URL (allows Server Actions behind a proxy/custom domain) |
-| `DATABENTO_API_KEY`                                       |    ▫️    | Enables historical candle charts on the trade detail page                     |
-| `R2_*`                                                    |    ▫️    | Cloudflare R2 credentials for trade screenshots                               |
-| `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                      |    ▫️    | Error monitoring & source maps                                                |
+| Variable                                                  | Required | Purpose                                                                                      |
+| --------------------------------------------------------- | :------: | -------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                            |    ✅    | Neon / PostgreSQL connection string                                                          |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                       |    ✅    | Clerk publishable key                                                                        |
+| `CLERK_SECRET_KEY`                                        |    ✅    | Clerk secret key                                                                             |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `..._SIGN_UP_URL`       |    ✅    | Auth route paths (`/sign-in`, `/sign-up`)                                                    |
+| `NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL` / `..._SIGN_UP_URL` |    ✅    | Post-auth redirect (`/dashboard`)                                                            |
+| `NEXT_PUBLIC_APP_URL`                                     |    ▫️    | Production app host (post-login). Enables host-based routing + Server Actions behind a proxy |
+| `NEXT_PUBLIC_MARKETING_URL`                               |    ▫️    | Production marketing/landing host. Pairs with `NEXT_PUBLIC_APP_URL` for the domain split     |
+| `DATABENTO_API_KEY`                                       |    ▫️    | Enables historical candle charts on the trade detail page                                    |
+| `R2_*`                                                    |    ▫️    | Cloudflare R2 credentials for trade screenshots                                              |
+| `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                      |    ▫️    | Error monitoring & source maps                                                               |
 
 ✅ required · ▫️ optional. See [`.env.example`](.env.example) for the full annotated list.
+
+## Environments
+
+The app runs in three isolated environments. Each service provides its own separation, so local testing never touches production data or users.
+
+| Layer          | Loaded from                                                          | Clerk                              | Database (Neon)           | Domain split                                             |
+| -------------- | -------------------------------------------------------------------- | ---------------------------------- | ------------------------- | -------------------------------------------------------- |
+| **Local**      | `.env.development` (committed) + `.env.local` (secrets, git-ignored) | Development instance (`pk_test_…`) | `dev` branch              | Off — everything on `http://localhost:3000`              |
+| **Preview**    | Host dashboard → Preview env                                         | Development instance               | `dev` (or preview) branch | Off / per-branch URL                                     |
+| **Production** | Host dashboard → Production env                                      | Production instance (`pk_live_…`)  | main branch               | On — `tradenza.dev` (landing) + `app.tradenza.dev` (app) |
+
+How the separation works:
+
+- **Auth (Clerk)** — Clerk ships two instances. The **Development** instance works on `localhost`; the **Production** instance is locked to the production domain. Use the matching key pair per environment.
+- **Database (Neon)** — create a **branch** (`Neon → Branches → dev`) and use its connection string in `.env.local`, so local writes go to the dev branch and production keeps its own data.
+- **Domain routing** — `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_MARKETING_URL` drive the host split in `middleware.ts`. They are **empty locally** (single host, no redirects) and set to the real domains only in the Production environment.
+
+Local secrets live in `.env.local` (never committed). Production and preview values are set in your host's dashboard (e.g. Vercel → Settings → Environment Variables), scoped to the matching environment. The committed `.env.development` only pins non-secret defaults (the domain split stays off locally).
 
 ## Project structure
 

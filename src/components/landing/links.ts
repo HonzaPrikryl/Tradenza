@@ -7,10 +7,13 @@ export const CONTRIBUTE_URL = 'https://github.com/HonzaPrikryl/tradenza/blob/mai
 // Landing page canonical URL — the marketing domain, not the app subdomain.
 export const SITE_URL = process.env.NEXT_PUBLIC_MARKETING_URL || 'https://tradenza.dev'
 
-// The app (post-login) lives on its own host. Auth and dashboard links from the
-// landing page point there directly, so they work no matter which domain the
-// landing page is served on (and skip an extra middleware redirect).
-export const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.tradenza.dev'
+// The app (post-login) lives on its own host in production. Auth and dashboard
+// links from the landing page point there directly so they work regardless of
+// which domain serves the landing page (and skip an extra middleware redirect).
+//
+// When unset (local dev, single-host), this is empty so the links stay relative
+// and resolve against the current origin (localhost) instead of jumping to prod.
+export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? ''
 
-/** Build an absolute URL to a path on the app domain. */
+/** Absolute app-domain URL in production; relative same-origin path locally. */
 export const appUrl = (path: string) => `${APP_URL}${path}`
