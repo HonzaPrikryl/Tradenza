@@ -1,22 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// Every user-scoped table that must be purged. If a new one is added to the
-// schema, add it here and to purge-user.ts — this test fails until both match.
-const EXPECTED_TABLES = [
-  'accounts',
-  'trades',
-  'tags',
-  'tagGroups',
-  'screenshots',
-  'candleCache',
-  'importLogs',
-  'dashboardTemplates',
-  'progressRules',
-  'ruleCompletions',
-  'dailyCheckins',
-]
-
-const { deleted, batchMock, r2, captureMock } = vi.hoisted(() => ({
+// Everything below `vi.hoisted` is available inside the (hoisted) `vi.mock`
+// factories. EXPECTED_TABLES lists every user-scoped table that must be purged —
+// if a new one is added to the schema, add it here and in purge-user.ts, or this
+// test fails until both match.
+const { EXPECTED_TABLES, deleted, batchMock, r2, captureMock } = vi.hoisted(() => ({
+  EXPECTED_TABLES: [
+    'accounts',
+    'trades',
+    'tags',
+    'tagGroups',
+    'screenshots',
+    'candleCache',
+    'importLogs',
+    'dashboardTemplates',
+    'progressRules',
+    'ruleCompletions',
+    'dailyCheckins',
+  ],
   deleted: [] as string[],
   batchMock: vi.fn(async (arr: unknown[]) => arr),
   r2: { isR2Configured: vi.fn(() => false), deleteR2Prefix: vi.fn(async () => 0) },
