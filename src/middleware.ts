@@ -8,6 +8,8 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/opengraph-image(.*)',
   '/api/webhooks(.*)',
+  '/privacy',
+  '/terms',
 ])
 
 // Paths that are allowed to live on the marketing domain (tradenza.dev).
@@ -22,6 +24,8 @@ const isMarketingRoute = createRouteMatcher([
   '/robots.txt',
   '/sitemap.xml',
   '/api/webhooks(.*)',
+  '/privacy',
+  '/terms',
 ])
 
 function hostOf(url?: string) {

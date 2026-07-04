@@ -15,7 +15,7 @@ export default function LandingFooter() {
           </div>
 
           {/* Link groups */}
-          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3 sm:gap-16">
+          <div className="grid grid-cols-2 gap-10 sm:grid-cols-4 sm:gap-16">
             <FooterColumn title={t('landing.footer.product')}>
               <FooterLink href="#features">{t('landing.footer.features')}</FooterLink>
               <FooterLink href="#how">{t('landing.footer.howItWorks')}</FooterLink>
@@ -41,6 +41,11 @@ export default function LandingFooter() {
               <FooterLink href={SPONSOR_URL} external>
                 {t('landing.footer.sponsor')}
               </FooterLink>
+            </FooterColumn>
+
+            <FooterColumn title={t('landing.footer.legal')}>
+              <FooterLink href="/privacy">{t('landing.footer.privacy')}</FooterLink>
+              <FooterLink href="/terms">{t('landing.footer.terms')}</FooterLink>
             </FooterColumn>
           </div>
         </div>
