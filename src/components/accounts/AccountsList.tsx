@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import {
   Plus,
   Pencil,
@@ -66,7 +67,7 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
 
   const act = async (fn: () => Promise<unknown>, msg: string) => {
     try {
-      await fn()
+      if (handleRateLimit(await fn())) return
       toast.success(msg)
       router.refresh()
     } catch (err) {
@@ -96,7 +97,7 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
     }
     setSaving(true)
     try {
-      await updateAccount(editing.id, form)
+      if (handleRateLimit(await updateAccount(editing.id, form))) return
       toast.success(t('accounts.toast.updated'))
       setEditing(null)
       router.refresh()
@@ -112,6 +113,7 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
     setTransferSaving(true)
     try {
       const res = await transferTrades(transferring.id, transferTarget)
+      if (handleRateLimit(res)) return
       const target = accounts.find((a) => a.id === transferTarget)
       toast.success(t('tradingAccounts.toast.transferred', { count: res.moved, name: target?.name ?? '' }))
       setTransferring(null)

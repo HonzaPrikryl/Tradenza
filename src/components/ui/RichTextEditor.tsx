@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { uploadNoteImage } from '@/lib/actions/uploads'
@@ -236,15 +237,18 @@ export default function RichTextEditor({
         const fd = new FormData()
         fd.append('file', new File([blob], `image.${ext}`, { type: blob.type || 'image/jpeg' }))
         const res = await uploadNoteImage(fd)
-        if (res.status === 'ok') {
-          src = res.url
-        } else if (res.status === 'error') {
-          // Upload reached the server but failed — surface it instead of silently
-          // embedding a huge base64 blob, so misconfig is obvious.
-          console.warn('[RichTextEditor] image upload failed:', res.message)
-          toast.error(res.message ? `Image upload failed: ${res.message}` : 'Image upload failed — stored inline')
+        // Rate-limited → show the countdown and keep the inline (data-URL) fallback.
+        if (!handleRateLimit(res)) {
+          if (res.status === 'ok') {
+            src = res.url
+          } else if (res.status === 'error') {
+            // Upload reached the server but failed — surface it instead of silently
+            // embedding a huge base64 blob, so misconfig is obvious.
+            console.warn('[RichTextEditor] image upload failed:', res.message)
+            toast.error(res.message ? `Image upload failed: ${res.message}` : 'Image upload failed — stored inline')
+          }
+          // status 'notConfigured' → expected without R2; keep inline fallback quietly.
         }
-        // status 'notConfigured' → expected without R2; keep inline fallback quietly.
       } catch (err) {
         console.warn('[RichTextEditor] image upload error', err)
       }

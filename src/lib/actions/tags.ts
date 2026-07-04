@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { t } from '@/i18n'
 import { UNGROUPED_ID } from '@/lib/tags-constants'
 import { uuid, uuidArray } from '@/lib/validation'
-import { authedAction } from '@/lib/safe-action'
+import { authedAction, mutationAction } from '@/lib/safe-action'
 import { NotFoundError } from '@/lib/action-errors'
 
 export interface TagValue {
@@ -82,7 +82,7 @@ export const getTagGroups = authedAction([], async ({ userId }): Promise<TagGrou
 
 // ─── Groups: CRUD ────────────────────────────────────────────────────────────
 
-export const createTagGroup = authedAction([nameColorSchema], async ({ userId }, { name, color }) => {
+export const createTagGroup = mutationAction([nameColorSchema], async ({ userId }, { name, color }) => {
   const existing = await db.query.tagGroups.findFirst({
     where: and(eq(tagGroups.userId, userId), sql`lower(${tagGroups.name}) = lower(${name})`),
   })
@@ -99,7 +99,7 @@ export const createTagGroup = authedAction([nameColorSchema], async ({ userId },
   return { success: true, group, existed: false }
 })
 
-export const reorderTagGroups = authedAction([uuidArray], async ({ userId }, orderedIds) => {
+export const reorderTagGroups = mutationAction([uuidArray], async ({ userId }, orderedIds) => {
   await Promise.all(
     orderedIds.map((id, i) =>
       db
@@ -112,7 +112,7 @@ export const reorderTagGroups = authedAction([uuidArray], async ({ userId }, ord
   return { success: true }
 })
 
-export const updateTagGroup = authedAction([uuid, nameColorSchema], async ({ userId }, id, { name, color }) => {
+export const updateTagGroup = mutationAction([uuid, nameColorSchema], async ({ userId }, id, { name, color }) => {
   const [group] = await db
     .update(tagGroups)
     .set({ name, color })
@@ -122,7 +122,7 @@ export const updateTagGroup = authedAction([uuid, nameColorSchema], async ({ use
   return { success: true, group }
 })
 
-export const deleteTagGroup = authedAction([uuid], async ({ userId }, id) => {
+export const deleteTagGroup = mutationAction([uuid], async ({ userId }, id) => {
   await db.delete(tagGroups).where(and(eq(tagGroups.id, id), eq(tagGroups.userId, userId)))
   revalidateTags()
   return { success: true }
@@ -130,7 +130,7 @@ export const deleteTagGroup = authedAction([uuid], async ({ userId }, id) => {
 
 // ─── Values (tags): CRUD ──────────────────────────────────────────────────────
 
-export const createTag = authedAction([valueSchema], async ({ userId }, { name, color, groupId }) => {
+export const createTag = mutationAction([valueSchema], async ({ userId }, { name, color, groupId }) => {
   const existing = await db.query.tags.findFirst({
     where: and(
       eq(tags.userId, userId),
@@ -149,7 +149,7 @@ export const createTag = authedAction([valueSchema], async ({ userId }, { name, 
   return { success: true, tag, existed: false }
 })
 
-export const updateTag = authedAction([uuid, updateTagSchema], async ({ userId }, id, { name, color, groupId }) => {
+export const updateTag = mutationAction([uuid, updateTagSchema], async ({ userId }, id, { name, color, groupId }) => {
   const set: { name: string; color: string; groupId?: string | null } = { name, color }
   if (groupId !== undefined) set.groupId = groupId || null
   const [tag] = await db
@@ -161,13 +161,13 @@ export const updateTag = authedAction([uuid, updateTagSchema], async ({ userId }
   return { success: true, tag }
 })
 
-export const deleteTag = authedAction([uuid], async ({ userId }, id) => {
+export const deleteTag = mutationAction([uuid], async ({ userId }, id) => {
   await db.delete(tags).where(and(eq(tags.id, id), eq(tags.userId, userId)))
   revalidateTags()
   return { success: true }
 })
 
-export const setTradeTags = authedAction([uuid, uuidArray], async ({ userId }, tradeId, tagIds) => {
+export const setTradeTags = mutationAction([uuid, uuidArray], async ({ userId }, tradeId, tagIds) => {
   const trade = await db.query.trades.findFirst({
     where: and(eq(trades.id, tradeId), eq(trades.userId, userId)),
     columns: { id: true },

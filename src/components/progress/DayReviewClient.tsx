@@ -7,6 +7,7 @@ import { Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ArrowLeft, ChevronRight, Sparkles, ListChecks, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { formatCurrency, axisUnit, cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { getUiLocale } from '@/i18n/config'
@@ -73,7 +74,10 @@ export default function DayReviewClient({
     setRules((arr) => arr.map((r) => (r.id === ruleId ? { ...r, completed: next } : r)))
     startTransition(async () => {
       try {
-        await toggleRuleCompletion(ruleId, date, next)
+        if (handleRateLimit(await toggleRuleCompletion(ruleId, date, next))) {
+          setRules((arr) => arr.map((r) => (r.id === ruleId ? { ...r, completed: !next } : r)))
+          return
+        }
         router.refresh()
       } catch (err) {
         setRules((arr) => arr.map((r) => (r.id === ruleId ? { ...r, completed: !next } : r)))

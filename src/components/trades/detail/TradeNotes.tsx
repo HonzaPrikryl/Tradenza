@@ -3,6 +3,7 @@
 import { Check, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { updateTradeJournal } from '@/lib/actions/trades'
 import { useAutosave } from '@/hooks/useAutosave'
 import RichTextEditor from '@/components/ui/RichTextEditor'
@@ -18,7 +19,7 @@ function isEmptyHtml(html: string): boolean {
 
 export default function TradeNotes({ tradeId, initialNotes }: { tradeId: string; initialNotes: string | null }) {
   const { value, state, onChange, flush } = useAutosave(initialNotes ?? '', (text) =>
-    updateTradeJournal(tradeId, { notes: isEmptyHtml(text) ? null : text }),
+    updateTradeJournal(tradeId, { notes: isEmptyHtml(text) ? null : text }).then(handleRateLimit),
   )
 
   return (

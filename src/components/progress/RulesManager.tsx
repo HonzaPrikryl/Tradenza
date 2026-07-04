@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { Plus, Pencil, Trash2, GripVertical, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
@@ -36,7 +37,7 @@ export default function RulesManager({ rules }: { rules: ProgressRule[] }) {
     // Optimistic
     setItems((arr) => arr.map((r) => (r.id === rule.id ? { ...r, active: !r.active } : r)))
     try {
-      await toggleRuleActive(rule.id, !rule.active)
+      if (handleRateLimit(await toggleRuleActive(rule.id, !rule.active))) return
       router.refresh()
     } catch (err) {
       setItems((arr) => arr.map((r) => (r.id === rule.id ? { ...r, active: rule.active } : r)))
@@ -53,7 +54,7 @@ export default function RulesManager({ rules }: { rules: ProgressRule[] }) {
     })
     if (!ok) return
     try {
-      await deleteRule(rule.id)
+      if (handleRateLimit(await deleteRule(rule.id))) return
       toast.success(t('progress.rules.toast.deleted'))
       router.refresh()
     } catch (err) {
@@ -66,10 +67,14 @@ export default function RulesManager({ rules }: { rules: ProgressRule[] }) {
       const map = new Map(arr.map((r) => [r.id, r]))
       return orderedIds.map((id) => map.get(id)!).filter(Boolean)
     })
-    reorderRules(orderedIds).catch(() => {
-      toast.error(t('progress.rules.toast.saveError'))
-      router.refresh()
-    })
+    reorderRules(orderedIds)
+      .then((res) => {
+        if (handleRateLimit(res)) router.refresh()
+      })
+      .catch(() => {
+        toast.error(t('progress.rules.toast.saveError'))
+        router.refresh()
+      })
   }
 
   return (

@@ -3,10 +3,15 @@ import { z } from 'zod'
 
 // Mock the wrapper's external dependencies. `vi.hoisted` lets the mock factories
 // reference these spies even though vi.mock is hoisted above the imports.
-const { authMock, captureMock } = vi.hoisted(() => ({ authMock: vi.fn(), captureMock: vi.fn() }))
+const { authMock, captureMock, enforceMock } = vi.hoisted(() => ({
+  authMock: vi.fn(),
+  captureMock: vi.fn(),
+  enforceMock: vi.fn(),
+}))
 
 vi.mock('@clerk/nextjs/server', () => ({ auth: authMock }))
 vi.mock('@sentry/nextjs', () => ({ captureException: captureMock }))
+vi.mock('./rate-limit', () => ({ enforceRateLimit: enforceMock }))
 vi.mock('next/navigation', () => ({
   // Mirror the real behaviour: rethrow Next's internal control-flow errors.
   unstable_rethrow: (err: unknown) => {
@@ -15,8 +20,9 @@ vi.mock('next/navigation', () => ({
   },
 }))
 
-import { authedAction } from './safe-action'
+import { authedAction, mutationAction } from './safe-action'
 import { ActionError, UnauthorizedError, ValidationError, NotFoundError } from './action-errors'
+import { isRateLimited } from './rate-limit-result'
 import { t } from '@/i18n'
 
 const uuid = z.string().uuid()
@@ -34,7 +40,9 @@ const rejection = (p: Promise<unknown>): Promise<any> =>
 beforeEach(() => {
   authMock.mockReset()
   captureMock.mockReset()
+  enforceMock.mockReset()
   authMock.mockResolvedValue({ userId: 'user_42' })
+  enforceMock.mockResolvedValue(null) // null = allowed
 })
 
 describe('authedAction — auth', () => {
@@ -111,5 +119,32 @@ describe('authedAction — error handling', () => {
 
     await expect(action()).rejects.toBe(redirect)
     expect(captureMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('authedAction — rate limiting', () => {
+  it('does not touch the rate limiter for untagged (read) actions', async () => {
+    const action = authedAction([], async () => 'ok')
+    await action()
+    expect(enforceMock).not.toHaveBeenCalled()
+  })
+
+  it('enforces the action-specific policy plus the global ceiling for tagged actions', async () => {
+    const action = mutationAction([], async () => 'ok')
+    await action()
+    expect(enforceMock).toHaveBeenCalledWith('global', 'user_42')
+    expect(enforceMock).toHaveBeenCalledWith('mutation', 'user_42')
+  })
+
+  it('returns a RateLimited signal (not a thrown error) and never runs the handler', async () => {
+    // Allowed on global, limited on the mutation policy with 12s to retry.
+    enforceMock.mockImplementation((policy: string) => Promise.resolve(policy === 'mutation' ? 12 : null))
+    const handler = vi.fn(async () => 'ok')
+    const action = mutationAction([], handler)
+
+    const res = await action()
+    expect(isRateLimited(res)).toBe(true)
+    expect(res).toEqual({ rateLimited: true, retryAfter: 12 })
+    expect(handler).not.toHaveBeenCalled()
   })
 })

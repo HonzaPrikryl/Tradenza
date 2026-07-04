@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Info, Target, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { cn, formatCurrency, formatDateTimeTz, formatPercent } from '@/lib/utils'
 import { t } from '@/i18n'
 import { contractMultiplier, tickValue as tickValueFor, tickSize as tickSizeFor } from '@/lib/futures'
@@ -169,7 +170,7 @@ export default function TradeStatsPanel({
     setSaveState('saving')
     const id = setTimeout(async () => {
       try {
-        await updateTradeRiskPlan(trade.id, { tickValue, profitTargets, stopLosses })
+        if (handleRateLimit(await updateTradeRiskPlan(trade.id, { tickValue, profitTargets, stopLosses }))) return
         setSaveState('saved')
         setTimeout(() => setSaveState('idle'), 1500)
       } catch (err) {
@@ -185,7 +186,7 @@ export default function TradeStatsPanel({
     const prev = rating
     setRating(next)
     try {
-      await updateTradeJournal(trade.id, { rating: next })
+      if (handleRateLimit(await updateTradeJournal(trade.id, { rating: next }))) return
     } catch (err) {
       setRating(prev)
       toast.error(getActionErrorMessage(err, 'trades.detail.saveFailed'))

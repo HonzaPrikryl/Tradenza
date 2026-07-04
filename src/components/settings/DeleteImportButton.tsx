@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import { deleteImport } from '@/lib/actions/wizard'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 
 interface DeleteImportButtonProps {
   id: string
@@ -36,6 +37,7 @@ export default function DeleteImportButton({ id, filename, trades }: DeleteImpor
     setDeleting(true)
     try {
       const res = await deleteImport(id)
+      if (handleRateLimit(res)) return
       toast.success(t('settings.importHistory.toast.deleted', { count: res.deletedTrades }))
       router.refresh()
     } catch (err) {

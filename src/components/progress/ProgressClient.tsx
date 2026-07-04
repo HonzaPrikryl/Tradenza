@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { Target, ListChecks, CalendarRange } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -82,7 +83,10 @@ export default function ProgressClient({
     })
     startToggle(async () => {
       try {
-        await toggleRuleCompletion(ruleId, today, next)
+        if (handleRateLimit(await toggleRuleCompletion(ruleId, today, next))) {
+          setDay(await getDayProgress(today))
+          return
+        }
         const [d, y, s] = await Promise.all([getDayProgress(today), getProgressYear(year), getProgressStats()])
         setDay(d)
         setYearData(y)

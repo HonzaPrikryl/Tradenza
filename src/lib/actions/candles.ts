@@ -142,101 +142,105 @@ async function fetchDatabento(
   return candles
 }
 
-export const getTradeCandles = authedAction([uuid], async ({ userId }, tradeId): Promise<CandlesResult> => {
-  const trade = await db.query.trades.findFirst({
-    where: and(eq(trades.id, tradeId), eq(trades.userId, userId)),
-  })
-  if (!trade) return { status: 'error' }
-  if (trade.assetClass !== 'futures') return { status: 'unsupported' }
+export const getTradeCandles = authedAction(
+  [uuid],
+  async ({ userId }, tradeId): Promise<CandlesResult> => {
+    const trade = await db.query.trades.findFirst({
+      where: and(eq(trades.id, tradeId), eq(trades.userId, userId)),
+    })
+    if (!trade) return { status: 'error' }
+    if (trade.assetClass !== 'futures') return { status: 'unsupported' }
 
-  const apiKey = process.env.DATABENTO_API_KEY
-  if (!apiKey) return { status: 'noKey' }
+    const apiKey = process.env.DATABENTO_API_KEY
+    if (!apiKey) return { status: 'noKey' }
 
-  const entrySec = Math.floor(new Date(trade.entryDatetime).getTime() / 1000)
-  const exitSec = trade.exitDatetime ? Math.floor(new Date(trade.exitDatetime).getTime() / 1000) : null
-  const nowSec = Math.floor(Date.now() / 1000) - AVAILABILITY_LAG
+    const entrySec = Math.floor(new Date(trade.entryDatetime).getTime() / 1000)
+    const exitSec = trade.exitDatetime ? Math.floor(new Date(trade.exitDatetime).getTime() / 1000) : null
+    const nowSec = Math.floor(Date.now() / 1000) - AVAILABILITY_LAG
 
-  const duration = (exitSec ?? entrySec) - entrySec
-  let schema: 'ohlcv-1m' | 'ohlcv-1h' = 'ohlcv-1m'
-  let intervalSec = 60
-  if (duration > 7 * 86400) {
-    schema = 'ohlcv-1h'
-    intervalSec = 3600
-  } else if (duration > 8 * 3600) {
-    intervalSec = 1800 // 1m → aggregate to 30m
-  }
-  const padding = PADDING_BY_INTERVAL[intervalSec]
-
-  const start = entrySec - padding
-  const end = Math.min((exitSec ?? entrySec) + padding, nowSec)
-  if (end <= start) return { status: 'noData' }
-
-  const symbolRoot = trade.symbol.toUpperCase().replace(MONTH_CODE, '')
-
-  // Fetch one time span from Databento and aggregate it to `intervalSec` if needed.
-  const fetchSpan = async (spanStart: number, spanEnd: number): Promise<Candle[] | null> => {
-    if (spanEnd <= spanStart) return []
-    let span: Candle[] | null
-    try {
-      span = await fetchDatabento(apiKey, symbolRoot, spanStart, spanEnd, schema)
-    } catch (e) {
-      console.error('[candles] fetch failed', e)
-      return null
+    const duration = (exitSec ?? entrySec) - entrySec
+    let schema: 'ohlcv-1m' | 'ohlcv-1h' = 'ohlcv-1m'
+    let intervalSec = 60
+    if (duration > 7 * 86400) {
+      schema = 'ohlcv-1h'
+      intervalSec = 3600
+    } else if (duration > 8 * 3600) {
+      intervalSec = 1800 // 1m → aggregate to 30m
     }
-    if (span === null) return null
-    return intervalSec === 1800 ? aggregate(span, 60, 1800) : span
-  }
+    const padding = PADDING_BY_INTERVAL[intervalSec]
 
-  // Slice the merged superset down to the window this trade actually wants.
-  const slice = (all: Candle[]): Candle[] => all.filter((c) => c.t >= start && c.t <= end)
+    const start = entrySec - padding
+    const end = Math.min((exitSec ?? entrySec) + padding, nowSec)
+    if (end <= start) return { status: 'noData' }
 
-  // Global cache shared across all users: candles for a continuous root + interval
-  // are identical for everyone, so a span fetched once serves every user's trade.
-  const cached = await db.query.marketCandles.findFirst({
-    where: and(eq(marketCandles.symbolRoot, symbolRoot), eq(marketCandles.intervalSec, intervalSec)),
-  })
+    const symbolRoot = trade.symbol.toUpperCase().replace(MONTH_CODE, '')
 
-  // Cache hit: requested window already within the covered span → no fetch.
-  if (cached && cached.fromSec <= start && cached.toSec >= end) {
-    const hit = slice(cached.candles as Candle[])
-    return hit.length > 0 ? { status: 'ok', intervalSec, candles: hit } : { status: 'noData' }
-  }
+    // Fetch one time span from Databento and aggregate it to `intervalSec` if needed.
+    const fetchSpan = async (spanStart: number, spanEnd: number): Promise<Candle[] | null> => {
+      if (spanEnd <= spanStart) return []
+      let span: Candle[] | null
+      try {
+        span = await fetchDatabento(apiKey, symbolRoot, spanStart, spanEnd, schema)
+      } catch (e) {
+        console.error('[candles] fetch failed', e)
+        return null
+      }
+      if (span === null) return null
+      return intervalSec === 1800 ? aggregate(span, 60, 1800) : span
+    }
 
-  if (!cached) {
-    const fetched = await fetchSpan(start, end)
-    if (fetched === null) return { status: 'error' }
+    // Slice the merged superset down to the window this trade actually wants.
+    const slice = (all: Candle[]): Candle[] => all.filter((c) => c.t >= start && c.t <= end)
+
+    // Global cache shared across all users: candles for a continuous root + interval
+    // are identical for everyone, so a span fetched once serves every user's trade.
+    const cached = await db.query.marketCandles.findFirst({
+      where: and(eq(marketCandles.symbolRoot, symbolRoot), eq(marketCandles.intervalSec, intervalSec)),
+    })
+
+    // Cache hit: requested window already within the covered span → no fetch.
+    if (cached && cached.fromSec <= start && cached.toSec >= end) {
+      const hit = slice(cached.candles as Candle[])
+      return hit.length > 0 ? { status: 'ok', intervalSec, candles: hit } : { status: 'noData' }
+    }
+
+    if (!cached) {
+      const fetched = await fetchSpan(start, end)
+      if (fetched === null) return { status: 'error' }
+      await db
+        .insert(marketCandles)
+        .values({ symbolRoot, intervalSec, fromSec: start, toSec: end, candles: fetched })
+        .onConflictDoUpdate({
+          target: [marketCandles.symbolRoot, marketCandles.intervalSec],
+          set: { fromSec: start, toSec: end, candles: fetched, updatedAt: new Date() },
+        })
+      const out = slice(fetched)
+      return out.length > 0 ? { status: 'ok', intervalSec, candles: out } : { status: 'noData' }
+    }
+
+    // Partial hit: extend the covered envelope by fetching only the missing edges.
+    const newFrom = Math.min(start, cached.fromSec)
+    const newTo = Math.max(end, cached.toSec)
+    let merged = cached.candles as Candle[]
+
+    if (newFrom < cached.fromSec) {
+      const left = await fetchSpan(newFrom, cached.fromSec)
+      if (left === null) return { status: 'error' }
+      merged = mergeCandles(left, merged)
+    }
+    if (newTo > cached.toSec) {
+      const right = await fetchSpan(cached.toSec, newTo)
+      if (right === null) return { status: 'error' }
+      merged = mergeCandles(merged, right)
+    }
+
     await db
-      .insert(marketCandles)
-      .values({ symbolRoot, intervalSec, fromSec: start, toSec: end, candles: fetched })
-      .onConflictDoUpdate({
-        target: [marketCandles.symbolRoot, marketCandles.intervalSec],
-        set: { fromSec: start, toSec: end, candles: fetched, updatedAt: new Date() },
-      })
-    const out = slice(fetched)
+      .update(marketCandles)
+      .set({ fromSec: newFrom, toSec: newTo, candles: merged, updatedAt: new Date() })
+      .where(and(eq(marketCandles.symbolRoot, symbolRoot), eq(marketCandles.intervalSec, intervalSec)))
+
+    const out = slice(merged)
     return out.length > 0 ? { status: 'ok', intervalSec, candles: out } : { status: 'noData' }
-  }
-
-  // Partial hit: extend the covered envelope by fetching only the missing edges.
-  const newFrom = Math.min(start, cached.fromSec)
-  const newTo = Math.max(end, cached.toSec)
-  let merged = cached.candles as Candle[]
-
-  if (newFrom < cached.fromSec) {
-    const left = await fetchSpan(newFrom, cached.fromSec)
-    if (left === null) return { status: 'error' }
-    merged = mergeCandles(left, merged)
-  }
-  if (newTo > cached.toSec) {
-    const right = await fetchSpan(cached.toSec, newTo)
-    if (right === null) return { status: 'error' }
-    merged = mergeCandles(merged, right)
-  }
-
-  await db
-    .update(marketCandles)
-    .set({ fromSec: newFrom, toSec: newTo, candles: merged, updatedAt: new Date() })
-    .where(and(eq(marketCandles.symbolRoot, symbolRoot), eq(marketCandles.intervalSec, intervalSec)))
-
-  const out = slice(merged)
-  return out.length > 0 ? { status: 'ok', intervalSec, candles: out } : { status: 'noData' }
-})
+  },
+  { limit: ['candles', 'candlesDaily'] },
+)

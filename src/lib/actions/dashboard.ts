@@ -27,7 +27,7 @@ import { classifyOutcome, classifyMeasure, outcomeMeasure, tradeNotional, multip
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { uuid, dateKey, year as yearSchema, month as monthSchema } from '@/lib/validation'
-import { authedAction } from '@/lib/safe-action'
+import { authedAction, mutationAction } from '@/lib/safe-action'
 
 async function globalConditions() {
   const gf = await readGlobalFilters()
@@ -282,7 +282,7 @@ const saveTemplateSchema = z.object({
   makeDefault: z.boolean().optional(),
 })
 
-export const saveTemplate = authedAction(
+export const saveTemplate = mutationAction(
   [saveTemplateSchema],
   async (
     { userId },
@@ -311,7 +311,7 @@ export const saveTemplate = authedAction(
   },
 )
 
-export const updateWidgetSettings = authedAction(
+export const updateWidgetSettings = mutationAction(
   [z.string().min(1).max(200), z.record(z.unknown())],
   async ({ userId }, widgetId, settings) => {
     const apply = (layout: DashboardLayout): boolean => {
@@ -361,13 +361,13 @@ async function setDefaultTemplateInternal(userId: string, id: string) {
     .where(and(eq(dashboardTemplates.id, id), eq(dashboardTemplates.userId, userId)))
 }
 
-export const setDefaultTemplate = authedAction([uuid], async ({ userId }, id) => {
+export const setDefaultTemplate = mutationAction([uuid], async ({ userId }, id) => {
   await setDefaultTemplateInternal(userId, id)
   revalidatePath('/dashboard')
   return { success: true }
 })
 
-export const renameTemplate = authedAction([uuid, z.string()], async ({ userId }, id, name) => {
+export const renameTemplate = mutationAction([uuid, z.string()], async ({ userId }, id, name) => {
   await db
     .update(dashboardTemplates)
     .set({ name: name.trim().slice(0, 30) || 'Untitled', updatedAt: new Date() })
@@ -376,13 +376,13 @@ export const renameTemplate = authedAction([uuid, z.string()], async ({ userId }
   return { success: true }
 })
 
-export const deleteTemplate = authedAction([uuid], async ({ userId }, id) => {
+export const deleteTemplate = mutationAction([uuid], async ({ userId }, id) => {
   await db.delete(dashboardTemplates).where(and(eq(dashboardTemplates.id, id), eq(dashboardTemplates.userId, userId)))
   revalidatePath('/dashboard')
   return { success: true }
 })
 
-export const createTemplateFromPreset = authedAction(
+export const createTemplateFromPreset = mutationAction(
   [z.string().max(100), z.boolean().default(false)],
   async ({ userId }, presetKey, makeDefault) => {
     const preset = PRESET_TEMPLATES.find((p) => p.key === presetKey) ?? PRESET_TEMPLATES[0]

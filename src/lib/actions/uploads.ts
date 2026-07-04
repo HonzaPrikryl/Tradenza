@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { isR2Configured, uploadToR2 } from '@/lib/r2'
-import { authedAction } from '@/lib/safe-action'
+import { mutationAction } from '@/lib/safe-action'
 
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
 const EXT_BY_TYPE: Record<string, string> = {
@@ -25,7 +25,7 @@ export type UploadResult =
  * enforced by the wrapper (throws for anonymous callers); the editor already
  * wraps this call in try/catch, so that surfaces as the inline fallback.
  */
-export const uploadNoteImage = authedAction(
+export const uploadNoteImage = mutationAction(
   [z.instanceof(FormData)],
   async ({ userId }, form): Promise<UploadResult> => {
     if (!isR2Configured()) return { status: 'notConfigured' }

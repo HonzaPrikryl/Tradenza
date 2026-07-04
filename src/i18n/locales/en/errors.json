@@ -5,6 +5,8 @@
   "notFound": "That could not be found.",
   "badRequest": "Some of the information provided is invalid.",
   "conflict": "That conflicts with existing data.",
+  "rateLimited": "You’re doing that too fast — please slow down and try again in a moment.",
+  "rateLimitedIn": "You’re going too fast — try again in {time}.",
   "internal": "Something went wrong. Please try again.",
   "trade": {
     "notFound": "Trade not found."

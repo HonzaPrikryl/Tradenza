@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { t } from '@/i18n'
 import { uuid } from '@/lib/validation'
-import { authedAction } from '@/lib/safe-action'
+import { authedAction, mutationAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 
 export interface AccountWithStats {
@@ -126,7 +126,7 @@ export const ensureDefaultAccount = authedAction([], async ({ userId }): Promise
   return def!.id
 })
 
-export const createAccount = authedAction([accountSchema], async ({ userId }, v) => {
+export const createAccount = mutationAction([accountSchema], async ({ userId }, v) => {
   const existingCount = await db
     .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(accounts)
@@ -155,7 +155,7 @@ export const createAccount = authedAction([accountSchema], async ({ userId }, v)
   return { success: true, account }
 })
 
-export const updateAccount = authedAction([uuid, accountSchema], async ({ userId }, id, v) => {
+export const updateAccount = mutationAction([uuid, accountSchema], async ({ userId }, id, v) => {
   const [account] = await db
     .update(accounts)
     .set({
@@ -177,7 +177,7 @@ export const updateAccount = authedAction([uuid, accountSchema], async ({ userId
   return { success: true, account }
 })
 
-export const setDefaultAccount = authedAction([uuid], async ({ userId }, id) => {
+export const setDefaultAccount = mutationAction([uuid], async ({ userId }, id) => {
   await db
     .update(accounts)
     .set({ isDefault: false })
@@ -192,7 +192,7 @@ export const setDefaultAccount = authedAction([uuid], async ({ userId }, id) => 
   return { success: true }
 })
 
-export const setAccountArchived = authedAction([uuid, z.boolean()], async ({ userId }, id, archived) => {
+export const setAccountArchived = mutationAction([uuid, z.boolean()], async ({ userId }, id, archived) => {
   await db
     .update(accounts)
     .set({ archived })
@@ -201,7 +201,7 @@ export const setAccountArchived = authedAction([uuid, z.boolean()], async ({ use
   return { success: true }
 })
 
-export const clearAccountTrades = authedAction([uuid], async ({ userId }, id) => {
+export const clearAccountTrades = mutationAction([uuid], async ({ userId }, id) => {
   await db.delete(trades).where(and(eq(trades.userId, userId), eq(trades.accountId, id)))
   revalidatePath('/accounts')
   revalidatePath('/trades')
@@ -210,7 +210,7 @@ export const clearAccountTrades = authedAction([uuid], async ({ userId }, id) =>
   return { success: true }
 })
 
-export const transferTrades = authedAction([uuid, uuid], async ({ userId }, fromId, toId) => {
+export const transferTrades = mutationAction([uuid, uuid], async ({ userId }, fromId, toId) => {
   if (fromId === toId) throw new ValidationError(t('errors.account.invalidTarget'))
 
   const [source, target] = await Promise.all([
@@ -232,7 +232,7 @@ export const transferTrades = authedAction([uuid, uuid], async ({ userId }, from
   return { success: true, moved: moved.length }
 })
 
-export const deleteAccount = authedAction([uuid], async ({ userId }, id) => {
+export const deleteAccount = mutationAction([uuid], async ({ userId }, id) => {
   await db.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
   revalidatePath('/accounts')
   revalidatePath('/trades')

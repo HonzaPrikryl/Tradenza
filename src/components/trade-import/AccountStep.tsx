@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -39,6 +40,10 @@ export default function AccountStep({ brokerId, brokerName }: { brokerId: string
     setSaving(true)
     try {
       const res = await createAccount({ ...form, broker: brokerId })
+      if (handleRateLimit(res)) {
+        setSaving(false)
+        return
+      }
       toast.success(t('addTrades.account.created'))
       router.push(`/trade-import/method?broker=${brokerId}&account=${res.account.id}`)
     } catch (e) {

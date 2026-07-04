@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { t } from '@/i18n'
 import { cn } from '@/lib/utils'
 import Modal from '@/components/ui/Modal'
@@ -63,8 +64,8 @@ export default function RuleDialog({
     setSaving(true)
     try {
       const payload = { name: name.trim(), description: description.trim() || null, activeDays: days }
-      if (mode === 'edit' && rule) await updateRule(rule.id, payload)
-      else await createRule(payload)
+      const res = mode === 'edit' && rule ? await updateRule(rule.id, payload) : await createRule(payload)
+      if (handleRateLimit(res)) return
       toast.success(mode === 'edit' ? t('progress.rules.toast.updated') : t('progress.rules.toast.created'))
       onClose()
       onSaved?.()

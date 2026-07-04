@@ -15,6 +15,7 @@ import NotesTabs from './detail/NotesTabs'
 import { normalizeExecutions } from './detail/executions'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -48,7 +49,10 @@ export default function TradeDetailClient({ trade, tagGroups, timezone, dayKey, 
     let cancelled = false
     setCandles(null)
     getTradeCandles(trade.id)
-      .then((r) => !cancelled && setCandles(r))
+      .then((r) => {
+        if (cancelled) return
+        setCandles(handleRateLimit(r) ? { status: 'error' } : r)
+      })
       .catch(() => !cancelled && setCandles({ status: 'error' }))
     return () => {
       cancelled = true
@@ -67,7 +71,7 @@ export default function TradeDetailClient({ trade, tagGroups, timezone, dayKey, 
     })
     if (!ok) return
     try {
-      await deleteTrade(trade.id)
+      if (handleRateLimit(await deleteTrade(trade.id))) return
       toast.success(t('trades.detail.deleted'))
       router.push('/trades')
     } catch (err) {

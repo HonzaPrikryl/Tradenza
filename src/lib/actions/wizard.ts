@@ -11,7 +11,7 @@ import { IMPORT_REQUIRED, FILL_REQUIRED } from '@/lib/csv-columns'
 import { t } from '@/i18n'
 import { stripTzAbbrev, parseDirection, parseNumber, parseBuySell, parseDateInTz } from './wizard-helpers'
 import { uuid } from '@/lib/validation'
-import { authedAction } from '@/lib/safe-action'
+import { authedAction, mutationAction, importAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ const manualTradeSchema = z.object({
 
 export type ManualTradeInput = z.infer<typeof manualTradeSchema>
 
-export const saveManualTrade = authedAction([manualTradeSchema], async ({ userId }, v) => {
+export const saveManualTrade = mutationAction([manualTradeSchema], async ({ userId }, v) => {
   await assertAccountOwnership(userId, v.accountId)
 
   const execs = [...v.executions].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())
@@ -148,7 +148,7 @@ export interface WizardImportResult {
   unmappedRequired: string[]
 }
 
-export const importTradesCsv = authedAction([csvImportSchema], async ({ userId }, v): Promise<WizardImportResult> => {
+export const importTradesCsv = importAction([csvImportSchema], async ({ userId }, v): Promise<WizardImportResult> => {
   const account = await assertAccountOwnership(userId, v.accountId)
 
   const m = v.mapping
@@ -343,7 +343,7 @@ export const getImportHistory = authedAction([], async ({ userId }): Promise<Imp
   }))
 })
 
-export const deleteImport = authedAction(
+export const deleteImport = mutationAction(
   [uuid],
   async ({ userId }, id): Promise<{ success: true; deletedTrades: number }> => {
     const log = await db.query.importLogs.findFirst({
@@ -387,7 +387,7 @@ interface Fill {
   commission: number
 }
 
-export const importFillsCsv = authedAction([fillImportSchema], async ({ userId }, v): Promise<WizardImportResult> => {
+export const importFillsCsv = importAction([fillImportSchema], async ({ userId }, v): Promise<WizardImportResult> => {
   const account = await assertAccountOwnership(userId, v.accountId)
 
   const m = v.mapping

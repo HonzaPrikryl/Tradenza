@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronDown, Check, Plus, X, Settings2, MoreHorizontal, Pencil, Trash2, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { cn } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
 import { UNGROUPED_ID } from '@/lib/tags-constants'
@@ -56,6 +57,7 @@ function GroupSelect({
     setSaving(true)
     try {
       const res = await createTag({ name, color: group.color, groupId: group.id })
+      if (handleRateLimit(res)) return
       setQuery('')
       onCreated()
       if (res?.tag?.id) onToggle(res.tag.id)
@@ -75,7 +77,7 @@ function GroupSelect({
     if (!name || busy) return
     setBusy(true)
     try {
-      await updateTag(v.id, { name, color: v.color })
+      if (handleRateLimit(await updateTag(v.id, { name, color: v.color }))) return
       setEditingId(null)
       onCreated()
     } catch (err) {
@@ -94,7 +96,7 @@ function GroupSelect({
     if (!ok) return
     setBusy(true)
     try {
-      await deleteTag(v.id)
+      if (handleRateLimit(await deleteTag(v.id))) return
       setEditingId(null)
       onCreated()
     } catch (err) {
@@ -265,7 +267,7 @@ function CategoryHeader({
     if (!n || busy) return
     setBusy(true)
     try {
-      await updateTagGroup(group.id, { name: n, color: group.color })
+      if (handleRateLimit(await updateTagGroup(group.id, { name: n, color: group.color }))) return
       setEditing(false)
       onReload()
     } catch (err) {
@@ -277,7 +279,7 @@ function CategoryHeader({
 
   const changeColor = async (color: string) => {
     try {
-      await updateTagGroup(group.id, { name: group.name, color })
+      if (handleRateLimit(await updateTagGroup(group.id, { name: group.name, color }))) return
       onReload()
     } catch (err) {
       toast.error(getActionErrorMessage(err, 'trades.detail.tags.updateCategoryFailed'))
@@ -294,7 +296,7 @@ function CategoryHeader({
     })
     if (!ok) return
     try {
-      await deleteTagGroup(group.id)
+      if (handleRateLimit(await deleteTagGroup(group.id))) return
       onReload()
     } catch (err) {
       toast.error(getActionErrorMessage(err, 'trades.detail.tags.deleteCategoryFailed'))
@@ -436,7 +438,7 @@ export default function TradeTagsPanel({
     const next = orderedRealIds.map((id) => byId.get(id)!).filter(Boolean)
     setGroups([...next, ...ungroupedGroups]) // optimistic
     try {
-      await reorderTagGroups(orderedRealIds)
+      if (handleRateLimit(await reorderTagGroups(orderedRealIds))) return
     } catch (err) {
       toast.error(getActionErrorMessage(err, 'trades.detail.tags.reorderFailed'))
       reload()
@@ -457,7 +459,10 @@ export default function TradeTagsPanel({
     const next = prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
     setSelected(next) // optimistic
     try {
-      await setTradeTags(tradeId, next)
+      if (handleRateLimit(await setTradeTags(tradeId, next))) {
+        setSelected(prev)
+        return
+      }
     } catch (err) {
       setSelected(prev)
       toast.error(getActionErrorMessage(err, 'trades.detail.tags.updateFailed'))
@@ -469,7 +474,7 @@ export default function TradeTagsPanel({
     if (!name || savingGroup) return
     setSavingGroup(true)
     try {
-      await createTagGroup({ name, color: NEUTRAL_COLOR })
+      if (handleRateLimit(await createTagGroup({ name, color: NEUTRAL_COLOR }))) return
       setGroupName('')
       setCreatingGroup(false)
       await reload()

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { Pencil, Check, X, Trash2 } from 'lucide-react'
 import { cn, formatCurrency, formatDateTime } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
@@ -82,7 +83,7 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
   const persist = async (nextRows: Row[]) => {
     setSaving(true)
     try {
-      await updateTradeExecutions(trade.id, {
+      const res = await updateTradeExecutions(trade.id, {
         contractMultiplier: num(multiplier) || undefined,
         executions: nextRows.map((r) => ({
           datetime: new Date(r.datetime).toISOString(),
@@ -93,6 +94,7 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
           fee: num(r.fee),
         })),
       })
+      if (handleRateLimit(res)) return false
       setRows(nextRows)
       toast.success(t('trades.detail.exec.saved'))
       router.refresh()

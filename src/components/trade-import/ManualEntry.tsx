@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -123,7 +124,7 @@ export default function ManualEntry({
     setSaving(true)
     try {
       const trimmed = symbol.trim().toUpperCase()
-      await saveManualTrade({
+      const res = await saveManualTrade({
         accountId,
         assetClass,
         symbol: trimmed,
@@ -138,6 +139,10 @@ export default function ManualEntry({
           fee: num(e.fee),
         })),
       })
+      if (handleRateLimit(res)) {
+        setSaving(false)
+        return
+      }
       toast.success(t('addTrades.manual.saved', { symbol: trimmed }))
       if (addNext) {
         setSymbol('')

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit, handleRateLimitBatch } from '@/components/ui/rate-limit-toast'
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
@@ -51,11 +52,11 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
     }
     setSaving(true)
     try {
-      if (dialog?.mode === 'edit' && dialog.cat) {
-        await updateTagGroup(dialog.cat.id, { name: name.trim(), color })
-      } else {
-        await createTagGroup({ name: name.trim(), color })
-      }
+      const res =
+        dialog?.mode === 'edit' && dialog.cat
+          ? await updateTagGroup(dialog.cat.id, { name: name.trim(), color })
+          : await createTagGroup({ name: name.trim(), color })
+      if (handleRateLimit(res)) return
       toast.success(
         dialog?.mode === 'edit'
           ? t('settings.tagsManagement.toast.updated')
@@ -79,7 +80,7 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
     })
     if (!ok) return
     try {
-      await deleteTagGroup(cat.id)
+      if (handleRateLimit(await deleteTagGroup(cat.id))) return
       toast.success(t('settings.tagsManagement.toast.deleted'))
       onChanged()
     } catch (err) {
@@ -96,7 +97,7 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
     })
     if (!ok) return
     try {
-      await Promise.all(sel.ids.map((id) => deleteTagGroup(id)))
+      if (handleRateLimitBatch(await Promise.all(sel.ids.map((id) => deleteTagGroup(id))))) return
       toast.success(t('settings.tagsManagement.toast.deleted'))
       sel.clear()
       onChanged()

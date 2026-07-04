@@ -6,6 +6,7 @@ import { useDropzone } from 'react-dropzone'
 import Papa from 'papaparse'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { FileUp, Info, ChevronDown, FileText, X, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -151,6 +152,7 @@ export default function UploadStep({
               mapping: colMap,
               rows,
             })
+      if (handleRateLimit(res)) return
       setResult(res)
       if (res.imported > 0) {
         toast.success(t('addTrades.upload.importedToast', { count: res.imported }))

@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit, handleRateLimitBatch } from '@/components/ui/rate-limit-toast'
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
@@ -85,11 +86,11 @@ export default function TagsView({
     const groupId = categoryId === UNGROUPED_ID ? null : categoryId
     const color = inheritedColor(categoryId)
     try {
-      if (dialog?.mode === 'edit' && dialog.tag) {
-        await updateTag(dialog.tag.id, { name: name.trim(), color })
-      } else {
-        await createTag({ name: name.trim(), color, groupId: groupId ?? undefined })
-      }
+      const res =
+        dialog?.mode === 'edit' && dialog.tag
+          ? await updateTag(dialog.tag.id, { name: name.trim(), color })
+          : await createTag({ name: name.trim(), color, groupId: groupId ?? undefined })
+      if (handleRateLimit(res)) return
       toast.success(
         dialog?.mode === 'edit'
           ? t('settings.tagsManagement.toast.updated')
@@ -113,7 +114,7 @@ export default function TagsView({
     })
     if (!ok) return
     try {
-      await deleteTag(tg.id)
+      if (handleRateLimit(await deleteTag(tg.id))) return
       toast.success(t('settings.tagsManagement.toast.deleted'))
       onChanged()
     } catch (err) {
@@ -130,7 +131,7 @@ export default function TagsView({
     })
     if (!ok) return
     try {
-      await Promise.all(sel.ids.map((id) => deleteTag(id)))
+      if (handleRateLimitBatch(await Promise.all(sel.ids.map((id) => deleteTag(id))))) return
       toast.success(t('settings.tagsManagement.toast.deleted'))
       sel.clear()
       onChanged()

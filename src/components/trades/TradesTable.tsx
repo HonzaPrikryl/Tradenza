@@ -9,6 +9,7 @@ import { exportTradesToCsv } from '@/lib/actions/export'
 import { Trash2, ExternalLink, Download, Tag, ArrowRightLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import Select from '@/components/ui/Select'
@@ -109,7 +110,7 @@ export default function TradesTable({
     })
     if (!ok) return
     try {
-      await deleteTrade(id)
+      if (handleRateLimit(await deleteTrade(id))) return
       toast.success(t('trades.deleted'))
       router.refresh()
     } catch (err) {
@@ -128,7 +129,7 @@ export default function TradesTable({
     if (!ok) return
     setBusy(true)
     try {
-      await deleteTrades(ids())
+      if (handleRateLimit(await deleteTrades(ids()))) return
       toast.success(t('trades.bulk.deletedMany', { count }))
       clearSel()
       router.refresh()
@@ -175,7 +176,7 @@ export default function TradesTable({
     const count = dialogIds.length
     setBusy(true)
     try {
-      await addTagToTrades(dialogIds, tagId)
+      if (handleRateLimit(await addTagToTrades(dialogIds, tagId))) return
       toast.success(t('trades.bulk.tagged', { count }))
       setDialog(null)
       clearSel()
@@ -192,7 +193,7 @@ export default function TradesTable({
     const count = dialogIds.length
     setBusy(true)
     try {
-      await setTradesAccount(dialogIds, accountId)
+      if (handleRateLimit(await setTradesAccount(dialogIds, accountId))) return
       toast.success(t('trades.bulk.transferred', { count }))
       setDialog(null)
       clearSel()
@@ -241,6 +242,7 @@ export default function TradesTable({
     try {
       const color = PALETTE[realCategories.length % PALETTE.length]
       const res = await createTagGroup({ name, color })
+      if (handleRateLimit(res)) return null
       if (!res?.group) return null
       const g = res.group
       setGroups((prev) =>
@@ -259,6 +261,7 @@ export default function TradesTable({
     if (!currentCat) return null
     try {
       const res = await createTag({ name, color: currentCat.color, groupId: currentCat.id })
+      if (handleRateLimit(res)) return null
       if (!res?.tag) return null
       const tag = res.tag
       setGroups((prev) =>

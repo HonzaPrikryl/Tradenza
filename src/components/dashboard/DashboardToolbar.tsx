@@ -7,6 +7,7 @@ import { Pencil, Check, Plus, Sliders } from 'lucide-react'
 import { setDefaultTemplate } from '@/lib/actions/dashboard'
 import type { DashboardTemplateDTO } from '@/lib/dashboard/types'
 import { t } from '@/i18n'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { cn } from '@/lib/utils'
 
 interface Props {
@@ -23,7 +24,7 @@ export default function DashboardToolbar({ templates, activeId, onEdit, onCreate
   function switchTo(id: string) {
     if (!id) return
     startTransition(async () => {
-      await setDefaultTemplate(id)
+      if (handleRateLimit(await setDefaultTemplate(id))) return
       router.refresh()
     })
   }

@@ -14,7 +14,7 @@ import { getDemoTrades } from '@/lib/demo/trades'
 import { userHasTrades } from '@/lib/demo/detect'
 import { z } from 'zod'
 import { uuid, uuidArray } from '@/lib/validation'
-import { authedAction } from '@/lib/safe-action'
+import { authedAction, mutationAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 import { t } from '@/i18n'
 
@@ -94,7 +94,7 @@ async function assignTags(tradeId: string, userId: string, tagIds: string[]) {
 
 // ─── Create trade ─────────────────────────────────────────────────────────────
 
-export const createTrade = authedAction(
+export const createTrade = mutationAction(
   [tradeFormSchema, uuidArray.default([]), uuid.nullable().default(null)],
   async ({ userId }, validated, tagIds, accountId) => {
     const [trade] = await db
@@ -117,7 +117,7 @@ export const createTrade = authedAction(
 
 // ─── Update trade ─────────────────────────────────────────────────────────────
 
-export const updateTrade = authedAction(
+export const updateTrade = mutationAction(
   [uuid, tradeFormSchema, uuidArray.optional(), uuid.nullable().optional()],
   async ({ userId }, id, validated, tagIds, accountId) => {
     const existing = await db.query.trades.findFirst({
@@ -152,7 +152,7 @@ const journalSchema = z.object({
   rating: z.number().min(0).max(5).multipleOf(0.5).nullable().optional(),
 })
 
-export const updateTradeJournal = authedAction([uuid, journalSchema], async ({ userId }, id, v) => {
+export const updateTradeJournal = mutationAction([uuid, journalSchema], async ({ userId }, id, v) => {
   const set: Partial<{ notes: string | null; rating: number | null; updatedAt: Date }> = {
     updatedAt: new Date(),
   }
@@ -183,7 +183,7 @@ const riskPlanSchema = z.object({
   stopLosses: z.array(legSchema).max(20),
 })
 
-export const updateTradeRiskPlan = authedAction([uuid, riskPlanSchema], async ({ userId }, id, plan) => {
+export const updateTradeRiskPlan = mutationAction([uuid, riskPlanSchema], async ({ userId }, id, plan) => {
   const existing = await db.query.trades.findFirst({
     where: and(eq(trades.id, id), eq(trades.userId, userId)),
   })
@@ -225,7 +225,7 @@ const execUpdateSchema = z.object({
   executions: z.array(execEditSchema).min(1),
 })
 
-export const updateTradeExecutions = authedAction([uuid, execUpdateSchema], async ({ userId }, tradeId, v) => {
+export const updateTradeExecutions = mutationAction([uuid, execUpdateSchema], async ({ userId }, tradeId, v) => {
   const existing = await db.query.trades.findFirst({
     where: and(eq(trades.id, tradeId), eq(trades.userId, userId)),
   })
@@ -305,7 +305,7 @@ export const updateTradeExecutions = authedAction([uuid, execUpdateSchema], asyn
 
 // ─── Delete trade ─────────────────────────────────────────────────────────────
 
-export const deleteTrade = authedAction([uuid], async ({ userId }, id) => {
+export const deleteTrade = mutationAction([uuid], async ({ userId }, id) => {
   await db.delete(trades).where(and(eq(trades.id, id), eq(trades.userId, userId)))
 
   revalidatePath('/dashboard')
@@ -313,7 +313,7 @@ export const deleteTrade = authedAction([uuid], async ({ userId }, id) => {
   return { success: true }
 })
 
-export const deleteTrades = authedAction([uuidArray], async ({ userId }, ids) => {
+export const deleteTrades = mutationAction([uuidArray], async ({ userId }, ids) => {
   if (ids.length === 0) return { success: true, count: 0 }
   await db.delete(trades).where(and(eq(trades.userId, userId), inArray(trades.id, ids)))
   revalidatePath('/dashboard')
@@ -322,7 +322,7 @@ export const deleteTrades = authedAction([uuidArray], async ({ userId }, ids) =>
   return { success: true, count: ids.length }
 })
 
-export const addTagToTrades = authedAction([uuidArray, uuid], async ({ userId }, ids, tagId) => {
+export const addTagToTrades = mutationAction([uuidArray, uuid], async ({ userId }, ids, tagId) => {
   if (ids.length === 0) return { success: true, added: 0 }
 
   const tag = await db.query.tags.findFirst({
@@ -350,7 +350,7 @@ export const addTagToTrades = authedAction([uuidArray, uuid], async ({ userId },
   return { success: true, added: toAdd.length }
 })
 
-export const setTradesAccount = authedAction([uuidArray, uuid], async ({ userId }, ids, accountId) => {
+export const setTradesAccount = mutationAction([uuidArray, uuid], async ({ userId }, ids, accountId) => {
   if (ids.length === 0) return { success: true, count: 0 }
 
   const acc = await db.query.accounts.findFirst({

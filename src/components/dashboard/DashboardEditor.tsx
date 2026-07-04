@@ -23,6 +23,7 @@ import { restrictToFirstScrollableAncestor } from '@dnd-kit/modifiers'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { X, Save, AlertTriangle, Loader2, MoreHorizontal, Pencil, Trash2, Check } from 'lucide-react'
 import { toast } from 'sonner'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import type { CSSProperties } from 'react'
 import {
   ZONE_CONFIG,
@@ -145,6 +146,7 @@ export default function DashboardEditor({ kind, template, initialLayout, onClose
         layout,
         makeDefault: true,
       })
+      if (handleRateLimit(res)) return
       if (res.success) {
         toast.success(kind === 'create' ? t('dashboard.editor.templateCreated') : t('dashboard.editor.dashboardSaved'))
         setCreateOpen(false)
@@ -161,7 +163,7 @@ export default function DashboardEditor({ kind, template, initialLayout, onClose
     setRenameOpen(false)
     if (template?.id) {
       startTransition(async () => {
-        await renameTemplate(template.id, newName)
+        if (handleRateLimit(await renameTemplate(template.id, newName))) return
         router.refresh()
       })
     }
@@ -178,7 +180,7 @@ export default function DashboardEditor({ kind, template, initialLayout, onClose
     })
     if (!ok) return
     startTransition(async () => {
-      await deleteTemplate(template.id)
+      if (handleRateLimit(await deleteTemplate(template.id))) return
       toast.success(t('dashboard.editor.templateDeleted'))
       router.refresh()
       onClose()

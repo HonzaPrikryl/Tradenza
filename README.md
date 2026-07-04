@@ -57,6 +57,7 @@ See [`docs/UX_UI.md`](docs/UX_UI.md) for a full UX/UI walkthrough of the screens
 | Market data _(optional)_      | [Databento](https://databento.com) for historical OHLC candles                                                                   |
 | Screenshots _(optional)_      | Cloudflare R2                                                                                                                    |
 | Error monitoring _(optional)_ | [Sentry](https://sentry.io)                                                                                                      |
+| Rate limiting _(optional)_    | [Upstash Redis](https://upstash.com) via `@upstash/ratelimit`                                                                    |
 | Quality                       | Vitest, ESLint, Prettier, Husky + lint-staged, GitHub Actions CI                                                                 |
 
 ## Quick start
@@ -120,8 +121,21 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 | `DATABENTO_API_KEY`                                       |    ▫️    | Enables historical candle charts on the trade detail page                                    |
 | `R2_*`                                                    |    ▫️    | Cloudflare R2 credentials for trade screenshots                                              |
 | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                      |    ▫️    | Error monitoring & source maps                                                               |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`     |    ▫️    | Per-user rate limiting (both required together; omit to disable — see below)                 |
 
 ✅ required · ▫️ optional. See [`.env.example`](.env.example) for the full annotated list.
+
+## Rate limiting
+
+Per-user rate limiting is **optional**, via [Upstash Redis](https://upstash.com). When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are unset it is disabled and the app behaves normally. To enable it, create a database in the [Upstash console](https://console.upstash.com) and add its REST URL + token to your environment (Upstash's free tier is more than enough).
+
+Only write actions are limited; browsing and reading are never throttled. If someone goes too fast, the action is held back and a friendly countdown tells them when to try again. If Redis is ever unreachable, requests are allowed through rather than blocked.
+
+| Action                   | Limit (per user)     |
+| ------------------------ | -------------------- |
+| Candle charts            | 10 / min · 100 / day |
+| CSV / manual import      | 5 / min              |
+| Create / update / delete | 60 / min             |
 
 ## Environments
 

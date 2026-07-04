@@ -4,9 +4,13 @@ import * as Sentry from '@sentry/nextjs'
 import { z } from 'zod'
 import { t } from '@/i18n'
 import { ActionError, UnauthorizedError, ValidationError } from './action-errors'
+import { enforceRateLimit, type RatePolicy } from './rate-limit'
+import type { RateLimited } from './rate-limit-result'
+
+export type { RateLimited } from './rate-limit-result'
 
 // Typed wrapper for server actions. Every action funnels through here so auth,
-// input validation and error handling are enforced in one place.
+// input validation, rate limiting and error handling are enforced in one place.
 
 // Re-export the error taxonomy so call sites can `import { ... } from '@/lib/safe-action'`.
 export * from './action-errors'
@@ -15,7 +19,14 @@ export interface ActionContext {
   userId: string
 }
 
+export interface ActionOptions {
+  /** Rate-limit policy (or policies) to enforce, on top of the always-on `global` ceiling. */
+  limit?: RatePolicy | RatePolicy[]
+}
+
 type SchemaTuple = readonly z.ZodTypeAny[]
+
+type Handler<S extends SchemaTuple, R> = (ctx: ActionContext, ...args: ParsedArgs<S>) => Promise<R>
 
 // What the caller passes in (schema *input*). Built recursively so that a slot
 // whose schema accepts `undefined` (ZodOptional / ZodDefault) becomes an optional
@@ -46,17 +57,47 @@ type ParsedArgs<S extends SchemaTuple> = { [K in keyof S]: z.output<S[K]> }
  *
  * Next.js control-flow signals (`redirect()`, `notFound()`) are re-thrown intact.
  *
+ * When a rate-limit policy is configured and the caller exceeds it, the action
+ * **returns** a {@link RateLimited} signal (`{ rateLimited, retryAfter }`) instead
+ * of throwing — so the retry timing survives the server→client boundary (Next.js
+ * strips fields and redacts messages from thrown server-action errors). The return
+ * type widens to `R | RateLimited`, so call sites are forced to handle it.
+ *
  * @param schemas Zod schemas matched one-to-one against the action arguments.
  * @param handler Receives the auth context and the parsed arguments.
+ * @param opts Optional per-action config (e.g. a rate-limit policy).
  * @returns An async function with the same argument shape the client calls.
  */
 export function authedAction<const S extends SchemaTuple, R>(
   schemas: S,
-  handler: (ctx: ActionContext, ...args: ParsedArgs<S>) => Promise<R>,
-): (...args: InputArgs<S>) => Promise<R> {
-  return async (...args: InputArgs<S>): Promise<R> => {
+  handler: Handler<S, R>,
+): (...args: InputArgs<S>) => Promise<R>
+export function authedAction<const S extends SchemaTuple, R>(
+  schemas: S,
+  handler: Handler<S, R>,
+  opts: ActionOptions,
+): (...args: InputArgs<S>) => Promise<R | RateLimited>
+export function authedAction<const S extends SchemaTuple, R>(
+  schemas: S,
+  handler: Handler<S, R>,
+  opts?: ActionOptions,
+): (...args: InputArgs<S>) => Promise<R | RateLimited> {
+  return async (...args: InputArgs<S>): Promise<R | RateLimited> => {
     const { userId } = await auth()
     if (!userId) throw new UnauthorizedError(t('errors.unauthorized'))
+
+    // Rate limiting runs before validation/work, and only for sensitive/expensive
+    // actions (writes, imports, candles) — reads stay Redis-free so Upstash usage
+    // stays well within its free tier; read floods are bounded by Vercel/Neon's own
+    // caps. A per-user `global` ceiling is checked alongside the action's own policy.
+    // No-ops entirely unless Upstash is configured; on a hit we return (not throw).
+    if (opts?.limit) {
+      const policies: RatePolicy[] = ['global', ...(Array.isArray(opts.limit) ? opts.limit : [opts.limit])]
+      for (const policy of policies) {
+        const retryAfter = await enforceRateLimit(policy, userId)
+        if (retryAfter !== null) return { rateLimited: true, retryAfter }
+      }
+    }
 
     let parsed: ParsedArgs<S>
     try {
@@ -82,4 +123,20 @@ export function authedAction<const S extends SchemaTuple, R>(
       throw new ActionError('INTERNAL', t('errors.internal'))
     }
   }
+}
+
+/** `authedAction` pre-tagged with the `mutation` rate-limit policy (writes). */
+export function mutationAction<const S extends SchemaTuple, R>(
+  schemas: S,
+  handler: Handler<S, R>,
+): (...args: InputArgs<S>) => Promise<R | RateLimited> {
+  return authedAction(schemas, handler, { limit: 'mutation' })
+}
+
+/** `authedAction` pre-tagged with the `import` rate-limit policy (bulk inserts). */
+export function importAction<const S extends SchemaTuple, R>(
+  schemas: S,
+  handler: Handler<S, R>,
+): (...args: InputArgs<S>) => Promise<R | RateLimited> {
+  return authedAction(schemas, handler, { limit: 'import' })
 }

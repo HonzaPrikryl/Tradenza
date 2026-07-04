@@ -17,6 +17,7 @@ import { useDashboardData } from '../DashboardDataContext'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import DayDetailDialog from './DayDetailDialog'
 import { t, tList } from '@/i18n'
+import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { getUiLocale } from '@/i18n/config'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 
@@ -124,7 +125,7 @@ function CalendarWidget({ instance }: { instance: WidgetInstance }) {
     setStats(next)
     if (!editing)
       startSave(async () => {
-        await updateWidgetSettings(instance.id, { stats: next })
+        if (handleRateLimit(await updateWidgetSettings(instance.id, { stats: next }))) return
       })
   }
 

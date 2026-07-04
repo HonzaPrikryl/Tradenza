@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { t } from '@/i18n'
 import { uuid, uuidArray, dateKey, year as yearSchema, month as monthSchema } from '@/lib/validation'
-import { authedAction } from '@/lib/safe-action'
+import { authedAction, mutationAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { dayKeyInTz, shiftDay } from '@/lib/date-tz'
@@ -154,7 +154,7 @@ export const getRules = authedAction([], async ({ userId }): Promise<ProgressRul
 
 // ─── Rules: CRUD ──────────────────────────────────────────────────────────────
 
-export const createRule = authedAction([ruleSchema], async ({ userId }, { name, description, activeDays }) => {
+export const createRule = mutationAction([ruleSchema], async ({ userId }, { name, description, activeDays }) => {
   const maxRow = await db
     .select({ m: sql<number>`coalesce(max(${progressRules.sortOrder}), -1)`.mapWith(Number) })
     .from(progressRules)
@@ -169,7 +169,7 @@ export const createRule = authedAction([ruleSchema], async ({ userId }, { name, 
   return { success: true, rule }
 })
 
-export const updateRule = authedAction(
+export const updateRule = mutationAction(
   [uuid, ruleSchema],
   async ({ userId }, id, { name, description, activeDays }) => {
     const [rule] = await db
@@ -182,7 +182,7 @@ export const updateRule = authedAction(
   },
 )
 
-export const toggleRuleActive = authedAction([uuid, z.boolean()], async ({ userId }, id, active) => {
+export const toggleRuleActive = mutationAction([uuid, z.boolean()], async ({ userId }, id, active) => {
   await db
     .update(progressRules)
     .set({ active, updatedAt: new Date() })
@@ -191,7 +191,7 @@ export const toggleRuleActive = authedAction([uuid, z.boolean()], async ({ userI
   return { success: true }
 })
 
-export const deleteRule = authedAction([uuid], async ({ userId }, id) => {
+export const deleteRule = mutationAction([uuid], async ({ userId }, id) => {
   // Soft-delete: archive instead of dropping the row, so the days this rule was
   // already in effect (and its completions) stay intact. It leaves the rules list
   // but still counts toward past days.
@@ -203,7 +203,7 @@ export const deleteRule = authedAction([uuid], async ({ userId }, id) => {
   return { success: true }
 })
 
-export const reorderRules = authedAction([uuidArray], async ({ userId }, orderedIds) => {
+export const reorderRules = mutationAction([uuidArray], async ({ userId }, orderedIds) => {
   await Promise.all(
     orderedIds.map((id, i) =>
       db
@@ -252,7 +252,7 @@ export const getDayProgress = authedAction([dateKey], async ({ userId }, day): P
   }
 })
 
-export const toggleRuleCompletion = authedAction(
+export const toggleRuleCompletion = mutationAction(
   [uuid, dateKey, z.boolean()],
   async ({ userId }, ruleId, day, completed) => {
     if (day !== (await todayKey())) {
@@ -292,7 +292,7 @@ export const getDailyNote = authedAction([dateKey], async ({ userId }, day): Pro
   return row?.note ?? ''
 })
 
-export const setDayNote = authedAction([dateKey, z.string()], async ({ userId }, day, note) => {
+export const setDayNote = mutationAction([dateKey, z.string()], async ({ userId }, day, note) => {
   const text = note.slice(0, NOTE_MAX)
 
   await db
