@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { t } from '@/i18n'
 import { cn } from '@/lib/utils'
 import Modal from '@/components/ui/Modal'
@@ -67,8 +68,8 @@ export default function RuleDialog({
       toast.success(mode === 'edit' ? t('progress.rules.toast.updated') : t('progress.rules.toast.created'))
       onClose()
       onSaved?.()
-    } catch {
-      toast.error(t('progress.rules.toast.saveError'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
     } finally {
       setSaving(false)
     }

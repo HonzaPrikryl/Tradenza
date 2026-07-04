@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { Target, ListChecks, CalendarRange } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -86,8 +87,8 @@ export default function ProgressClient({
         setDay(d)
         setYearData(y)
         setStats(s)
-      } catch {
-        toast.error(t('progress.rules.toast.saveError'))
+      } catch (err) {
+        toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
         setDay(await getDayProgress(today))
       }
     })

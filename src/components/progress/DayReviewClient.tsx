@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { ArrowLeft, ChevronRight, Sparkles, ListChecks, Lock } from 'lucide-react'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { formatCurrency, axisUnit, cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { getUiLocale } from '@/i18n/config'
@@ -74,9 +75,9 @@ export default function DayReviewClient({
       try {
         await toggleRuleCompletion(ruleId, date, next)
         router.refresh()
-      } catch {
+      } catch (err) {
         setRules((arr) => arr.map((r) => (r.id === ruleId ? { ...r, completed: !next } : r)))
-        toast.error(t('progress.rules.toast.saveError'))
+        toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
       }
     })
   }

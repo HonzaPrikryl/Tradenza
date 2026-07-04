@@ -1,8 +1,9 @@
 'use server'
 
-import { auth } from '@clerk/nextjs/server'
 import { db, trades, marketCandles } from '@/lib/db'
 import { and, eq } from 'drizzle-orm'
+import { uuid } from '@/lib/validation'
+import { authedAction } from '@/lib/safe-action'
 
 // Historical API: https://databento.com/docs/api-reference-historical
 
@@ -28,12 +29,6 @@ const PADDING_BY_INTERVAL: Record<number, number> = {
 const AVAILABILITY_LAG = 20 * 60
 
 const MONTH_CODE = /[FGHJKMNQUVXZ]\d{1,2}$/
-
-async function getUserId(): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized')
-  return userId
-}
 
 function aggregate(candles: Candle[], fromSec: number, toSec: number): Candle[] {
   if (toSec === fromSec) return candles
@@ -147,9 +142,7 @@ async function fetchDatabento(
   return candles
 }
 
-export async function getTradeCandles(tradeId: string): Promise<CandlesResult> {
-  const userId = await getUserId()
-
+export const getTradeCandles = authedAction([uuid], async ({ userId }, tradeId): Promise<CandlesResult> => {
   const trade = await db.query.trades.findFirst({
     where: and(eq(trades.id, tradeId), eq(trades.userId, userId)),
   })
@@ -246,4 +239,4 @@ export async function getTradeCandles(tradeId: string): Promise<CandlesResult> {
 
   const out = slice(merged)
   return out.length > 0 ? { status: 'ok', intervalSec, candles: out } : { status: 'noData' }
-}
+})

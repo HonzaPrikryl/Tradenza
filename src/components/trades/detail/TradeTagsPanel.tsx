@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ChevronDown, Check, Plus, X, Settings2, MoreHorizontal, Pencil, Trash2, GripVertical } from 'lucide-react'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { cn } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
 import { UNGROUPED_ID } from '@/lib/tags-constants'
@@ -58,8 +59,8 @@ function GroupSelect({
       setQuery('')
       onCreated()
       if (res?.tag?.id) onToggle(res.tag.id)
-    } catch {
-      toast.error(t('trades.tagSelector.createFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.tagSelector.createFailed'))
     } finally {
       setSaving(false)
     }
@@ -77,8 +78,8 @@ function GroupSelect({
       await updateTag(v.id, { name, color: v.color })
       setEditingId(null)
       onCreated()
-    } catch {
-      toast.error(t('trades.detail.tags.updateTagFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.detail.tags.updateTagFailed'))
     } finally {
       setBusy(false)
     }
@@ -96,8 +97,8 @@ function GroupSelect({
       await deleteTag(v.id)
       setEditingId(null)
       onCreated()
-    } catch {
-      toast.error(t('trades.detail.tags.deleteTagFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.detail.tags.deleteTagFailed'))
     } finally {
       setBusy(false)
     }
@@ -267,8 +268,8 @@ function CategoryHeader({
       await updateTagGroup(group.id, { name: n, color: group.color })
       setEditing(false)
       onReload()
-    } catch {
-      toast.error(t('trades.detail.tags.updateCategoryFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.detail.tags.updateCategoryFailed'))
     } finally {
       setBusy(false)
     }
@@ -278,8 +279,8 @@ function CategoryHeader({
     try {
       await updateTagGroup(group.id, { name: group.name, color })
       onReload()
-    } catch {
-      toast.error(t('trades.detail.tags.updateCategoryFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.detail.tags.updateCategoryFailed'))
     }
   }
 
@@ -295,8 +296,8 @@ function CategoryHeader({
     try {
       await deleteTagGroup(group.id)
       onReload()
-    } catch {
-      toast.error(t('trades.detail.tags.deleteCategoryFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.detail.tags.deleteCategoryFailed'))
     }
   }
 
@@ -436,8 +437,8 @@ export default function TradeTagsPanel({
     setGroups([...next, ...ungroupedGroups]) // optimistic
     try {
       await reorderTagGroups(orderedRealIds)
-    } catch {
-      toast.error(t('trades.detail.tags.reorderFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.detail.tags.reorderFailed'))
       reload()
     }
   }
@@ -457,9 +458,9 @@ export default function TradeTagsPanel({
     setSelected(next) // optimistic
     try {
       await setTradeTags(tradeId, next)
-    } catch {
+    } catch (err) {
       setSelected(prev)
-      toast.error(t('trades.detail.tags.updateFailed'))
+      toast.error(getActionErrorMessage(err, 'trades.detail.tags.updateFailed'))
     }
   }
 
@@ -472,8 +473,8 @@ export default function TradeTagsPanel({
       setGroupName('')
       setCreatingGroup(false)
       await reload()
-    } catch {
-      toast.error(t('trades.tagSelector.createGroupFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.tagSelector.createGroupFailed'))
     } finally {
       setSavingGroup(false)
     }

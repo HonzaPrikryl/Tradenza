@@ -9,6 +9,7 @@ import meta from './locales/en/meta.json'
 import landing from './locales/en/landing.json'
 import notfound from './locales/en/notfound.json'
 import error from './locales/en/error.json'
+import errors from './locales/en/errors.json'
 import dashboard from './locales/en/dashboard.json'
 import stats from './locales/en/stats.json'
 import trades from './locales/en/trades.json'
@@ -32,6 +33,7 @@ const en = {
   landing,
   notfound,
   error,
+  errors,
   dashboard,
   stats,
   trades,

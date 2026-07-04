@@ -8,6 +8,7 @@ import { t, tRich } from '@/i18n'
 import { cn } from '@/lib/utils'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import { deleteImport } from '@/lib/actions/wizard'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 
 interface DeleteImportButtonProps {
   id: string
@@ -37,8 +38,8 @@ export default function DeleteImportButton({ id, filename, trades }: DeleteImpor
       const res = await deleteImport(id)
       toast.success(t('settings.importHistory.toast.deleted', { count: res.deletedTrades }))
       router.refresh()
-    } catch {
-      toast.error(t('settings.importHistory.toast.deleteFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'settings.importHistory.toast.deleteFailed'))
     } finally {
       setDeleting(false)
     }

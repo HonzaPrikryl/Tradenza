@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { Pencil, Check, X, Trash2 } from 'lucide-react'
 import { cn, formatCurrency, formatDateTime } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
@@ -97,7 +98,7 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
       router.refresh()
       return true
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('trades.detail.exec.saveError'))
+      toast.error(getActionErrorMessage(e, 'trades.detail.exec.saveError'))
       return false
     } finally {
       setSaving(false)

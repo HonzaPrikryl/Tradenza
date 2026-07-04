@@ -1,17 +1,13 @@
 'use server'
 
-import { auth } from '@clerk/nextjs/server'
 import { db, accounts, trades } from '@/lib/db'
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { t } from '@/i18n'
-
-async function getUserId(): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized')
-  return userId
-}
+import { uuid } from '@/lib/validation'
+import { authedAction } from '@/lib/safe-action'
+import { NotFoundError, ValidationError } from '@/lib/action-errors'
 
 export interface AccountWithStats {
   id: string
@@ -65,42 +61,42 @@ async function provisionGenericIfEmpty(userId: string) {
   }
 }
 
-export async function getAccounts(includeArchived = false): Promise<AccountWithStats[]> {
-  const userId = await getUserId()
-  await provisionGenericIfEmpty(userId)
+export const getAccounts = authedAction(
+  [z.boolean().default(false)],
+  async ({ userId }, includeArchived): Promise<AccountWithStats[]> => {
+    await provisionGenericIfEmpty(userId)
 
-  const rows = await db
-    .select({
-      id: accounts.id,
-      name: accounts.name,
-      firm: accounts.firm,
-      broker: accounts.broker,
-      timezone: accounts.timezone,
-      accountSize: accounts.accountSize,
-      phase: accounts.phase,
-      startingBalance: accounts.startingBalance,
-      currency: accounts.currency,
-      isDefault: accounts.isDefault,
-      archived: accounts.archived,
-      tradeCount: sql<number>`count(${trades.id})`.mapWith(Number),
-      netPnl: sql<number>`coalesce(sum(${trades.netPnl}), 0)`.mapWith(Number),
-      lastTradeAt: sql<string | null>`max(${trades.updatedAt})::text`,
-      importedCount: sql<number>`count(${trades.id}) filter (where ${trades.importSource} = 'csv')`.mapWith(Number),
-    })
-    .from(accounts)
-    .leftJoin(trades, eq(trades.accountId, accounts.id))
-    .where(
-      includeArchived ? eq(accounts.userId, userId) : and(eq(accounts.userId, userId), eq(accounts.archived, false)),
-    )
-    .groupBy(accounts.id)
-    .orderBy(accounts.createdAt)
+    const rows = await db
+      .select({
+        id: accounts.id,
+        name: accounts.name,
+        firm: accounts.firm,
+        broker: accounts.broker,
+        timezone: accounts.timezone,
+        accountSize: accounts.accountSize,
+        phase: accounts.phase,
+        startingBalance: accounts.startingBalance,
+        currency: accounts.currency,
+        isDefault: accounts.isDefault,
+        archived: accounts.archived,
+        tradeCount: sql<number>`count(${trades.id})`.mapWith(Number),
+        netPnl: sql<number>`coalesce(sum(${trades.netPnl}), 0)`.mapWith(Number),
+        lastTradeAt: sql<string | null>`max(${trades.updatedAt})::text`,
+        importedCount: sql<number>`count(${trades.id}) filter (where ${trades.importSource} = 'csv')`.mapWith(Number),
+      })
+      .from(accounts)
+      .leftJoin(trades, eq(trades.accountId, accounts.id))
+      .where(
+        includeArchived ? eq(accounts.userId, userId) : and(eq(accounts.userId, userId), eq(accounts.archived, false)),
+      )
+      .groupBy(accounts.id)
+      .orderBy(accounts.createdAt)
 
-  return rows
-}
+    return rows
+  },
+)
 
-export async function ensureDefaultAccount(): Promise<string> {
-  const userId = await getUserId()
-
+export const ensureDefaultAccount = authedAction([], async ({ userId }): Promise<string> => {
   let def = await db.query.accounts.findFirst({
     where: and(eq(accounts.userId, userId), eq(accounts.isDefault, true)),
   })
@@ -128,12 +124,9 @@ export async function ensureDefaultAccount(): Promise<string> {
   revalidatePath('/trades')
   revalidatePath('/accounts')
   return def!.id
-}
+})
 
-export async function createAccount(input: AccountInput) {
-  const userId = await getUserId()
-  const v = accountSchema.parse(input)
-
+export const createAccount = authedAction([accountSchema], async ({ userId }, v) => {
   const existingCount = await db
     .select({ count: sql<number>`count(*)`.mapWith(Number) })
     .from(accounts)
@@ -160,12 +153,9 @@ export async function createAccount(input: AccountInput) {
   revalidatePath('/accounts')
   revalidatePath('/trades')
   return { success: true, account }
-}
+})
 
-export async function updateAccount(id: string, input: AccountInput) {
-  const userId = await getUserId()
-  const v = accountSchema.parse(input)
-
+export const updateAccount = authedAction([uuid, accountSchema], async ({ userId }, id, v) => {
   const [account] = await db
     .update(accounts)
     .set({
@@ -185,11 +175,9 @@ export async function updateAccount(id: string, input: AccountInput) {
   revalidatePath('/accounts')
   revalidatePath('/trades')
   return { success: true, account }
-}
+})
 
-export async function setDefaultAccount(id: string) {
-  const userId = await getUserId()
-
+export const setDefaultAccount = authedAction([uuid], async ({ userId }, id) => {
   await db
     .update(accounts)
     .set({ isDefault: false })
@@ -202,37 +190,34 @@ export async function setDefaultAccount(id: string) {
 
   revalidatePath('/accounts')
   return { success: true }
-}
+})
 
-export async function setAccountArchived(id: string, archived: boolean) {
-  const userId = await getUserId()
+export const setAccountArchived = authedAction([uuid, z.boolean()], async ({ userId }, id, archived) => {
   await db
     .update(accounts)
     .set({ archived })
     .where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
   revalidatePath('/accounts')
   return { success: true }
-}
+})
 
-export async function clearAccountTrades(id: string) {
-  const userId = await getUserId()
+export const clearAccountTrades = authedAction([uuid], async ({ userId }, id) => {
   await db.delete(trades).where(and(eq(trades.userId, userId), eq(trades.accountId, id)))
   revalidatePath('/accounts')
   revalidatePath('/trades')
   revalidatePath('/dashboard')
   revalidatePath('/add-trade')
   return { success: true }
-}
+})
 
-export async function transferTrades(fromId: string, toId: string) {
-  const userId = await getUserId()
-  if (!toId || fromId === toId) throw new Error('Invalid target account')
+export const transferTrades = authedAction([uuid, uuid], async ({ userId }, fromId, toId) => {
+  if (fromId === toId) throw new ValidationError(t('errors.account.invalidTarget'))
 
   const [source, target] = await Promise.all([
     db.query.accounts.findFirst({ where: and(eq(accounts.id, fromId), eq(accounts.userId, userId)) }),
     db.query.accounts.findFirst({ where: and(eq(accounts.id, toId), eq(accounts.userId, userId)) }),
   ])
-  if (!source || !target) throw new Error('Account not found')
+  if (!source || !target) throw new NotFoundError(t('errors.account.notFound'))
 
   const moved = await db
     .update(trades)
@@ -245,12 +230,11 @@ export async function transferTrades(fromId: string, toId: string) {
   revalidatePath('/trades')
   revalidatePath('/dashboard')
   return { success: true, moved: moved.length }
-}
+})
 
-export async function deleteAccount(id: string) {
-  const userId = await getUserId()
+export const deleteAccount = authedAction([uuid], async ({ userId }, id) => {
   await db.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
   revalidatePath('/accounts')
   revalidatePath('/trades')
   return { success: true }
-}
+})

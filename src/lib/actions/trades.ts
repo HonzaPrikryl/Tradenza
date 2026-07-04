@@ -1,6 +1,5 @@
 'use server'
 
-import { auth } from '@clerk/nextjs/server'
 import { db, trades, tags, tradeTags, accounts } from '@/lib/db'
 import { eq, and, or, desc, asc, gte, lte, ilike, inArray, count } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
@@ -14,14 +13,12 @@ import { generalConditions } from './filter-sql'
 import { getDemoTrades } from '@/lib/demo/trades'
 import { userHasTrades } from '@/lib/demo/detect'
 import { z } from 'zod'
+import { uuid, uuidArray } from '@/lib/validation'
+import { authedAction } from '@/lib/safe-action'
+import { NotFoundError, ValidationError } from '@/lib/action-errors'
+import { t } from '@/i18n'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function getAuthenticatedUserId(): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized')
-  return userId
-}
 
 type TradeFormInput = z.infer<typeof tradeFormSchema>
 
@@ -82,33 +79,6 @@ function buildTradeColumns(v: TradeFormInput) {
   }
 }
 
-// ─── Create trade ─────────────────────────────────────────────────────────────
-
-export async function createTrade(
-  data: z.infer<typeof tradeFormSchema>,
-  tagIds: string[] = [],
-  accountId: string | null = null,
-) {
-  const userId = await getAuthenticatedUserId()
-  const validated = tradeFormSchema.parse(data)
-
-  const [trade] = await db
-    .insert(trades)
-    .values({
-      userId,
-      accountId: accountId || null,
-      ...buildTradeColumns(validated),
-      importSource: 'manual',
-    })
-    .returning()
-
-  await assignTags(trade.id, userId, tagIds)
-
-  revalidatePath('/dashboard')
-  revalidatePath('/trades')
-  return { success: true, trade }
-}
-
 async function assignTags(tradeId: string, userId: string, tagIds: string[]) {
   await db.delete(tradeTags).where(eq(tradeTags.tradeId, tradeId))
   if (tagIds.length === 0) return
@@ -122,52 +92,67 @@ async function assignTags(tradeId: string, userId: string, tagIds: string[]) {
   }
 }
 
+// ─── Create trade ─────────────────────────────────────────────────────────────
+
+export const createTrade = authedAction(
+  [tradeFormSchema, uuidArray.default([]), uuid.nullable().default(null)],
+  async ({ userId }, validated, tagIds, accountId) => {
+    const [trade] = await db
+      .insert(trades)
+      .values({
+        userId,
+        accountId: accountId || null,
+        ...buildTradeColumns(validated),
+        importSource: 'manual',
+      })
+      .returning()
+
+    await assignTags(trade.id, userId, tagIds)
+
+    revalidatePath('/dashboard')
+    revalidatePath('/trades')
+    return { success: true, trade }
+  },
+)
+
 // ─── Update trade ─────────────────────────────────────────────────────────────
 
-export async function updateTrade(
-  id: string,
-  data: z.infer<typeof tradeFormSchema>,
-  tagIds?: string[],
-  accountId?: string | null,
-) {
-  const userId = await getAuthenticatedUserId()
-  const validated = tradeFormSchema.parse(data)
-
-  const existing = await db.query.trades.findFirst({
-    where: and(eq(trades.id, id), eq(trades.userId, userId)),
-  })
-  if (!existing) throw new Error('Trade not found')
-
-  const [updated] = await db
-    .update(trades)
-    .set({
-      // accountId is only touched when the caller passes it explicitly.
-      ...(accountId !== undefined ? { accountId: accountId || null } : {}),
-      ...buildTradeColumns(validated),
-      updatedAt: new Date(),
+export const updateTrade = authedAction(
+  [uuid, tradeFormSchema, uuidArray.optional(), uuid.nullable().optional()],
+  async ({ userId }, id, validated, tagIds, accountId) => {
+    const existing = await db.query.trades.findFirst({
+      where: and(eq(trades.id, id), eq(trades.userId, userId)),
     })
-    .where(and(eq(trades.id, id), eq(trades.userId, userId)))
-    .returning()
+    if (!existing) throw new NotFoundError(t('errors.trade.notFound'))
 
-  if (tagIds !== undefined) {
-    await assignTags(id, userId, tagIds)
-  }
+    const [updated] = await db
+      .update(trades)
+      .set({
+        // accountId is only touched when the caller passes it explicitly.
+        ...(accountId !== undefined ? { accountId: accountId || null } : {}),
+        ...buildTradeColumns(validated),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(trades.id, id), eq(trades.userId, userId)))
+      .returning()
 
-  revalidatePath('/dashboard')
-  revalidatePath('/trades')
-  revalidatePath(`/trades/${id}`)
-  return { success: true, trade: updated }
-}
+    if (tagIds !== undefined) {
+      await assignTags(id, userId, tagIds)
+    }
+
+    revalidatePath('/dashboard')
+    revalidatePath('/trades')
+    revalidatePath(`/trades/${id}`)
+    return { success: true, trade: updated }
+  },
+)
 
 const journalSchema = z.object({
   notes: z.string().max(8_000_000).nullable().optional(),
   rating: z.number().min(0).max(5).multipleOf(0.5).nullable().optional(),
 })
 
-export async function updateTradeJournal(id: string, input: z.infer<typeof journalSchema>) {
-  const userId = await getAuthenticatedUserId()
-  const v = journalSchema.parse(input)
-
+export const updateTradeJournal = authedAction([uuid, journalSchema], async ({ userId }, id, v) => {
   const set: Partial<{ notes: string | null; rating: number | null; updatedAt: Date }> = {
     updatedAt: new Date(),
   }
@@ -179,11 +164,11 @@ export async function updateTradeJournal(id: string, input: z.infer<typeof journ
     .set(set)
     .where(and(eq(trades.id, id), eq(trades.userId, userId)))
     .returning({ id: trades.id })
-  if (!updated) throw new Error('Trade not found')
+  if (!updated) throw new NotFoundError(t('errors.trade.notFound'))
 
   revalidatePath('/trades')
   return { success: true }
-}
+})
 
 // ─── Risk plan: profit targets + stop losses (ticks/qty) from detail ─────────────
 
@@ -198,14 +183,11 @@ const riskPlanSchema = z.object({
   stopLosses: z.array(legSchema).max(20),
 })
 
-export async function updateTradeRiskPlan(id: string, input: z.infer<typeof riskPlanSchema>) {
-  const userId = await getAuthenticatedUserId()
-  const plan = riskPlanSchema.parse(input)
-
+export const updateTradeRiskPlan = authedAction([uuid, riskPlanSchema], async ({ userId }, id, plan) => {
   const existing = await db.query.trades.findFirst({
     where: and(eq(trades.id, id), eq(trades.userId, userId)),
   })
-  if (!existing) throw new Error('Trade not found')
+  if (!existing) throw new NotFoundError(t('errors.trade.notFound'))
 
   const targetUsd = plan.profitTargets.reduce((s, l) => s + l.ticks * l.qty * plan.tickValue, 0)
   const riskUsd = plan.stopLosses.reduce((s, l) => s + l.ticks * l.qty * plan.tickValue, 0)
@@ -227,7 +209,7 @@ export async function updateTradeRiskPlan(id: string, input: z.infer<typeof risk
   revalidatePath('/trades')
   revalidatePath(`/trades/${id}`)
   return { success: true, targetUsd, riskUsd, rr }
-}
+})
 
 const execEditSchema = z.object({
   datetime: z.string().min(1),
@@ -243,18 +225,15 @@ const execUpdateSchema = z.object({
   executions: z.array(execEditSchema).min(1),
 })
 
-export async function updateTradeExecutions(tradeId: string, input: z.infer<typeof execUpdateSchema>) {
-  const userId = await getAuthenticatedUserId()
-  const v = execUpdateSchema.parse(input)
-
+export const updateTradeExecutions = authedAction([uuid, execUpdateSchema], async ({ userId }, tradeId, v) => {
   const existing = await db.query.trades.findFirst({
     where: and(eq(trades.id, tradeId), eq(trades.userId, userId)),
   })
-  if (!existing) throw new Error('Trade not found')
+  if (!existing) throw new NotFoundError(t('errors.trade.notFound'))
 
   const execs = [...v.executions].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())
   for (const e of execs) {
-    if (isNaN(new Date(e.datetime).getTime())) throw new Error('Invalid execution date')
+    if (isNaN(new Date(e.datetime).getTime())) throw new ValidationError(t('errors.execution.invalidDate'))
   }
 
   const direction: 'long' | 'short' = execs[0].side === 'buy' ? 'long' : 'short'
@@ -322,39 +301,35 @@ export async function updateTradeExecutions(tradeId: string, input: z.infer<type
   revalidatePath('/dashboard')
   revalidatePath('/accounts')
   return { success: true }
-}
+})
 
 // ─── Delete trade ─────────────────────────────────────────────────────────────
 
-export async function deleteTrade(id: string) {
-  const userId = await getAuthenticatedUserId()
-
+export const deleteTrade = authedAction([uuid], async ({ userId }, id) => {
   await db.delete(trades).where(and(eq(trades.id, id), eq(trades.userId, userId)))
 
   revalidatePath('/dashboard')
   revalidatePath('/trades')
   return { success: true }
-}
+})
 
-export async function deleteTrades(ids: string[]) {
-  const userId = await getAuthenticatedUserId()
+export const deleteTrades = authedAction([uuidArray], async ({ userId }, ids) => {
   if (ids.length === 0) return { success: true, count: 0 }
   await db.delete(trades).where(and(eq(trades.userId, userId), inArray(trades.id, ids)))
   revalidatePath('/dashboard')
   revalidatePath('/trades')
   revalidatePath('/accounts')
   return { success: true, count: ids.length }
-}
+})
 
-export async function addTagToTrades(ids: string[], tagId: string) {
-  const userId = await getAuthenticatedUserId()
+export const addTagToTrades = authedAction([uuidArray, uuid], async ({ userId }, ids, tagId) => {
   if (ids.length === 0) return { success: true, added: 0 }
 
   const tag = await db.query.tags.findFirst({
     where: and(eq(tags.id, tagId), eq(tags.userId, userId)),
     columns: { id: true },
   })
-  if (!tag) throw new Error('Tag not found')
+  if (!tag) throw new NotFoundError(t('errors.tag.notFound'))
 
   const owned = await db
     .select({ id: trades.id })
@@ -373,17 +348,16 @@ export async function addTagToTrades(ids: string[], tagId: string) {
 
   revalidatePath('/trades')
   return { success: true, added: toAdd.length }
-}
+})
 
-export async function setTradesAccount(ids: string[], accountId: string) {
-  const userId = await getAuthenticatedUserId()
+export const setTradesAccount = authedAction([uuidArray, uuid], async ({ userId }, ids, accountId) => {
   if (ids.length === 0) return { success: true, count: 0 }
 
   const acc = await db.query.accounts.findFirst({
     where: and(eq(accounts.id, accountId), eq(accounts.userId, userId)),
     columns: { id: true },
   })
-  if (!acc) throw new Error('Account not found')
+  if (!acc) throw new NotFoundError(t('errors.account.notFound'))
 
   await db
     .update(trades)
@@ -394,9 +368,29 @@ export async function setTradesAccount(ids: string[], accountId: string) {
   revalidatePath('/dashboard')
   revalidatePath('/accounts')
   return { success: true, count: ids.length }
-}
+})
 
 // ─── Get trades (with filters) ────────────────────────────────────────────────────
+
+// Filters originate from client UI state, so validate the shape before it reaches SQL.
+const tradeFiltersSchema = z
+  .object({
+    search: z.string().optional(),
+    direction: z.enum(['long', 'short', 'all']).optional(),
+    status: z.enum(['open', 'closed', 'cancelled', 'all']).optional(),
+    assetClass: z.string().optional(),
+    tagId: z.string().optional(),
+    dateFrom: z.string().optional(),
+    dateTo: z.string().optional(),
+    setupName: z.string().optional(),
+    minPnl: z.number().optional(),
+    maxPnl: z.number().optional(),
+    page: z.number().int().positive().optional(),
+    pageSize: z.number().int().positive().max(500).optional(),
+    sortBy: z.enum(['entryDatetime', 'netPnl', 'symbol']).optional(),
+    sortOrder: z.enum(['asc', 'desc']).optional(),
+  })
+  .default({})
 
 async function buildTradeConditions(userId: string, filters: TradeFilters) {
   const { direction, status, assetClass, tagId, dateFrom, dateTo, setupName, minPnl, maxPnl, search } = filters
@@ -429,35 +423,33 @@ async function buildTradeConditions(userId: string, filters: TradeFilters) {
   return conditions
 }
 
-export async function getFilteredTradeIds(filters: TradeFilters = {}): Promise<string[]> {
-  const userId = await getAuthenticatedUserId()
-  const conditions = await buildTradeConditions(userId, filters)
-  const rows = await db
-    .select({ id: trades.id })
-    .from(trades)
-    .where(and(...conditions))
-  return rows.map((r) => r.id)
-}
+export const getFilteredTradeIds = authedAction(
+  [tradeFiltersSchema],
+  async ({ userId }, filters): Promise<string[]> => {
+    const conditions = await buildTradeConditions(userId, filters)
+    const rows = await db
+      .select({ id: trades.id })
+      .from(trades)
+      .where(and(...conditions))
+    return rows.map((r) => r.id)
+  },
+)
 
-export async function getTradeSymbols(): Promise<string[]> {
-  const userId = await getAuthenticatedUserId()
+export const getTradeSymbols = authedAction([], async ({ userId }): Promise<string[]> => {
   const rows = await db
     .selectDistinct({ symbol: trades.symbol })
     .from(trades)
     .where(eq(trades.userId, userId))
     .orderBy(asc(trades.symbol))
   return rows.map((r) => r.symbol)
-}
+})
 
 /** True once the user has at least one trade — used to toggle demo/onboarding. */
-export async function hasAnyTrades(): Promise<boolean> {
-  const userId = await getAuthenticatedUserId()
+export const hasAnyTrades = authedAction([], async ({ userId }): Promise<boolean> => {
   return userHasTrades(userId)
-}
+})
 
-export async function getTrades(filters: TradeFilters = {}) {
-  const userId = await getAuthenticatedUserId()
-
+export const getTrades = authedAction([tradeFiltersSchema], async ({ userId }, filters) => {
   const { page = 1, pageSize = 25, sortBy = 'entryDatetime', sortOrder = 'desc' } = filters
 
   // New user with no trades: serve the sample dataset (sorted + paginated the
@@ -511,13 +503,11 @@ export async function getTrades(filters: TradeFilters = {}) {
     pageSize,
     totalPages: Math.ceil(totalResult[0].count / pageSize),
   }
-}
+})
 
 // ─── Get single trade ─────────────────────────────────────────────────────────
 
-export async function getTradeById(id: string) {
-  const userId = await getAuthenticatedUserId()
-
+export const getTradeById = authedAction([uuid], async ({ userId }, id) => {
   const trade = await db.query.trades.findFirst({
     where: and(eq(trades.id, id), eq(trades.userId, userId)),
     with: {
@@ -529,4 +519,4 @@ export async function getTradeById(id: string) {
 
   if (!trade) return null
   return trade
-}
+})

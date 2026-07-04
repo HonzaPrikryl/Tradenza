@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Info, Target, Shield } from 'lucide-react'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { cn, formatCurrency, formatDateTimeTz, formatPercent } from '@/lib/utils'
 import { t } from '@/i18n'
 import { contractMultiplier, tickValue as tickValueFor, tickSize as tickSizeFor } from '@/lib/futures'
@@ -171,9 +172,9 @@ export default function TradeStatsPanel({
         await updateTradeRiskPlan(trade.id, { tickValue, profitTargets, stopLosses })
         setSaveState('saved')
         setTimeout(() => setSaveState('idle'), 1500)
-      } catch {
+      } catch (err) {
         setSaveState('idle')
-        toast.error(t('trades.detail.saveFailed'))
+        toast.error(getActionErrorMessage(err, 'trades.detail.saveFailed'))
       }
     }, 700)
     return () => clearTimeout(id)
@@ -185,9 +186,9 @@ export default function TradeStatsPanel({
     setRating(next)
     try {
       await updateTradeJournal(trade.id, { rating: next })
-    } catch {
+    } catch (err) {
       setRating(prev)
-      toast.error(t('trades.detail.saveFailed'))
+      toast.error(getActionErrorMessage(err, 'trades.detail.saveFailed'))
     }
   }
 

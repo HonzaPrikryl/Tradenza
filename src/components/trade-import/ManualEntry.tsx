@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -146,7 +147,7 @@ export default function ManualEntry({
         router.push('/trades')
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('addTrades.manual.saveError'))
+      toast.error(getActionErrorMessage(e, 'addTrades.manual.saveError'))
       setSaving(false)
     }
   }

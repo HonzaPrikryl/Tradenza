@@ -1,11 +1,13 @@
 'use server'
 
-import { auth } from '@clerk/nextjs/server'
 import { db, progressRules, ruleCompletions, dailyCheckins } from '@/lib/db'
 import { and, eq, sql, gte, isNull } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { t } from '@/i18n'
+import { uuid, uuidArray, dateKey, year as yearSchema, month as monthSchema } from '@/lib/validation'
+import { authedAction } from '@/lib/safe-action'
+import { NotFoundError, ValidationError } from '@/lib/action-errors'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { dayKeyInTz, shiftDay } from '@/lib/date-tz'
 import {
@@ -15,12 +17,6 @@ import {
   ALL_WEEKDAYS,
   type RuleLifecycle,
 } from '@/lib/progress-compute'
-
-async function getUserId(): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized')
-  return userId
-}
 
 async function todayKey(): Promise<string> {
   const { timezone } = await readGlobalSettings()
@@ -53,9 +49,6 @@ function completionsByDate(rows: { date: string; ruleId: string }[]): Map<string
   }
   return byDate
 }
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-const dateSchema = z.string().regex(DATE_RE)
 
 // Store schedules in canonical Mon→Sun order regardless of click order.
 const sortDays = (days: number[]) => [...days].sort((a, b) => a - b)
@@ -142,8 +135,7 @@ const ruleSchema = z.object({
     .default([...ALL_WEEKDAYS]),
 })
 
-export async function getRules(): Promise<ProgressRule[]> {
-  const userId = await getUserId()
+export const getRules = authedAction([], async ({ userId }): Promise<ProgressRule[]> => {
   // Archived (deleted) rules are kept in the DB for history but never listed.
   const rows = await db
     .select()
@@ -158,14 +150,11 @@ export async function getRules(): Promise<ProgressRule[]> {
     active: r.active,
     activeDays: r.activeDays,
   }))
-}
+})
 
 // ─── Rules: CRUD ──────────────────────────────────────────────────────────────
 
-export async function createRule(input: z.infer<typeof ruleSchema>) {
-  const userId = await getUserId()
-  const { name, description, activeDays } = ruleSchema.parse(input)
-
+export const createRule = authedAction([ruleSchema], async ({ userId }, { name, description, activeDays }) => {
   const maxRow = await db
     .select({ m: sql<number>`coalesce(max(${progressRules.sortOrder}), -1)`.mapWith(Number) })
     .from(progressRules)
@@ -178,32 +167,31 @@ export async function createRule(input: z.infer<typeof ruleSchema>) {
     .returning()
   revalidatePath('/progress')
   return { success: true, rule }
-}
+})
 
-export async function updateRule(id: string, input: z.infer<typeof ruleSchema>) {
-  const userId = await getUserId()
-  const { name, description, activeDays } = ruleSchema.parse(input)
-  const [rule] = await db
-    .update(progressRules)
-    .set({ name, description: description || null, activeDays: sortDays(activeDays), updatedAt: new Date() })
-    .where(and(eq(progressRules.id, id), eq(progressRules.userId, userId)))
-    .returning()
-  revalidatePath('/progress')
-  return { success: true, rule }
-}
+export const updateRule = authedAction(
+  [uuid, ruleSchema],
+  async ({ userId }, id, { name, description, activeDays }) => {
+    const [rule] = await db
+      .update(progressRules)
+      .set({ name, description: description || null, activeDays: sortDays(activeDays), updatedAt: new Date() })
+      .where(and(eq(progressRules.id, id), eq(progressRules.userId, userId)))
+      .returning()
+    revalidatePath('/progress')
+    return { success: true, rule }
+  },
+)
 
-export async function toggleRuleActive(id: string, active: boolean) {
-  const userId = await getUserId()
+export const toggleRuleActive = authedAction([uuid, z.boolean()], async ({ userId }, id, active) => {
   await db
     .update(progressRules)
     .set({ active, updatedAt: new Date() })
     .where(and(eq(progressRules.id, id), eq(progressRules.userId, userId)))
   revalidatePath('/progress')
   return { success: true }
-}
+})
 
-export async function deleteRule(id: string) {
-  const userId = await getUserId()
+export const deleteRule = authedAction([uuid], async ({ userId }, id) => {
   // Soft-delete: archive instead of dropping the row, so the days this rule was
   // already in effect (and its completions) stay intact. It leaves the rules list
   // but still counts toward past days.
@@ -213,10 +201,9 @@ export async function deleteRule(id: string) {
     .where(and(eq(progressRules.id, id), eq(progressRules.userId, userId)))
   revalidatePath('/progress')
   return { success: true }
-}
+})
 
-export async function reorderRules(orderedIds: string[]) {
-  const userId = await getUserId()
+export const reorderRules = authedAction([uuidArray], async ({ userId }, orderedIds) => {
   await Promise.all(
     orderedIds.map((id, i) =>
       db
@@ -227,11 +214,9 @@ export async function reorderRules(orderedIds: string[]) {
   )
   revalidatePath('/progress')
   return { success: true }
-}
+})
 
-export async function getDayProgress(date: string): Promise<DayProgress> {
-  const userId = await getUserId()
-  const day = dateSchema.parse(date)
+export const getDayProgress = authedAction([dateKey], async ({ userId }, day): Promise<DayProgress> => {
   const { timezone } = await readGlobalSettings()
   const today = dayKeyInTz(new Date(), timezone)
 
@@ -265,53 +250,49 @@ export async function getDayProgress(date: string): Promise<DayProgress> {
     totalCount: dayRules.length,
     anyRules: ruleRows.some((r) => r.archivedAt === null),
   }
-}
+})
 
-export async function toggleRuleCompletion(ruleId: string, date: string, completed: boolean) {
-  const userId = await getUserId()
-  const day = dateSchema.parse(date)
+export const toggleRuleCompletion = authedAction(
+  [uuid, dateKey, z.boolean()],
+  async ({ userId }, ruleId, day, completed) => {
+    if (day !== (await todayKey())) {
+      throw new ValidationError(t('errors.rule.notToday'))
+    }
 
-  if (day !== (await todayKey())) {
-    throw new Error('Rules can only be tracked for the current day')
-  }
+    const rule = await db.query.progressRules.findFirst({
+      where: and(eq(progressRules.id, ruleId), eq(progressRules.userId, userId)),
+      columns: { id: true, activeDays: true },
+    })
+    if (!rule) throw new NotFoundError(t('errors.rule.notFound'))
+    if (!rule.activeDays.includes(isoWeekdayOf(day))) {
+      throw new ValidationError(t('errors.rule.notScheduled'))
+    }
 
-  const rule = await db.query.progressRules.findFirst({
-    where: and(eq(progressRules.id, ruleId), eq(progressRules.userId, userId)),
-    columns: { id: true, activeDays: true },
-  })
-  if (!rule) throw new Error('Rule not found')
-  if (!rule.activeDays.includes(isoWeekdayOf(day))) {
-    throw new Error('Rule is not scheduled for this day')
-  }
-
-  if (completed) {
-    await db
-      .insert(ruleCompletions)
-      .values({ userId, ruleId, date: day })
-      .onConflictDoNothing({ target: [ruleCompletions.ruleId, ruleCompletions.date] })
-  } else {
-    await db.delete(ruleCompletions).where(and(eq(ruleCompletions.ruleId, ruleId), eq(ruleCompletions.date, day)))
-  }
-  revalidatePath('/progress')
-  revalidatePath(`/progress/${day}`)
-  return { success: true }
-}
+    if (completed) {
+      await db
+        .insert(ruleCompletions)
+        .values({ userId, ruleId, date: day })
+        .onConflictDoNothing({ target: [ruleCompletions.ruleId, ruleCompletions.date] })
+    } else {
+      await db.delete(ruleCompletions).where(and(eq(ruleCompletions.ruleId, ruleId), eq(ruleCompletions.date, day)))
+    }
+    revalidatePath('/progress')
+    revalidatePath(`/progress/${day}`)
+    return { success: true }
+  },
+)
 
 const NOTE_MAX = 8_000_000
 
-export async function getDailyNote(date: string): Promise<string> {
-  const userId = await getUserId()
-  const day = dateSchema.parse(date)
+export const getDailyNote = authedAction([dateKey], async ({ userId }, day): Promise<string> => {
   const row = await db.query.dailyCheckins.findFirst({
     where: and(eq(dailyCheckins.userId, userId), eq(dailyCheckins.date, day)),
     columns: { note: true },
   })
   return row?.note ?? ''
-}
+})
 
-export async function setDayNote(date: string, note: string) {
-  const userId = await getUserId()
-  const day = dateSchema.parse(date)
+export const setDayNote = authedAction([dateKey, z.string()], async ({ userId }, day, note) => {
   const text = note.slice(0, NOTE_MAX)
 
   await db
@@ -324,46 +305,48 @@ export async function setDayNote(date: string, note: string) {
   revalidatePath('/progress')
   revalidatePath(`/progress/${day}`)
   return { success: true }
-}
+})
 
-export async function getProgressCalendar(year: number, month: number): Promise<ProgressCalendarData> {
-  const userId = await getUserId()
-  const { timezone } = await readGlobalSettings()
-  const today = dayKeyInTz(new Date(), timezone)
-  const prefix = `${year}-${String(month).padStart(2, '0')}`
+export const getProgressCalendar = authedAction(
+  [yearSchema, monthSchema],
+  async ({ userId }, year, month): Promise<ProgressCalendarData> => {
+    const { timezone } = await readGlobalSettings()
+    const today = dayKeyInTz(new Date(), timezone)
+    const prefix = `${year}-${String(month).padStart(2, '0')}`
 
-  const [ruleRows, comps, notes] = await Promise.all([
-    db.select().from(progressRules).where(eq(progressRules.userId, userId)),
-    db
-      .select({ date: ruleCompletions.date, ruleId: ruleCompletions.ruleId })
-      .from(ruleCompletions)
-      .where(and(eq(ruleCompletions.userId, userId), sql`${ruleCompletions.date} like ${prefix + '%'}`)),
-    db
-      .select({ date: dailyCheckins.date })
-      .from(dailyCheckins)
-      .where(and(eq(dailyCheckins.userId, userId), sql`${dailyCheckins.date} like ${prefix + '%'}`)),
-  ])
+    const [ruleRows, comps, notes] = await Promise.all([
+      db.select().from(progressRules).where(eq(progressRules.userId, userId)),
+      db
+        .select({ date: ruleCompletions.date, ruleId: ruleCompletions.ruleId })
+        .from(ruleCompletions)
+        .where(and(eq(ruleCompletions.userId, userId), sql`${ruleCompletions.date} like ${prefix + '%'}`)),
+      db
+        .select({ date: dailyCheckins.date })
+        .from(dailyCheckins)
+        .where(and(eq(dailyCheckins.userId, userId), sql`${dailyCheckins.date} like ${prefix + '%'}`)),
+    ])
 
-  const lifecycles = ruleRows.map(toLifecycle(timezone))
-  const byDate = completionsByDate(comps)
-  const noteSet = new Set(notes.map((n) => n.date))
+    const lifecycles = ruleRows.map(toLifecycle(timezone))
+    const byDate = completionsByDate(comps)
+    const noteSet = new Set(notes.map((n) => n.date))
 
-  const dates = new Set<string>([...byDate.keys(), ...noteSet])
-  const days: ProgressCalendarCell[] = [...dates]
-    .sort()
-    .map((date) => buildCell(date, today, lifecycles, byDate, noteSet))
+    const dates = new Set<string>([...byDate.keys(), ...noteSet])
+    const days: ProgressCalendarCell[] = [...dates]
+      .sort()
+      .map((date) => buildCell(date, today, lifecycles, byDate, noteSet))
 
-  const ratioDays = days.filter((d) => d.completed > 0)
-  return {
-    year,
-    month,
-    days,
-    activeRules: expectedRulesOn(today, today, lifecycles),
-    monthPerfectDays: days.filter((d) => d.perfect).length,
-    monthLoggedDays: days.length,
-    monthAvgRatio: ratioDays.length ? ratioDays.reduce((a, d) => a + d.ratio, 0) / ratioDays.length : 0,
-  }
-}
+    const ratioDays = days.filter((d) => d.completed > 0)
+    return {
+      year,
+      month,
+      days,
+      activeRules: expectedRulesOn(today, today, lifecycles),
+      monthPerfectDays: days.filter((d) => d.perfect).length,
+      monthLoggedDays: days.length,
+      monthAvgRatio: ratioDays.length ? ratioDays.reduce((a, d) => a + d.ratio, 0) / ratioDays.length : 0,
+    }
+  },
+)
 
 // Build one calendar cell: completed counts only rules that were in effect that day,
 // total is the rule count in effect that day (the historically correct denominator).
@@ -382,8 +365,7 @@ function buildCell(
   return { date, completed, total, ratio, perfect: total > 0 && completed >= total, hasNote: noteSet.has(date) }
 }
 
-export async function getProgressStats(): Promise<ProgressStats> {
-  const userId = await getUserId()
+export const getProgressStats = authedAction([], async ({ userId }): Promise<ProgressStats> => {
   const { timezone } = await readGlobalSettings()
   const today = dayKeyInTz(new Date(), timezone)
 
@@ -500,7 +482,7 @@ export async function getProgressStats(): Promise<ProgressStats> {
     perRule,
     weekday,
   }
-}
+})
 
 export interface ProgressYearData {
   year: number
@@ -511,8 +493,7 @@ export interface ProgressYearData {
   avgRatio: number
 }
 
-export async function getProgressYears(): Promise<number[]> {
-  const userId = await getUserId()
+export const getProgressYears = authedAction([], async ({ userId }): Promise<number[]> => {
   const [rc, dc] = await Promise.all([
     db
       .select({ m: sql<string | null>`min(${ruleCompletions.date})` })
@@ -530,10 +511,9 @@ export async function getProgressYears(): Promise<number[]> {
   const years: number[] = []
   for (let y = currentYear; y >= minYear; y--) years.push(y)
   return years
-}
+})
 
-export async function getProgressYear(year: number): Promise<ProgressYearData> {
-  const userId = await getUserId()
+export const getProgressYear = authedAction([yearSchema], async ({ userId }, year): Promise<ProgressYearData> => {
   const { timezone } = await readGlobalSettings()
   const today = dayKeyInTz(new Date(), timezone)
   const prefix = `${year}-`
@@ -568,8 +548,6 @@ export async function getProgressYear(year: number): Promise<ProgressYearData> {
     loggedDays: days.length,
     avgRatio: ratioDays.length ? ratioDays.reduce((a, d) => a + d.ratio, 0) / ratioDays.length : 0,
   }
-}
+})
 
-export async function getTodayKey(): Promise<string> {
-  return todayKey()
-}
+export const getTodayKey = authedAction([], async (): Promise<string> => todayKey())

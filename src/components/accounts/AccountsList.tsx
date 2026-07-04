@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import {
   Plus,
   Pencil,
@@ -68,8 +69,8 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
       await fn()
       toast.success(msg)
       router.refresh()
-    } catch {
-      toast.error(t('accounts.toast.actionFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'accounts.toast.actionFailed'))
     }
   }
 
@@ -100,7 +101,7 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
       setEditing(null)
       router.refresh()
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('accounts.toast.saveError'))
+      toast.error(getActionErrorMessage(e, 'accounts.toast.saveError'))
     } finally {
       setSaving(false)
     }
@@ -115,8 +116,8 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
       toast.success(t('tradingAccounts.toast.transferred', { count: res.moved, name: target?.name ?? '' }))
       setTransferring(null)
       router.refresh()
-    } catch {
-      toast.error(t('tradingAccounts.toast.transferFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'tradingAccounts.toast.transferFailed'))
     } finally {
       setTransferSaving(false)
     }

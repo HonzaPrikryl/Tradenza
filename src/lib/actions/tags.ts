@@ -1,18 +1,14 @@
 'use server'
 
-import { auth } from '@clerk/nextjs/server'
 import { db, tags, tagGroups, tradeTags, trades } from '@/lib/db'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { t } from '@/i18n'
 import { UNGROUPED_ID } from '@/lib/tags-constants'
-
-async function getUserId(): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized')
-  return userId
-}
+import { uuid, uuidArray } from '@/lib/validation'
+import { authedAction } from '@/lib/safe-action'
+import { NotFoundError } from '@/lib/action-errors'
 
 export interface TagValue {
   id: string
@@ -41,9 +37,17 @@ const valueSchema = nameColorSchema.extend({
   groupId: z.string().uuid().optional(),
 })
 
-export async function getTagGroups(): Promise<TagGroupWithValues[]> {
-  const userId = await getUserId()
+const updateTagSchema = nameColorSchema.extend({
+  groupId: z.string().uuid().nullable().optional(),
+})
 
+// Both the trades table and the tag manager read from the same source of truth.
+function revalidateTags() {
+  revalidatePath('/trades')
+  revalidatePath('/settings/tags')
+}
+
+export const getTagGroups = authedAction([], async ({ userId }): Promise<TagGroupWithValues[]> => {
   const [groups, values] = await Promise.all([
     db.select().from(tagGroups).where(eq(tagGroups.userId, userId)).orderBy(tagGroups.sortOrder, tagGroups.name),
     db
@@ -74,14 +78,11 @@ export async function getTagGroups(): Promise<TagGroupWithValues[]> {
   }
 
   return result
-}
+})
 
 // ─── Groups: CRUD ────────────────────────────────────────────────────────────
 
-export async function createTagGroup(input: z.infer<typeof nameColorSchema>) {
-  const userId = await getUserId()
-  const { name, color } = nameColorSchema.parse(input)
-
+export const createTagGroup = authedAction([nameColorSchema], async ({ userId }, { name, color }) => {
   const existing = await db.query.tagGroups.findFirst({
     where: and(eq(tagGroups.userId, userId), sql`lower(${tagGroups.name}) = lower(${name})`),
   })
@@ -94,13 +95,11 @@ export async function createTagGroup(input: z.infer<typeof nameColorSchema>) {
   const nextOrder = (maxRow[0]?.m ?? -1) + 1
 
   const [group] = await db.insert(tagGroups).values({ userId, name, color, sortOrder: nextOrder }).returning()
-  revalidatePath('/trades')
-  revalidatePath('/settings/tags')
+  revalidateTags()
   return { success: true, group, existed: false }
-}
+})
 
-export async function reorderTagGroups(orderedIds: string[]) {
-  const userId = await getUserId()
+export const reorderTagGroups = authedAction([uuidArray], async ({ userId }, orderedIds) => {
   await Promise.all(
     orderedIds.map((id, i) =>
       db
@@ -109,38 +108,29 @@ export async function reorderTagGroups(orderedIds: string[]) {
         .where(and(eq(tagGroups.id, id), eq(tagGroups.userId, userId))),
     ),
   )
-  revalidatePath('/trades')
-  revalidatePath('/settings/tags')
+  revalidateTags()
   return { success: true }
-}
+})
 
-export async function updateTagGroup(id: string, input: z.infer<typeof nameColorSchema>) {
-  const userId = await getUserId()
-  const { name, color } = nameColorSchema.parse(input)
+export const updateTagGroup = authedAction([uuid, nameColorSchema], async ({ userId }, id, { name, color }) => {
   const [group] = await db
     .update(tagGroups)
     .set({ name, color })
     .where(and(eq(tagGroups.id, id), eq(tagGroups.userId, userId)))
     .returning()
-  revalidatePath('/trades')
-  revalidatePath('/settings/tags')
+  revalidateTags()
   return { success: true, group }
-}
+})
 
-export async function deleteTagGroup(id: string) {
-  const userId = await getUserId()
+export const deleteTagGroup = authedAction([uuid], async ({ userId }, id) => {
   await db.delete(tagGroups).where(and(eq(tagGroups.id, id), eq(tagGroups.userId, userId)))
-  revalidatePath('/trades')
-  revalidatePath('/settings/tags')
+  revalidateTags()
   return { success: true }
-}
+})
 
 // ─── Values (tags): CRUD ──────────────────────────────────────────────────────
 
-export async function createTag(input: z.infer<typeof valueSchema>) {
-  const userId = await getUserId()
-  const { name, color, groupId } = valueSchema.parse(input)
-
+export const createTag = authedAction([valueSchema], async ({ userId }, { name, color, groupId }) => {
   const existing = await db.query.tags.findFirst({
     where: and(
       eq(tags.userId, userId),
@@ -155,42 +145,34 @@ export async function createTag(input: z.infer<typeof valueSchema>) {
     .values({ userId, name, color, groupId: groupId ?? null })
     .returning()
 
-  revalidatePath('/trades')
-  revalidatePath('/settings/tags')
+  revalidateTags()
   return { success: true, tag, existed: false }
-}
+})
 
-export async function updateTag(id: string, input: { name: string; color?: string; groupId?: string | null }) {
-  const userId = await getUserId()
-  const { name, color } = nameColorSchema.parse({ name: input.name, color: input.color })
+export const updateTag = authedAction([uuid, updateTagSchema], async ({ userId }, id, { name, color, groupId }) => {
   const set: { name: string; color: string; groupId?: string | null } = { name, color }
-  if (input.groupId !== undefined) set.groupId = input.groupId || null
+  if (groupId !== undefined) set.groupId = groupId || null
   const [tag] = await db
     .update(tags)
     .set(set)
     .where(and(eq(tags.id, id), eq(tags.userId, userId)))
     .returning()
-  revalidatePath('/trades')
-  revalidatePath('/settings/tags')
+  revalidateTags()
   return { success: true, tag }
-}
+})
 
-export async function deleteTag(id: string) {
-  const userId = await getUserId()
+export const deleteTag = authedAction([uuid], async ({ userId }, id) => {
   await db.delete(tags).where(and(eq(tags.id, id), eq(tags.userId, userId)))
-  revalidatePath('/trades')
-  revalidatePath('/settings/tags')
+  revalidateTags()
   return { success: true }
-}
+})
 
-export async function setTradeTags(tradeId: string, tagIds: string[]) {
-  const userId = await getUserId()
-
+export const setTradeTags = authedAction([uuid, uuidArray], async ({ userId }, tradeId, tagIds) => {
   const trade = await db.query.trades.findFirst({
     where: and(eq(trades.id, tradeId), eq(trades.userId, userId)),
     columns: { id: true },
   })
-  if (!trade) throw new Error('Trade not found')
+  if (!trade) throw new NotFoundError(t('errors.trade.notFound'))
 
   await db.delete(tradeTags).where(eq(tradeTags.tradeId, tradeId))
 
@@ -209,4 +191,4 @@ export async function setTradeTags(tradeId: string, tagIds: string[]) {
   revalidatePath('/trades')
   revalidatePath(`/trades/${tradeId}`)
   return { success: true }
-}
+})

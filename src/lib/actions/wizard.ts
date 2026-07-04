@@ -1,6 +1,5 @@
 'use server'
 
-import { auth } from '@clerk/nextjs/server'
 import { db, accounts, trades, importLogs } from '@/lib/db'
 import { and, eq, gte, desc, inArray } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
@@ -11,20 +10,17 @@ import { contractMultiplier } from '@/lib/futures'
 import { IMPORT_REQUIRED, FILL_REQUIRED } from '@/lib/csv-columns'
 import { t } from '@/i18n'
 import { stripTzAbbrev, parseDirection, parseNumber, parseBuySell, parseDateInTz } from './wizard-helpers'
+import { uuid } from '@/lib/validation'
+import { authedAction } from '@/lib/safe-action'
+import { NotFoundError, ValidationError } from '@/lib/action-errors'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-async function getUserId(): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized')
-  return userId
-}
 
 async function assertAccountOwnership(userId: string, accountId: string) {
   const acc = await db.query.accounts.findFirst({
     where: and(eq(accounts.id, accountId), eq(accounts.userId, userId)),
   })
-  if (!acc) throw new Error(t('validation.wizard.accountNotFound'))
+  if (!acc) throw new NotFoundError(t('validation.wizard.accountNotFound'))
   return acc
 }
 
@@ -56,16 +52,14 @@ const manualTradeSchema = z.object({
 
 export type ManualTradeInput = z.infer<typeof manualTradeSchema>
 
-export async function saveManualTrade(input: ManualTradeInput) {
-  const userId = await getUserId()
-  const v = manualTradeSchema.parse(input)
+export const saveManualTrade = authedAction([manualTradeSchema], async ({ userId }, v) => {
   await assertAccountOwnership(userId, v.accountId)
 
   const execs = [...v.executions].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())
 
   for (const e of execs) {
     if (isNaN(new Date(e.datetime).getTime())) {
-      throw new Error(t('validation.wizard.invalidExecutionDate'))
+      throw new ValidationError(t('validation.wizard.invalidExecutionDate'))
     }
   }
 
@@ -133,7 +127,7 @@ export async function saveManualTrade(input: ManualTradeInput) {
 
   revalidateAll()
   return { success: true, tradeId: trade.id }
-}
+})
 
 const csvImportSchema = z.object({
   accountId: z.string().uuid(),
@@ -154,9 +148,7 @@ export interface WizardImportResult {
   unmappedRequired: string[]
 }
 
-export async function importTradesCsv(input: CsvImportInput): Promise<WizardImportResult> {
-  const userId = await getUserId()
-  const v = csvImportSchema.parse(input)
+export const importTradesCsv = authedAction([csvImportSchema], async ({ userId }, v): Promise<WizardImportResult> => {
   const account = await assertAccountOwnership(userId, v.accountId)
 
   const m = v.mapping
@@ -307,7 +299,7 @@ export async function importTradesCsv(input: CsvImportInput): Promise<WizardImpo
 
   revalidateAll()
   return { total: v.rows.length, imported, skipped, errors, unmappedRequired: [] }
-}
+})
 
 export interface ImportHistoryRow {
   id: string
@@ -320,8 +312,7 @@ export interface ImportHistoryRow {
   status: 'completed' | 'partial' | 'failed'
 }
 
-export async function getImportHistory(): Promise<ImportHistoryRow[]> {
-  const userId = await getUserId()
+export const getImportHistory = authedAction([], async ({ userId }): Promise<ImportHistoryRow[]> => {
   const since = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000)
 
   const rows = await db
@@ -350,33 +341,34 @@ export async function getImportHistory(): Promise<ImportHistoryRow[]> {
     trades: r.importedRows,
     status: r.importedRows === 0 ? 'failed' : r.errorRows > 0 ? 'partial' : 'completed',
   }))
-}
+})
 
-export async function deleteImport(id: string): Promise<{ success: true; deletedTrades: number }> {
-  const userId = await getUserId()
+export const deleteImport = authedAction(
+  [uuid],
+  async ({ userId }, id): Promise<{ success: true; deletedTrades: number }> => {
+    const log = await db.query.importLogs.findFirst({
+      where: and(eq(importLogs.id, id), eq(importLogs.userId, userId)),
+    })
+    if (!log) throw new NotFoundError(t('validation.import.logNotFound'))
 
-  const log = await db.query.importLogs.findFirst({
-    where: and(eq(importLogs.id, id), eq(importLogs.userId, userId)),
-  })
-  if (!log) throw new Error(t('validation.import.logNotFound'))
+    const tradeIds = Array.isArray(log.tradeIds) ? (log.tradeIds as string[]) : []
 
-  const tradeIds = Array.isArray(log.tradeIds) ? (log.tradeIds as string[]) : []
+    let deletedTrades = 0
+    if (tradeIds.length > 0) {
+      const deleted = await db
+        .delete(trades)
+        .where(and(eq(trades.userId, userId), inArray(trades.id, tradeIds)))
+        .returning({ id: trades.id })
+      deletedTrades = deleted.length
+    }
 
-  let deletedTrades = 0
-  if (tradeIds.length > 0) {
-    const deleted = await db
-      .delete(trades)
-      .where(and(eq(trades.userId, userId), inArray(trades.id, tradeIds)))
-      .returning({ id: trades.id })
-    deletedTrades = deleted.length
-  }
+    await db.delete(importLogs).where(and(eq(importLogs.id, id), eq(importLogs.userId, userId)))
 
-  await db.delete(importLogs).where(and(eq(importLogs.id, id), eq(importLogs.userId, userId)))
-
-  revalidateAll()
-  revalidatePath('/settings/import-history')
-  return { success: true, deletedTrades }
-}
+    revalidateAll()
+    revalidatePath('/settings/import-history')
+    return { success: true, deletedTrades }
+  },
+)
 
 const fillImportSchema = z.object({
   accountId: z.string().uuid(),
@@ -395,9 +387,7 @@ interface Fill {
   commission: number
 }
 
-export async function importFillsCsv(input: FillImportInput): Promise<WizardImportResult> {
-  const userId = await getUserId()
-  const v = fillImportSchema.parse(input)
+export const importFillsCsv = authedAction([fillImportSchema], async ({ userId }, v): Promise<WizardImportResult> => {
   const account = await assertAccountOwnership(userId, v.accountId)
 
   const m = v.mapping
@@ -553,4 +543,4 @@ export async function importFillsCsv(input: FillImportInput): Promise<WizardImpo
 
   revalidateAll()
   return { total: v.rows.length, imported, skipped, errors: [], unmappedRequired: [] }
-}
+})

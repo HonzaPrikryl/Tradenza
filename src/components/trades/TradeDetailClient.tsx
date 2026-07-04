@@ -14,6 +14,7 @@ import TradeTagsPanel from './detail/TradeTagsPanel'
 import NotesTabs from './detail/NotesTabs'
 import { normalizeExecutions } from './detail/executions'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import ErrorBoundary from '@/components/ErrorBoundary'
@@ -69,8 +70,8 @@ export default function TradeDetailClient({ trade, tagGroups, timezone, dayKey, 
       await deleteTrade(trade.id)
       toast.success(t('trades.detail.deleted'))
       router.push('/trades')
-    } catch {
-      toast.error(t('trades.detail.deleteFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.detail.deleteFailed'))
     }
   }
 

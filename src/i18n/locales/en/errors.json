@@ -1,0 +1,27 @@
+{
+  "generic": "Something went wrong. Please try again.",
+  "unauthorized": "You must be signed in to do that.",
+  "forbidden": "You don’t have access to this resource.",
+  "notFound": "That could not be found.",
+  "badRequest": "Some of the information provided is invalid.",
+  "conflict": "That conflicts with existing data.",
+  "internal": "Something went wrong. Please try again.",
+  "trade": {
+    "notFound": "Trade not found."
+  },
+  "tag": {
+    "notFound": "Tag not found."
+  },
+  "account": {
+    "notFound": "Account not found.",
+    "invalidTarget": "Invalid target account."
+  },
+  "rule": {
+    "notFound": "Rule not found.",
+    "notToday": "Rules can only be tracked for the current day.",
+    "notScheduled": "This rule is not scheduled for that day."
+  },
+  "execution": {
+    "invalidDate": "One of the executions has an invalid date."
+  }
+}

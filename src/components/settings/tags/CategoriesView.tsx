@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
@@ -62,8 +63,8 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
       )
       setDialog(null)
       onChanged()
-    } catch {
-      toast.error(t('settings.tagsManagement.toast.saveError'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'settings.tagsManagement.toast.saveError'))
     } finally {
       setSaving(false)
     }
@@ -81,8 +82,8 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
       await deleteTagGroup(cat.id)
       toast.success(t('settings.tagsManagement.toast.deleted'))
       onChanged()
-    } catch {
-      toast.error(t('settings.tagsManagement.toast.deleteError'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'settings.tagsManagement.toast.deleteError'))
     }
   }
 
@@ -99,8 +100,8 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
       toast.success(t('settings.tagsManagement.toast.deleted'))
       sel.clear()
       onChanged()
-    } catch {
-      toast.error(t('settings.tagsManagement.toast.deleteError'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'settings.tagsManagement.toast.deleteError'))
     }
   }
 

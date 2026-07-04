@@ -8,6 +8,7 @@ import { createTag, createTagGroup, type TagGroupWithValues } from '@/lib/action
 import { exportTradesToCsv } from '@/lib/actions/export'
 import { Trash2, ExternalLink, Download, Tag, ArrowRightLeft } from 'lucide-react'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import Select from '@/components/ui/Select'
@@ -92,8 +93,8 @@ export default function TradesTable({
     try {
       const all = await getFilteredTradeIds(listFilters)
       sel.set(all)
-    } catch {
-      toast.error(t('trades.bulk.actionFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
     } finally {
       setBusy(false)
     }
@@ -111,8 +112,8 @@ export default function TradesTable({
       await deleteTrade(id)
       toast.success(t('trades.deleted'))
       router.refresh()
-    } catch {
-      toast.error(t('trades.deleteFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.deleteFailed'))
     }
   }
 
@@ -131,8 +132,8 @@ export default function TradesTable({
       toast.success(t('trades.bulk.deletedMany', { count }))
       clearSel()
       router.refresh()
-    } catch {
-      toast.error(t('trades.bulk.actionFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
     } finally {
       setBusy(false)
     }
@@ -150,8 +151,8 @@ export default function TradesTable({
       a.click()
       URL.revokeObjectURL(url)
       toast.success(t('trades.bulk.exported'))
-    } catch {
-      toast.error(t('trades.bulk.actionFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
     } finally {
       setBusy(false)
     }
@@ -179,8 +180,8 @@ export default function TradesTable({
       setDialog(null)
       clearSel()
       router.refresh()
-    } catch {
-      toast.error(t('trades.bulk.actionFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
     } finally {
       setBusy(false)
     }
@@ -196,8 +197,8 @@ export default function TradesTable({
       setDialog(null)
       clearSel()
       router.refresh()
-    } catch {
-      toast.error(t('trades.bulk.actionFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
     } finally {
       setBusy(false)
     }
@@ -248,8 +249,8 @@ export default function TradesTable({
       setCategoryId(g.id)
       setTagId('')
       return { value: g.id, label: g.name, dot: g.color }
-    } catch {
-      toast.error(t('trades.bulk.actionFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
       return null
     }
   }
@@ -273,8 +274,8 @@ export default function TradesTable({
         ),
       )
       return { value: tag.id, label: tag.name, dot: tag.color }
-    } catch {
-      toast.error(t('trades.bulk.actionFailed'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
       return null
     }
   }

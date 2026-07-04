@@ -1,15 +1,13 @@
 'use server'
 
-import { auth } from '@clerk/nextjs/server'
 import { db, trades } from '@/lib/db'
 import { and, eq, inArray } from 'drizzle-orm'
+import { uuidArray } from '@/lib/validation'
+import { authedAction } from '@/lib/safe-action'
 
 // ─── Export to CSV ────────────────────────────────────────────────────────────
 
-export async function exportTradesToCsv(ids?: string[]): Promise<string> {
-  const { userId } = await auth()
-  if (!userId) throw new Error('Unauthorized')
-
+export const exportTradesToCsv = authedAction([uuidArray.optional()], async ({ userId }, ids): Promise<string> => {
   const rows = await db.query.trades.findMany({
     where: ids && ids.length > 0 ? and(eq(trades.userId, userId), inArray(trades.id, ids)) : eq(trades.userId, userId),
     orderBy: (t, { asc }) => [asc(t.entryDatetime)],
@@ -59,4 +57,4 @@ export async function exportTradesToCsv(ids?: string[]): Promise<string> {
   )
 
   return [headers.join(','), ...csvRows].join('\n')
-}
+})

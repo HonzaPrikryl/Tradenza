@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
@@ -41,7 +42,7 @@ export default function AccountStep({ brokerId, brokerName }: { brokerId: string
       toast.success(t('addTrades.account.created'))
       router.push(`/trade-import/method?broker=${brokerId}&account=${res.account.id}`)
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : t('accounts.toast.saveError'))
+      toast.error(getActionErrorMessage(e, 'accounts.toast.saveError'))
       setSaving(false)
     }
   }

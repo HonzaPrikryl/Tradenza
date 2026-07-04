@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { Plus, Pencil, Trash2, GripVertical, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
@@ -37,9 +38,9 @@ export default function RulesManager({ rules }: { rules: ProgressRule[] }) {
     try {
       await toggleRuleActive(rule.id, !rule.active)
       router.refresh()
-    } catch {
+    } catch (err) {
       setItems((arr) => arr.map((r) => (r.id === rule.id ? { ...r, active: rule.active } : r)))
-      toast.error(t('progress.rules.toast.saveError'))
+      toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
     }
   }
 
@@ -55,8 +56,8 @@ export default function RulesManager({ rules }: { rules: ProgressRule[] }) {
       await deleteRule(rule.id)
       toast.success(t('progress.rules.toast.deleted'))
       router.refresh()
-    } catch {
-      toast.error(t('progress.rules.toast.deleteError'))
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'progress.rules.toast.deleteError'))
     }
   }
 
