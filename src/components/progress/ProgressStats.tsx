@@ -173,7 +173,7 @@ export default function ProgressStats({
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full rounded-full bg-primary transition-all duration-500"
+                        className="h-full rounded-full bg-primary opacity-50 transition-all duration-500"
                         style={{ width: `${Math.round(r.rate * 100)}%` }}
                       />
                     </div>
@@ -202,7 +202,7 @@ export default function ProgressStats({
                         className="w-full rounded-t-md bg-primary transition-all duration-500"
                         style={{
                           height: `${w.ratio > 0 ? Math.max(6, Math.round(w.ratio * 100)) : 2}%`,
-                          opacity: 0.4 + w.ratio * 0.6,
+                          opacity: 0.5,
                         }}
                       />
                     </div>

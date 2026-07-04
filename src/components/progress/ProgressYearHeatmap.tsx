@@ -64,15 +64,18 @@ function buildYearGrid(year: number): DayCell[][] {
   return weeks
 }
 
+function heatClass(d: ProgressCalendarCell | undefined): string | false {
+  if (!d || d.ratio <= 0) return false
+  if (d.perfect) return 'heat-perfect'
+  if (d.ratio > 0.75) return 'heat-l4'
+  if (d.ratio > 0.5) return 'heat-l3'
+  if (d.ratio > 0.25) return 'heat-l2'
+  return 'heat-l1'
+}
+
 function cellStyle(d: ProgressCalendarCell | undefined): React.CSSProperties {
-  if (!d || d.ratio <= 0) return {}
-  const bgAlpha = (0.14 + d.ratio * 0.78).toFixed(3)
-  const borderAlpha = (0.55 + d.ratio * 0.45).toFixed(3)
-  return {
-    backgroundColor: `hsl(var(--primary) / ${bgAlpha})`,
-    borderColor: `hsl(var(--primary) / ${borderAlpha})`,
-    boxShadow: d.perfect ? '0 0 6px hsl(var(--primary) / 0.45)' : undefined,
-  }
+  if (d?.perfect) return { boxShadow: '0 0 7px hsl(var(--primary) / 0.6)' }
+  return {}
 }
 
 export default function ProgressYearHeatmap({
@@ -184,6 +187,7 @@ export default function ProgressYearHeatmap({
                         className={cn(
                           'h-3 w-3 rounded-[3px] border transition-transform hover:scale-125',
                           (!d || d.ratio <= 0) && 'border-muted-foreground/30 bg-muted/50',
+                          heatClass(d),
                           isFuture && 'opacity-30',
                           isToday && 'ring-1 ring-foreground/50',
                           isSelected && 'ring-2 ring-primary ring-offset-1 ring-offset-card',
@@ -205,7 +209,11 @@ export default function ProgressYearHeatmap({
         {[0, 0.25, 0.5, 0.75, 1].map((r) => (
           <span
             key={r}
-            className="h-3 w-3 rounded-[3px] border"
+            className={cn(
+              'h-3 w-3 rounded-[3px] border',
+              r <= 0 && 'border-muted-foreground/30 bg-muted/50',
+              heatClass({ date: '', completed: 0, total: 0, ratio: r, perfect: r >= 1, hasNote: false }),
+            )}
             style={cellStyle({ date: '', completed: 0, total: 0, ratio: r, perfect: r >= 1, hasNote: false })}
           />
         ))}

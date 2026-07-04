@@ -80,6 +80,55 @@
   }
 }
 
+/* ─── Heatmap: "perfect" day accent ────────────────────────────────────────── */
+/* Perfect days are pushed further from near-perfect: lighter in dark mode,
+   darker in light mode, for a clearly stronger contrast. */
+@layer components {
+  /* Dark mode (default :root): dim → bright, perfect brightest. */
+  .heat-l1 {
+    background-color: hsl(158 38% 24%);
+    border-color: hsl(158 40% 30%);
+  }
+  .heat-l2 {
+    background-color: hsl(158 46% 34%);
+    border-color: hsl(158 48% 40%);
+  }
+  .heat-l3 {
+    background-color: hsl(158 56% 45%);
+    border-color: hsl(158 58% 51%);
+  }
+  .heat-l4 {
+    background-color: hsl(158 64% 56%);
+    border-color: hsl(158 66% 62%);
+  }
+  .heat-perfect {
+    background-color: hsl(158 74% 72%);
+    border-color: hsl(158 80% 82%);
+  }
+
+  /* Light mode: pale → deep, perfect darkest. */
+  .light .heat-l1 {
+    background-color: hsl(158 52% 86%);
+    border-color: hsl(158 48% 76%);
+  }
+  .light .heat-l2 {
+    background-color: hsl(158 56% 70%);
+    border-color: hsl(158 54% 60%);
+  }
+  .light .heat-l3 {
+    background-color: hsl(158 60% 54%);
+    border-color: hsl(158 60% 45%);
+  }
+  .light .heat-l4 {
+    background-color: hsl(158 64% 40%);
+    border-color: hsl(158 66% 32%);
+  }
+  .light .heat-perfect {
+    background-color: hsl(158 72% 26%);
+    border-color: hsl(158 76% 18%);
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
