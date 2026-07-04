@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import SortableList from '@/components/ui/SortableList'
+import { scheduleLabel } from '@/lib/rule-schedule'
 import Tooltip from '@/components/ui/Tooltip'
 import RuleDialog from './RuleDialog'
 import { deleteRule, toggleRuleActive, reorderRules, type ProgressRule } from '@/lib/actions/progress'
@@ -113,6 +114,11 @@ export default function RulesManager({ rules }: { rules: ProgressRule[] }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium text-foreground">{rule.name}</span>
+                    {rule.activeDays.length < 7 && (
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        {scheduleLabel(rule.activeDays)}
+                      </span>
+                    )}
                     {!rule.active && (
                       <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                         {t('progress.rules.inactive')}

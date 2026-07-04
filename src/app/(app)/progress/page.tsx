@@ -46,6 +46,7 @@ const emptyDay = (date: string): DayProgress => ({
   rules: [],
   completedCount: 0,
   totalCount: 0,
+  anyRules: false,
 })
 
 export default async function ProgressPage({

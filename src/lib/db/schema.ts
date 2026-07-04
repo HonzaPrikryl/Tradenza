@@ -12,7 +12,7 @@ import {
   uniqueIndex,
   jsonb,
 } from 'drizzle-orm/pg-core'
-import { relations } from 'drizzle-orm'
+import { relations, sql } from 'drizzle-orm'
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -233,6 +233,12 @@ export const progressRules = pgTable(
     description: text('description'),
     sortOrder: integer('sort_order').notNull().default(0),
     active: boolean('active').notNull().default(true), // paused (false) vs running (true)
+    // ISO weekdays (1=Mon … 7=Sun) on which the rule applies. Default: every day.
+    // Schedule changes apply retroactively — off-days are simply out of scope.
+    activeDays: integer('active_days')
+      .array()
+      .notNull()
+      .default(sql`'{1,2,3,4,5,6,7}'::integer[]`),
     // Soft-delete / effective-end. When set, the rule no longer applies from this
     // moment on, but it still counts toward the days it was in effect (history is
     // preserved). null = live rule.

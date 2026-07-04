@@ -8,7 +8,13 @@ import { z } from 'zod'
 import { t } from '@/i18n'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { dayKeyInTz, shiftDay } from '@/lib/date-tz'
-import { expectedRulesOn, ruleIdsInEffectOn, type RuleLifecycle } from '@/lib/progress-compute'
+import {
+  expectedRulesOn,
+  ruleIdsInEffectOn,
+  isoWeekdayOf,
+  ALL_WEEKDAYS,
+  type RuleLifecycle,
+} from '@/lib/progress-compute'
 
 async function getUserId(): Promise<string> {
   const { userId } = await auth()
@@ -23,11 +29,18 @@ async function todayKey(): Promise<string> {
 
 // Project a rule row onto its effective-dated lifecycle in the user's timezone.
 function toLifecycle(tz: string | null) {
-  return (r: { id: string; createdAt: Date; archivedAt: Date | null; active: boolean }): RuleLifecycle => ({
+  return (r: {
+    id: string
+    createdAt: Date
+    archivedAt: Date | null
+    active: boolean
+    activeDays: number[]
+  }): RuleLifecycle => ({
     id: r.id,
     createdDay: dayKeyInTz(r.createdAt, tz),
     archivedDay: r.archivedAt ? dayKeyInTz(r.archivedAt, tz) : null,
     active: r.active,
+    activeDays: r.activeDays,
   })
 }
 
@@ -44,6 +57,9 @@ function completionsByDate(rows: { date: string; ruleId: string }[]): Map<string
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const dateSchema = z.string().regex(DATE_RE)
 
+// Store schedules in canonical Mon→Sun order regardless of click order.
+const sortDays = (days: number[]) => [...days].sort((a, b) => a - b)
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface ProgressRule {
@@ -52,6 +68,7 @@ export interface ProgressRule {
   description: string | null
   sortOrder: number
   active: boolean
+  activeDays: number[]
 }
 
 export interface DayRule {
@@ -67,6 +84,7 @@ export interface DayProgress {
   rules: DayRule[]
   completedCount: number
   totalCount: number
+  anyRules: boolean
 }
 
 export interface ProgressCalendarCell {
@@ -115,6 +133,13 @@ export interface ProgressStats {
 const ruleSchema = z.object({
   name: z.string().trim().min(1, t('validation.nameRequired')).max(80),
   description: z.string().trim().max(280).optional().nullable(),
+  // ISO weekdays (1=Mon … 7=Sun); at least one, no duplicates. Defaults to every day.
+  activeDays: z
+    .array(z.number().int().min(1).max(7))
+    .min(1)
+    .max(7)
+    .refine((d) => new Set(d).size === d.length, 'Duplicate weekdays')
+    .default([...ALL_WEEKDAYS]),
 })
 
 export async function getRules(): Promise<ProgressRule[]> {
@@ -131,6 +156,7 @@ export async function getRules(): Promise<ProgressRule[]> {
     description: r.description,
     sortOrder: r.sortOrder,
     active: r.active,
+    activeDays: r.activeDays,
   }))
 }
 
@@ -138,7 +164,7 @@ export async function getRules(): Promise<ProgressRule[]> {
 
 export async function createRule(input: z.infer<typeof ruleSchema>) {
   const userId = await getUserId()
-  const { name, description } = ruleSchema.parse(input)
+  const { name, description, activeDays } = ruleSchema.parse(input)
 
   const maxRow = await db
     .select({ m: sql<number>`coalesce(max(${progressRules.sortOrder}), -1)`.mapWith(Number) })
@@ -148,7 +174,7 @@ export async function createRule(input: z.infer<typeof ruleSchema>) {
 
   const [rule] = await db
     .insert(progressRules)
-    .values({ userId, name, description: description || null, sortOrder: nextOrder })
+    .values({ userId, name, description: description || null, sortOrder: nextOrder, activeDays: sortDays(activeDays) })
     .returning()
   revalidatePath('/progress')
   return { success: true, rule }
@@ -156,10 +182,10 @@ export async function createRule(input: z.infer<typeof ruleSchema>) {
 
 export async function updateRule(id: string, input: z.infer<typeof ruleSchema>) {
   const userId = await getUserId()
-  const { name, description } = ruleSchema.parse(input)
+  const { name, description, activeDays } = ruleSchema.parse(input)
   const [rule] = await db
     .update(progressRules)
-    .set({ name, description: description || null, updatedAt: new Date() })
+    .set({ name, description: description || null, activeDays: sortDays(activeDays), updatedAt: new Date() })
     .where(and(eq(progressRules.id, id), eq(progressRules.userId, userId)))
     .returning()
   revalidatePath('/progress')
@@ -237,6 +263,7 @@ export async function getDayProgress(date: string): Promise<DayProgress> {
     rules: dayRules,
     completedCount: dayRules.filter((r) => r.completed).length,
     totalCount: dayRules.length,
+    anyRules: ruleRows.some((r) => r.archivedAt === null),
   }
 }
 
@@ -250,9 +277,12 @@ export async function toggleRuleCompletion(ruleId: string, date: string, complet
 
   const rule = await db.query.progressRules.findFirst({
     where: and(eq(progressRules.id, ruleId), eq(progressRules.userId, userId)),
-    columns: { id: true },
+    columns: { id: true, activeDays: true },
   })
   if (!rule) throw new Error('Rule not found')
+  if (!rule.activeDays.includes(isoWeekdayOf(day))) {
+    throw new Error('Rule is not scheduled for this day')
+  }
 
   if (completed) {
     await db
@@ -435,7 +465,11 @@ export async function getProgressStats(): Promise<ProgressStats> {
     for (const [date, set] of byDate) {
       if (last30.has(date) && set.has(r.id)) completed += 1
     }
-    return { id: r.id, name: r.name, completed, rate: completed / 30 }
+    // Rate against the days the rule was actually scheduled — a Mon–Fri rule
+    // followed every weekday scores 100%, not 5/7.
+    let scheduled = 0
+    for (const date of last30) if (r.activeDays.includes(isoWeekdayOf(date))) scheduled += 1
+    return { id: r.id, name: r.name, completed, rate: scheduled > 0 ? completed / scheduled : 0 }
   })
 
   const wdSum = new Array(7).fill(0)

@@ -38,6 +38,7 @@
     "allDone": "All rules followed",
     "completedOf": "{completed} / {total} followed",
     "noActiveRules": "No active rules. Add rules in the Rules tab.",
+    "noScheduledRules": "No rules scheduled for this day.",
     "selectDay": "Select a day on the calendar to track your rules.",
     "viewDay": "View day",
     "moreRules": "+{count} more"
@@ -89,6 +90,16 @@
     "active": "Active",
     "inactive": "Inactive",
     "activeHint": "Inactive rules are hidden from daily tracking but keep their history.",
+    "schedule": {
+      "label": "Schedule",
+      "presetDaily": "Every day",
+      "presetWeekdays": "Weekdays",
+      "presetCustom": "Custom",
+      "daily": "Daily",
+      "perWeek": "{count}× per week",
+      "minOneDay": "A rule needs at least one day",
+      "retroHint": "Days outside the schedule won't count toward this rule — past days included."
+    },
     "empty": "No rules yet. Add your first rule to start tracking.",
     "col": {
       "rule": "Rule",

@@ -161,9 +161,10 @@ export default function DaySummaryPanel({
   const perfect = totalCount > 0 && completedCount >= totalCount
   const clamp = useMediaQuery('(min-width: 1280px)')
 
+  const emptyMessage = day.anyRules ? t('progress.day.noScheduledRules') : t('progress.day.noActiveRules')
   const message =
     totalCount === 0
-      ? t('progress.day.noActiveRules')
+      ? emptyMessage
       : perfect
         ? t('progress.process.perfect')
         : completedCount > 0
@@ -222,7 +223,7 @@ export default function DaySummaryPanel({
         </h3>
         {totalCount === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-            {t('progress.day.noActiveRules')}
+            {emptyMessage}
           </p>
         ) : clamp ? (
           <ClampedRuleList key={day.date} rules={day.rules} controls={controls} />

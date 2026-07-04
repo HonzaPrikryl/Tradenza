@@ -42,6 +42,7 @@ export default function DayReviewClient({
   editable,
   detail,
   rules: initialRules,
+  anyRules = true,
   note,
   currency,
 }: {
@@ -49,6 +50,7 @@ export default function DayReviewClient({
   editable: boolean
   detail: DayDetail
   rules: DayRule[]
+  anyRules?: boolean
   note: string
   currency: string
 }) {
@@ -263,7 +265,7 @@ export default function DayReviewClient({
 
           {totalCount === 0 ? (
             <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-              {t('progress.day.noActiveRules')}
+              {anyRules ? t('progress.day.noScheduledRules') : t('progress.day.noActiveRules')}
             </p>
           ) : (
             <div className="space-y-1.5">

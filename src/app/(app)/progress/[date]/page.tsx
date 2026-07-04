@@ -29,6 +29,7 @@ export default async function DayReviewPage({ params }: { params: Promise<{ date
       editable={date === today}
       detail={detail}
       rules={dayProgress.rules}
+      anyRules={dayProgress.anyRules}
       note={note}
       currency="USD"
     />

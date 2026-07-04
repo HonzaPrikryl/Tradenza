@@ -13,6 +13,26 @@ export interface RuleLifecycle {
   archivedDay: string | null
   /** Whether the rule is currently running (false = paused). */
   active: boolean
+  /**
+   * ISO weekdays (1=Mon … 7=Sun) on which the rule applies. A rule is never
+   * expected on days outside this set — they don't count toward or against it.
+   * Schedule changes apply retroactively (history is recomputed).
+   */
+  activeDays: number[]
+}
+
+/** Every day of the week — the default schedule. */
+export const ALL_WEEKDAYS: readonly number[] = [1, 2, 3, 4, 5, 6, 7]
+
+/**
+ * ISO weekday (1=Mon … 7=Sun) of a "yyyy-MM-dd" day key. Computed in UTC so it
+ * never drifts across DST boundaries; the key is already in the user's calendar,
+ * so no timezone input is needed.
+ */
+export function isoWeekdayOf(day: string): number {
+  const [y, m, d] = day.split('-').map(Number)
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay() // 0=Sun … 6=Sat
+  return dow === 0 ? 7 : dow
 }
 
 /**
@@ -22,11 +42,13 @@ export interface RuleLifecycle {
  * - Not on/after it was archived (deleted).
  * - On `today` and beyond, a paused rule (active === false) is not expected — pausing
  *   is forward-looking and does not rewrite the past.
+ * - Not on weekdays outside its schedule (`activeDays`), past or future.
  */
 export function ruleInEffectOn(day: string, today: string, r: RuleLifecycle): boolean {
   if (r.createdDay > day) return false
   if (r.archivedDay !== null && day >= r.archivedDay) return false
   if (day >= today && !r.active) return false
+  if (!r.activeDays.includes(isoWeekdayOf(day))) return false
   return true
 }
 
