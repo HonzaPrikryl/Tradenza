@@ -43,6 +43,10 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Optional rate-limit deps are loaded at runtime (only when Upstash is set), so
+  // keep them external instead of bundling — this also ensures they're included in
+  // the serverless deployment.
+  serverExternalPackages: ['@upstash/ratelimit', '@upstash/redis'],
   experimental: {
     serverActions: {
       allowedOrigins: serverActionOrigins,

@@ -47,10 +47,15 @@ async function getLimiters(): Promise<Limiters | null> {
     limitersPromise = (async () => {
       // Variable specifiers keep Upstash a truly optional dependency: the modules
       // are only resolved at runtime when the feature is enabled.
+      // Variable specifiers + webpackIgnore keep Upstash a true optional runtime
+      // dependency: webpack doesn't try to bundle or analyse them (no "Critical
+      // dependency" warning), and they're loaded from node_modules only when the
+      // feature is actually enabled. They're also listed in `serverExternalPackages`
+      // (next.config.js) so the deployment includes them.
       const redisMod = '@upstash/redis'
       const ratelimitMod = '@upstash/ratelimit'
-      const { Redis } = await import(/* webpackIgnore: false */ redisMod)
-      const { Ratelimit } = await import(/* webpackIgnore: false */ ratelimitMod)
+      const { Redis } = await import(/* webpackIgnore: true */ redisMod)
+      const { Ratelimit } = await import(/* webpackIgnore: true */ ratelimitMod)
 
       const redis = Redis.fromEnv()
       const make = (policy: RatePolicy): Limiter =>
