@@ -20,6 +20,10 @@ jobs:
   backup:
     name: Dump production database
     runs-on: ubuntu-latest
+    # `secrets` can't be used in an `if:` expression, so surface the one we
+    # branch on as an env var (empty when the secret is unset) and test that.
+    env:
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
     steps:
       - uses: actions/checkout@v4
 
@@ -38,12 +42,11 @@ jobs:
         run: ./scripts/backup-db.sh backups
 
       - name: Upload to Cloudflare R2
-        if: ${{ secrets.R2_ENDPOINT != '' }}
+        if: ${{ env.R2_ENDPOINT != '' }}
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
           FILE: ${{ steps.dump.outputs.file }}
         run: |
