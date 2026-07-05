@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
-import { LayoutDashboard, List, BarChart3, Target, Settings, Plus, X } from 'lucide-react'
+import { LayoutDashboard, List, BarChart3, Target, Settings, Plus, X, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import Logo from '@/components/ui/Logo'
@@ -19,7 +19,7 @@ const NAV = [
   { href: '/settings/accounts', labelKey: 'nav.settings', icon: Settings },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname()
   const { open, setOpen } = useSidebar()
 
@@ -96,6 +96,21 @@ export default function Sidebar() {
               </Link>
             )
           })}
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={cn(
+                'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
+                pathname === '/admin' || pathname.startsWith('/admin/')
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent',
+              )}
+            >
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              {t('nav.admin')}
+            </Link>
+          )}
         </nav>
 
         {/* Bottom */}

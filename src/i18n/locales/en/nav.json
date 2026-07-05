@@ -8,5 +8,6 @@
   "accounts": "Accounts",
   "settings": "Settings",
   "import": "Import / Export",
-  "profile": "Profile"
+  "profile": "Profile",
+  "admin": "Admin"
 }
