@@ -29,6 +29,20 @@
       "when": 1783275838251,
       "tag": "0003_onboarding_dismissed",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783280799305,
+      "tag": "0004_feedback",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783282752186,
+      "tag": "0005_feedback_image",
+      "breakpoints": true
     }
   ]
 }

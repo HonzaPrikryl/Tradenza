@@ -19,6 +19,7 @@ import { relations, sql } from 'drizzle-orm'
 export const directionEnum = pgEnum('direction', ['long', 'short'])
 export const statusEnum = pgEnum('status', ['open', 'closed', 'cancelled'])
 export const assetClassEnum = pgEnum('asset_class', ['stocks', 'futures', 'forex', 'crypto', 'options', 'other'])
+export const feedbackKindEnum = pgEnum('feedback_kind', ['bug', 'idea', 'other'])
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 // Lightweight registry of the app's users. Auth stays owned by Clerk (the source
@@ -305,6 +306,26 @@ export const dailyCheckins = pgTable(
   }),
 )
 
+// ─── Feedback ─────────────────────────────────────────────────────────────────
+// User-submitted bug reports / ideas / wishes. Stored in-app (self-hosted, no
+// external dependency); an optional e-mail notification is sent on submit when
+// the mailer is configured. Purged with the rest of a user's data on deletion.
+export const feedback = pgTable(
+  'feedback',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    kind: feedbackKindEnum('kind').notNull().default('other'),
+    message: text('message').notNull(),
+    imageUrl: text('image_url'), // optional R2 URL of an attached screenshot
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    userIdIdx: index('feedback_user_id_idx').on(t.userId),
+    createdAtIdx: index('feedback_created_at_idx').on(t.createdAt),
+  }),
+)
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const tradesRelations = relations(trades, ({ many, one }) => ({
@@ -362,3 +383,5 @@ export type NewProgressRule = typeof progressRules.$inferInsert
 export type RuleCompletion = typeof ruleCompletions.$inferSelect
 export type DailyCheckin = typeof dailyCheckins.$inferSelect
 export type MarketCandles = typeof marketCandles.$inferSelect
+export type Feedback = typeof feedback.$inferSelect
+export type NewFeedback = typeof feedback.$inferInsert

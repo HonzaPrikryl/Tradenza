@@ -17,6 +17,7 @@ const GROUPS: { name: string; keys: string[] }[] = [
     keys: ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET_NAME', 'R2_PUBLIC_URL'],
   },
   { name: 'Upstash Redis', keys: ['UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'] },
+  { name: 'Feedback e-mail (Resend)', keys: ['RESEND_API_KEY', 'FEEDBACK_FROM_EMAIL', 'FEEDBACK_NOTIFY_EMAIL'] },
 ]
 
 function isSet(value: string | undefined): boolean {

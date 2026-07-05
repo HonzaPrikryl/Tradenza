@@ -54,36 +54,50 @@ export async function getUserOverview(): Promise<UserOverviewRow[]> {
   return (res as unknown as { rows: UserOverviewRow[] }).rows ?? []
 }
 
+export type ReconcileResult =
+  | { ok: true; removed: number; checked: number }
+  | { ok: false; reason: 'forbidden' | 'skipped' | 'error' }
+
 // Reconcile the `users` mirror against Clerk (the source of truth) and purge rows
 // for users that no longer exist there. This is the delete-side counterpart to
-// `ensureUserRecord`: it self-heals the mirror when a `user.deleted` webhook was
-// missed or never reached us (e.g. accounts deleted via Clerk's built-in UI, or
-// any deletion in local dev where the webhook can't reach localhost). Best-effort
-// and safe: any error aborts without changes, and an unexpectedly empty Clerk
-// result is ignored so a transient API blip can never wipe the whole table.
-export async function reconcileUsersWithClerk(): Promise<void> {
-  if (!(await isAdmin())) throw new Error('Forbidden')
+// `ensureUserRecord`, and the safety net for a missed `user.deleted` webhook.
+//
+// This is DESTRUCTIVE, so it is deliberately NOT run on page load — it is invoked
+// explicitly (the admin "Sync" button) and hardened so it can never mass-delete:
+//   • any error → abort, no changes
+//   • Clerk returned nobody → abort (a transient blip must not wipe the table)
+//   • the enumerated count doesn't match Clerk's reported totalCount → abort
+//     (an incomplete/racey listing must not mark real users as ghosts)
+// Only after a *complete, consistent* Clerk snapshot do we purge the rows that are
+// provably absent from it.
+export async function reconcileUsersWithClerk(): Promise<ReconcileResult> {
+  if (!(await isAdmin())) return { ok: false, reason: 'forbidden' }
   try {
     const client = await clerkClient()
     const clerkIds = new Set<string>()
     const limit = 100
     let offset = 0
+    let reportedTotal = -1
     for (;;) {
-      const { data } = await client.users.getUserList({ limit, offset })
-      for (const u of data) clerkIds.add(u.id)
-      if (data.length < limit) break
-      offset += data.length
+      const res = await client.users.getUserList({ limit, offset })
+      reportedTotal = res.totalCount
+      for (const u of res.data) clerkIds.add(u.id)
+      if (res.data.length < limit) break
+      offset += res.data.length
     }
-    // Safety valve: never treat "Clerk returned nobody" as "delete everyone".
-    if (clerkIds.size === 0) return
+
+    // Guards: never purge on an empty or incomplete/inconsistent enumeration.
+    if (clerkIds.size === 0) return { ok: false, reason: 'skipped' }
+    if (reportedTotal >= 0 && clerkIds.size !== reportedTotal) return { ok: false, reason: 'skipped' }
 
     const dbRows = await db.select({ id: users.id }).from(users)
     const ghosts = dbRows.filter((r) => !clerkIds.has(r.id))
     for (const g of ghosts) {
       await purgeUserData(g.id)
     }
+    return { ok: true, removed: ghosts.length, checked: dbRows.length }
   } catch {
-    // Reconcile is best-effort — never break the admin page over it.
+    return { ok: false, reason: 'error' }
   }
 }
 

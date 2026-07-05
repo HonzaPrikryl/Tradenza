@@ -1,0 +1,20 @@
+{
+  "trigger": "Feedback",
+  "title": "Send feedback",
+  "description": "Found a bug or have an idea? Tell us.",
+  "kind": {
+    "bug": "Bug",
+    "idea": "Idea",
+    "other": "Other"
+  },
+  "placeholder": "Describe the bug, idea or wish…",
+  "attach": "Attach image",
+  "uploading": "Uploading…",
+  "removeImage": "Remove image",
+  "imageUnavailable": "Image attachments aren't available (storage not configured).",
+  "submit": "Send",
+  "sending": "Sending…",
+  "cancel": "Cancel",
+  "success": "Thanks! Your feedback was sent.",
+  "error": "Couldn't send feedback. Please try again."
+}

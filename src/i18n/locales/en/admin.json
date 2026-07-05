@@ -1,4 +1,32 @@
 {
+  "sync": {
+    "button": "Sync",
+    "syncing": "Syncing…",
+    "removed": "Removed {count} deleted user(s)",
+    "upToDate": "All users up to date",
+    "skipped": "Sync skipped — couldn't fully verify with Clerk",
+    "error": "Sync failed"
+  },
+  "nav": {
+    "users": "Users",
+    "feedback": "Feedback"
+  },
+  "feedback": {
+    "title": "Feedback",
+    "subtitle": "Bug reports, ideas and wishes from users",
+    "empty": "No feedback yet.",
+    "columns": {
+      "kind": "Type",
+      "message": "Message",
+      "user": "User",
+      "date": "Date"
+    },
+    "kind": {
+      "bug": "Bug",
+      "idea": "Idea",
+      "other": "Other"
+    }
+  },
   "users": {
     "title": "Users",
     "subtitle": "Internal admin overview",

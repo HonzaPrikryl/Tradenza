@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import Logo from '@/components/ui/Logo'
 import ThemeToggle from '@/components/ui/ThemeToggle'
+import FeedbackButton from '@/components/feedback/FeedbackButton'
 import { useSidebar } from './SidebarContext'
 
 const NAV = [
@@ -112,6 +113,11 @@ export default function Sidebar({ isAdmin = false }: { isAdmin?: boolean }) {
             </Link>
           )}
         </nav>
+
+        {/* Feedback */}
+        <div className="px-3 pb-2">
+          <FeedbackButton />
+        </div>
 
         {/* Bottom */}
         <div className="px-4 py-4 border-t border-[hsl(var(--sidebar-border))] flex items-center gap-3">

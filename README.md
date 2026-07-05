@@ -125,6 +125,7 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                      |    ▫️    | Error monitoring & source maps                                                               |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`     |    ▫️    | Per-user rate limiting (both required together; omit to disable — see below)                 |
 | `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST`    |    ▫️    | Privacy-respecting analytics (PostHog EU, cookieless). Omit the key to disable analytics     |
+| `RESEND_API_KEY` / `FEEDBACK_*`                           |    ▫️    | Feedback e-mail notifications (Resend). Omit to disable.                                     |
 
 ✅ required · ▫️ optional. See [`.env.example`](.env.example) for the full annotated list.
 
