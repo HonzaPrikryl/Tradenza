@@ -15,7 +15,11 @@ function adminEmails(): string[] {
 export async function isAdmin(): Promise<boolean> {
   const allow = adminEmails()
   if (allow.length === 0) return false
-  const user = await currentUser()
-  if (!user) return false
-  return user.emailAddresses.some((e) => allow.includes(e.emailAddress.toLowerCase()))
+  try {
+    const user = await currentUser()
+    if (!user) return false
+    return user.emailAddresses.some((e) => allow.includes(e.emailAddress.toLowerCase()))
+  } catch {
+    return false
+  }
 }
