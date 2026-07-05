@@ -10,6 +10,7 @@ import Modal from '@/components/ui/Modal'
 import { ALL_WEEKDAYS } from '@/lib/progress-compute'
 import { WEEKDAYS_PRESET, isoWeekdayMin, scheduleLabel } from '@/lib/rule-schedule'
 import { createRule, updateRule, type ProgressRule } from '@/lib/actions/progress'
+import { track } from '@/lib/analytics'
 
 const inputClass =
   'w-full rounded-md border border-border bg-input/40 px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
@@ -66,6 +67,7 @@ export default function RuleDialog({
       const payload = { name: name.trim(), description: description.trim() || null, activeDays: days }
       const res = mode === 'edit' && rule ? await updateRule(rule.id, payload) : await createRule(payload)
       if (handleRateLimit(res)) return
+      if (mode !== 'edit') track({ name: 'progress_rule_created' })
       toast.success(mode === 'edit' ? t('progress.rules.toast.updated') : t('progress.rules.toast.created'))
       onClose()
       onSaved?.()

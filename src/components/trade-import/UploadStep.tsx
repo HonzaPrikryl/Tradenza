@@ -24,6 +24,7 @@ import {
   FILL_REQUIRED,
 } from '@/lib/csv-columns'
 import { importTradesCsv, importFillsCsv, type WizardImportResult } from '@/lib/actions/wizard'
+import { track } from '@/lib/analytics'
 import { setAccountsFilter } from '@/lib/global-filters'
 
 const NONE = '__none__'
@@ -155,6 +156,7 @@ export default function UploadStep({
       if (handleRateLimit(res)) return
       setResult(res)
       if (res.imported > 0) {
+        track({ name: 'trades_imported', props: { count: res.imported, kind: mode === 'fills' ? 'fills' : 'trades' } })
         toast.success(t('addTrades.upload.importedToast', { count: res.imported }))
       }
     } catch (e) {

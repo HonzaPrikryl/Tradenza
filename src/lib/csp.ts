@@ -16,6 +16,8 @@ const CLERK = ['https://*.clerk.accounts.dev', 'https://*.clerk.com']
 const TURNSTILE = 'https://challenges.cloudflare.com'
 const SENTRY = ['https://*.ingest.sentry.io', 'https://*.ingest.us.sentry.io', 'https://*.ingest.de.sentry.io']
 const R2 = 'https://*.r2.cloudflarestorage.com'
+// PostHog EU (analytics). Harmless to allow even when analytics is disabled.
+const POSTHOG = ['https://eu.i.posthog.com', 'https://eu-assets.i.posthog.com']
 
 /** Cryptographically-random, base64 nonce. Runs in the Edge (Web Crypto) runtime. */
 export function generateNonce(): string {
@@ -28,8 +30,8 @@ export function generateNonce(): string {
 /** Assemble the CSP header value for one request. */
 export function buildCsp(nonce: string, isDev: boolean): string {
   const scriptSrc = isDev
-    ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${CLERK.join(' ')} ${TURNSTILE}`
-    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${CLERK.join(' ')} ${TURNSTILE}`
+    ? `script-src 'self' 'unsafe-inline' 'unsafe-eval' ${CLERK.join(' ')} ${TURNSTILE} ${POSTHOG.join(' ')}`
+    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${CLERK.join(' ')} ${TURNSTILE} ${POSTHOG.join(' ')}`
 
   return [
     "default-src 'self'",
@@ -37,7 +39,7 @@ export function buildCsp(nonce: string, isDev: boolean): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    `connect-src 'self' ${CLERK.join(' ')} ${R2} ${SENTRY.join(' ')}`,
+    `connect-src 'self' ${CLERK.join(' ')} ${R2} ${SENTRY.join(' ')} ${POSTHOG.join(' ')}`,
     `frame-src 'self' ${CLERK.join(' ')} ${TURNSTILE}`,
     "worker-src 'self' blob:",
     "object-src 'none'",

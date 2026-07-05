@@ -139,6 +139,23 @@ Only write actions are limited; browsing and reading are never throttled. If som
 | CSV / manual import      | 5 / min              |
 | Create / update / delete | 60 / min             |
 
+## Analytics
+
+Product analytics is **optional** and privacy-respecting, via [PostHog](https://posthog.com) on its **EU** cloud. When `NEXT_PUBLIC_POSTHOG_KEY` is unset it is disabled and nothing is loaded. To enable it, create a project in the PostHog EU region and set `NEXT_PUBLIC_POSTHOG_KEY` (host defaults to `https://eu.i.posthog.com`).
+
+It is deliberately minimal and cookieless: `persistence: 'memory'` (no cookies → no consent banner), autocapture and session recording are **off** (we never capture DOM text/inputs, which for a trading app could be financial data), and only a small set of meaningful product events is sent:
+
+| Event                   | Fired when                                         |
+| ----------------------- | -------------------------------------------------- |
+| `signed_up`             | a new Clerk user is created                        |
+| `account_created`       | a trading account is created                       |
+| `trade_created`         | a trade is added manually (`source`, `assetClass`) |
+| `trades_imported`       | a CSV import completes (`count`, `kind`)           |
+| `progress_rule_created` | a discipline rule is created                       |
+| `trades_exported`       | trades are exported to CSV (`count`)               |
+| `onboarding_completed`  | all getting-started steps are done (once)          |
+| `account_deleted`       | a Clerk user is deleted                            |
+
 ## Account & data deletion
 
 Users can permanently delete their account and all associated data from **Settings → Global settings → Delete account** (trades, journal, tags, accounts, discipline history, and uploaded images).

@@ -7,6 +7,7 @@ import { readGlobalFilters } from '@/lib/global-filters'
 import DashboardClient from '@/components/dashboard/DashboardClient'
 import DemoNotice from '@/components/onboarding/DemoNotice'
 import GettingStarted, { type OnboardingStep } from '@/components/onboarding/GettingStarted'
+import OnboardingCompleteTracker from '@/components/onboarding/OnboardingCompleteTracker'
 import { t } from '@/i18n'
 import type { Metadata } from 'next'
 
@@ -36,6 +37,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-5 w-full animate-in">
+      <OnboardingCompleteTracker allDone={allDone} />
       {showChecklist ? (
         <GettingStarted steps={steps} isDemo={!hasTrades} />
       ) : (

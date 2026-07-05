@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { createAccount, type AccountInput } from '@/lib/actions/accounts'
+import { track } from '@/lib/analytics'
 
 const inputClass =
   'w-full rounded-md border border-border bg-input/40 px-3 py-2.5 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'
@@ -44,6 +45,7 @@ export default function AccountStep({ brokerId, brokerName }: { brokerId: string
         setSaving(false)
         return
       }
+      track({ name: 'account_created' })
       toast.success(t('addTrades.account.created'))
       router.push(`/trade-import/method?broker=${brokerId}&account=${res.account.id}`)
     } catch (e) {

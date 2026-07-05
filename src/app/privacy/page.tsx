@@ -87,6 +87,11 @@ export default function PrivacyPage() {
         <li>
           <strong>Upstash</strong> (optional) — rate-limiting counters keyed by your user identifier.
         </li>
+        <li>
+          <strong>PostHog</strong> (optional) — privacy-respecting, cookieless product analytics hosted in the EU. We
+          record which pages are viewed to understand usage; we do not use cookies for this and do not track you across
+          other sites.
+        </li>
       </LUL>
       <LP>
         Some providers are located outside your country (e.g. in the United States). Where personal data is transferred

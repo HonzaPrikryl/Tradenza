@@ -6,6 +6,7 @@ import { formatCurrency, formatDateTimeTz, cn } from '@/lib/utils'
 import { deleteTrade, deleteTrades, addTagToTrades, setTradesAccount, getFilteredTradeIds } from '@/lib/actions/trades'
 import { createTag, createTagGroup, type TagGroupWithValues } from '@/lib/actions/tags'
 import { exportTradesToCsv } from '@/lib/actions/export'
+import { track } from '@/lib/analytics'
 import { Trash2, ExternalLink, Download, Tag, ArrowRightLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
@@ -151,6 +152,7 @@ export default function TradesTable({
       a.download = `tradenza-export-${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
+      track({ name: 'trades_exported', props: { count: targetIds.length || undefined } })
       toast.success(t('trades.bulk.exported'))
     } catch (err) {
       toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))

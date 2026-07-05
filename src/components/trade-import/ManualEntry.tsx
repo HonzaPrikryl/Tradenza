@@ -9,6 +9,7 @@ import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
 import { t } from '@/i18n'
 import { saveManualTrade } from '@/lib/actions/wizard'
+import { track } from '@/lib/analytics'
 import { contractMultiplier } from '@/lib/futures'
 import DateTimeField from '@/components/ui/DateTimeField'
 import DateField from '@/components/ui/DateField'
@@ -143,6 +144,7 @@ export default function ManualEntry({
         setSaving(false)
         return
       }
+      track({ name: 'trade_created', props: { source: 'manual', assetClass } })
       toast.success(t('addTrades.manual.saved', { symbol: trimmed }))
       if (addNext) {
         setSymbol('')
