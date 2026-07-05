@@ -90,5 +90,8 @@ export function ThemeScript({ nonce }: { nonce?: string }) {
   // the provider's logic: stored choice wins, otherwise the OS preference.
   // `nonce` lets this inline script satisfy the nonce-based CSP.
   const js = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t!=='light'&&t!=='dark'){t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}var c=document.documentElement.classList;c.remove('dark','light');c.add(t);document.documentElement.style.colorScheme=t;}catch(e){}})();`
-  return <script nonce={nonce} dangerouslySetInnerHTML={{ __html: js }} />
+  // suppressHydrationWarning: browsers scrub the `nonce` content attribute from the
+  // DOM after load (an anti-exfiltration measure), so at hydration React sees an
+  // empty nonce vs the server value. This is expected — the nonce still applied.
+  return <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: js }} />
 }
