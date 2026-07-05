@@ -92,12 +92,14 @@ export const metadata: Metadata = {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Per-request nonce set by middleware — passed to Clerk and our inline theme
-  // script so they satisfy the nonce-based Content-Security-Policy.
+  // Per-request nonce set by middleware — used for our inline theme script.
+  // Clerk ignores the `nonce` prop and instead reads the `x-nonce` request header
+  // itself, but ONLY when `dynamic` is set — without it Clerk stamps an empty
+  // nonce on its loader script and `strict-dynamic` blocks clerk.browser.js.
   const nonce = (await headers()).get('x-nonce') ?? undefined
 
   return (
-    <ClerkProvider appearance={clerkAppearance} nonce={nonce}>
+    <ClerkProvider dynamic appearance={clerkAppearance}>
       <html lang={activeLocale} suppressHydrationWarning>
         <head>
           <ThemeScript nonce={nonce} />
