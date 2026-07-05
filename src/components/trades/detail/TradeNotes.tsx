@@ -1,10 +1,12 @@
 'use client'
 
+import { useRef } from 'react'
 import { Check, Loader2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { updateTradeJournal } from '@/lib/actions/trades'
+import { track } from '@/lib/analytics'
 import { useAutosave } from '@/hooks/useAutosave'
 import RichTextEditor from '@/components/ui/RichTextEditor'
 
@@ -18,9 +20,16 @@ function isEmptyHtml(html: string): boolean {
 }
 
 export default function TradeNotes({ tradeId, initialNotes }: { tradeId: string; initialNotes: string | null }) {
-  const { value, state, onChange, flush } = useAutosave(initialNotes ?? '', (text) =>
-    updateTradeJournal(tradeId, { notes: isEmptyHtml(text) ? null : text }).then(handleRateLimit),
-  )
+  const journaledRef = useRef(false)
+  const { value, state, onChange, flush } = useAutosave(initialNotes ?? '', async (text) => {
+    const empty = isEmptyHtml(text)
+    const res = await updateTradeJournal(tradeId, { notes: empty ? null : text })
+    if (handleRateLimit(res)) return
+    if (!empty && !journaledRef.current) {
+      journaledRef.current = true
+      track({ name: 'trade_journaled' })
+    }
+  })
 
   return (
     <div className="rounded-xl border border-border bg-card">

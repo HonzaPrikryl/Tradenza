@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Check, Loader2, AlertCircle, CalendarDays } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { setDayNote } from '@/lib/actions/progress'
+import { track } from '@/lib/analytics'
 import { useAutosave, type SaveState } from '@/hooks/useAutosave'
 import RichTextEditor from '@/components/ui/RichTextEditor'
 
@@ -29,11 +30,21 @@ export default function DailyNoteEditor({
   showHeader?: boolean
   minHeight?: number
 }) {
-  const { value, state, onChange, flush, reset } = useAutosave(initialNote, (text) =>
-    setDayNote(date, isEmptyHtml(text) ? '' : text).then(handleRateLimit),
-  )
+  const reviewedRef = useRef(false)
+  const { value, state, onChange, flush, reset } = useAutosave(initialNote, async (text) => {
+    const empty = isEmptyHtml(text)
+    const res = await setDayNote(date, empty ? '' : text)
+    if (handleRateLimit(res)) return
+    if (!empty && !reviewedRef.current) {
+      reviewedRef.current = true
+      track({ name: 'daily_review_completed' })
+    }
+  })
 
-  useEffect(() => reset(initialNote), [date, initialNote, reset])
+  useEffect(() => {
+    reviewedRef.current = false
+    reset(initialNote)
+  }, [date, initialNote, reset])
 
   return (
     <div className="rounded-xl border border-border bg-card">

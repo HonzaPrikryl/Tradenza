@@ -38,6 +38,7 @@ import {
   type LayoutValidationError,
 } from '@/lib/dashboard/types'
 import { saveTemplate, renameTemplate, deleteTemplate } from '@/lib/actions/dashboard'
+import { track } from '@/lib/analytics'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import { t } from '@/i18n'
 import { getWidgetDef, MAIN_WIDGETS } from './widget-registry'
@@ -148,6 +149,7 @@ export default function DashboardEditor({ kind, template, initialLayout, onClose
       })
       if (handleRateLimit(res)) return
       if (res.success) {
+        track({ name: 'dashboard_customized', props: { kind } })
         toast.success(kind === 'create' ? t('dashboard.editor.templateCreated') : t('dashboard.editor.dashboardSaved'))
         setCreateOpen(false)
         router.refresh()
