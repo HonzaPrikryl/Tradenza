@@ -12,7 +12,28 @@
 // In development the script policy stays permissive: Next's HMR / React Refresh
 // rely on 'unsafe-eval' and inline bootstrapping.
 
-const CLERK = ['https://*.clerk.accounts.dev', 'https://*.clerk.com']
+// The wildcard hosts cover Clerk's shared dev/prod infra. Production instances on
+// a *custom* Frontend API domain (e.g. https://clerk.tradenza.dev) are NOT matched
+// by these wildcards, so we also derive that origin from the publishable key —
+// Clerk base64-encodes the Frontend API host into the key itself, which keeps the
+// CSP in lock-step with whatever instance the deploy is pointed at (zero config drift).
+const CLERK_WILDCARDS = ['https://*.clerk.accounts.dev', 'https://*.clerk.com']
+
+/** Origin of the Clerk Frontend API, decoded from the publishable key. */
+function clerkFrontendApiOrigin(): string | null {
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+  if (!pk) return null
+  try {
+    // pk_(test|live)_<base64("<frontend-api-host>$")> — atob is available in the Edge runtime.
+    const host = atob(pk.replace(/^pk_(test|live)_/, '')).replace(/\$+$/, '')
+    return host ? `https://${host}` : null
+  } catch {
+    return null
+  }
+}
+
+const CLERK_ORIGIN = clerkFrontendApiOrigin()
+const CLERK = CLERK_ORIGIN ? [...CLERK_WILDCARDS, CLERK_ORIGIN] : CLERK_WILDCARDS
 const TURNSTILE = 'https://challenges.cloudflare.com'
 const SENTRY = ['https://*.ingest.sentry.io', 'https://*.ingest.us.sentry.io', 'https://*.ingest.de.sentry.io']
 const R2 = 'https://*.r2.cloudflarestorage.com'
