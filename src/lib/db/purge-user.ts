@@ -13,6 +13,7 @@ import {
   progressRules,
   ruleCompletions,
   dailyCheckins,
+  users,
 } from '@/lib/db'
 import { isR2Configured, deleteR2Prefix } from '@/lib/r2'
 
@@ -36,6 +37,7 @@ export async function purgeUserData(userId: string): Promise<void> {
     db.delete(dashboardTemplates).where(eq(dashboardTemplates.userId, userId)),
     db.delete(dailyCheckins).where(eq(dailyCheckins.userId, userId)),
     db.delete(accounts).where(eq(accounts.userId, userId)),
+    db.delete(users).where(eq(users.id, userId)),
   ])
 
   // Best-effort: remove the user's uploaded note images from object storage.

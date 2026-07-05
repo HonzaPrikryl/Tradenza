@@ -8,6 +8,20 @@
       "when": 1783162112422,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783269663337,
+      "tag": "0001_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783270795769,
+      "tag": "0002_user_names",
+      "breakpoints": true
     }
   ]
 }

@@ -20,6 +20,24 @@ export const directionEnum = pgEnum('direction', ['long', 'short'])
 export const statusEnum = pgEnum('status', ['open', 'closed', 'cancelled'])
 export const assetClassEnum = pgEnum('asset_class', ['stocks', 'futures', 'forex', 'crypto', 'options', 'other'])
 
+// ─── Users ────────────────────────────────────────────────────────────────────
+// Lightweight registry of the app's users. Auth stays owned by Clerk (the source
+// of truth for identity); this table is a synced mirror kept up to date by the
+// Clerk webhook (`user.created` / `user.updated` upsert, `user.deleted` remove).
+// Its purpose is purely operational: a single place to answer "how many users do
+// we have?" straight from the DB, including users who signed up but created no
+// data yet. `id` holds the Clerk user ID — the same value stored as `user_id` on
+// every other table.
+export const users = pgTable('users', {
+  id: text('id').primaryKey(), // Clerk user ID
+  email: text('email'),
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  username: text('username'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
 export const accounts = pgTable(
   'accounts',
   {
@@ -326,6 +344,8 @@ export const ruleCompletionsRelations = relations(ruleCompletions, ({ one }) => 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type User = typeof users.$inferSelect
+export type NewUser = typeof users.$inferInsert
 export type Trade = typeof trades.$inferSelect
 export type NewTrade = typeof trades.$inferInsert
 export type Account = typeof accounts.$inferSelect
