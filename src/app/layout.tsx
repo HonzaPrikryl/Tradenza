@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { ClerkProvider } from '@clerk/nextjs'
 import { clerkAppearance } from '@/lib/clerk-appearance'
 import { Toaster } from 'sonner'
@@ -89,12 +90,16 @@ export const metadata: Metadata = {
   category: 'finance',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Per-request nonce set by middleware — passed to Clerk and our inline theme
+  // script so they satisfy the nonce-based Content-Security-Policy.
+  const nonce = (await headers()).get('x-nonce') ?? undefined
+
   return (
-    <ClerkProvider appearance={clerkAppearance}>
+    <ClerkProvider appearance={clerkAppearance} nonce={nonce}>
       <html lang={activeLocale} suppressHydrationWarning>
         <head>
-          <ThemeScript />
+          <ThemeScript nonce={nonce} />
         </head>
         <body
           className={`${GeistMono.variable} font-body antialiased`}

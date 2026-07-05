@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
+import { buildCsp, generateNonce } from '@/lib/csp'
 
 // Routes that require authentication are everything NOT listed here.
 const isPublicRoute = createRouteMatcher([
@@ -9,6 +10,8 @@ const isPublicRoute = createRouteMatcher([
   '/opengraph-image(.*)',
   '/api/webhooks(.*)',
   '/api/health',
+  '/robots.txt',
+  '/sitemap.xml',
   '/privacy',
   '/terms',
 ])
@@ -61,6 +64,21 @@ export default clerkMiddleware(async (auth, request) => {
   if (!isPublicRoute(request)) {
     await auth.protect()
   }
+
+  // Attach a per-request nonce + strict CSP. The nonce is exposed on the request
+  // headers so Server Components (root layout, Clerk) can read it via `next/headers`
+  // and stamp it onto their inline scripts; it's also set on the response so the
+  // browser enforces the same policy.
+  const nonce = generateNonce()
+  const csp = buildCsp(nonce, process.env.NODE_ENV !== 'production')
+
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-nonce', nonce)
+  requestHeaders.set('content-security-policy', csp)
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } })
+  response.headers.set('content-security-policy', csp)
+  return response
 })
 
 export const config = {

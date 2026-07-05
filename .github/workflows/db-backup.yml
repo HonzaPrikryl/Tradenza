@@ -64,3 +64,18 @@ jobs:
           path: backups/*.sql.gz
           retention-days: 30
           if-no-files-found: error
+
+      # A silently-failing backup is worse than none. Alert if any step failed.
+      # GitHub also emails the actor on a failed scheduled run by default.
+      - name: Notify on failure
+        if: ${{ failure() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -sf -X POST -H 'Content-type: application/json' \
+              --data '{"text":"🔴 Tradenza DB backup FAILED — see the GitHub Actions run."}' \
+              "$SLACK_WEBHOOK_URL" || true
+          else
+            echo "No SLACK_WEBHOOK_URL set — relying on GitHub's failed-run email."
+          fi

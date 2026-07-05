@@ -1,0 +1,59 @@
+name: Uptime
+
+# Lightweight uptime monitor: polls the production /api/health endpoint every
+# ~15 min. A non-200, a timeout, or a body that isn't `"status":"ok"` fails the
+# run, which triggers GitHub's failed-workflow email (and an optional Slack ping).
+#
+# This is the zero-cost, in-repo safety net. For richer alerting (SMS, phone call,
+# public status page) point UptimeRobot / Better Stack at the same URL too — they
+# complement this, they don't replace the endpoint.
+#
+# Required repository VARIABLE (Settings → Secrets and variables → Actions → Variables):
+#   HEALTH_URL   — e.g. https://app.tradenza.dev/api/health
+# Optional repository SECRET:
+#   SLACK_WEBHOOK_URL — incoming webhook to notify on failure.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch: {}
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Ping /api/health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health check
+        env:
+          HEALTH_URL: ${{ vars.HEALTH_URL }}
+        run: |
+          if [ -z "$HEALTH_URL" ]; then
+            echo "::error::Set the repository variable HEALTH_URL (e.g. https://app.tradenza.dev/api/health)"
+            exit 1
+          fi
+          code=$(curl -s -o body.txt -w '%{http_code}' --max-time 20 "$HEALTH_URL" || echo 000)
+          echo "HTTP $code"
+          cat body.txt 2>/dev/null || true
+          echo
+          if [ "$code" != "200" ] || ! grep -q '"status":"ok"' body.txt; then
+            echo "::error::Health check failed (HTTP $code)"
+            exit 1
+          fi
+          echo "✓ healthy"
+
+      - name: Notify on failure
+        if: ${{ failure() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -sf -X POST -H 'Content-type: application/json' \
+              --data '{"text":"🔴 Tradenza health check FAILED — see the GitHub Actions run."}' \
+              "$SLACK_WEBHOOK_URL" || true
+          else
+            echo "No SLACK_WEBHOOK_URL set — relying on GitHub's failed-run email."
+          fi

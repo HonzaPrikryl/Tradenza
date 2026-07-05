@@ -85,9 +85,10 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
   return <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>{children}</ThemeContext.Provider>
 }
 
-export function ThemeScript() {
+export function ThemeScript({ nonce }: { nonce?: string }) {
   // Runs before paint (in <head>) to set the theme class with no flash. Mirrors
   // the provider's logic: stored choice wins, otherwise the OS preference.
+  // `nonce` lets this inline script satisfy the nonce-based CSP.
   const js = `(function(){try{var t=localStorage.getItem('${STORAGE_KEY}');if(t!=='light'&&t!=='dark'){t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}var c=document.documentElement.classList;c.remove('dark','light');c.add(t);document.documentElement.style.colorScheme=t;}catch(e){}})();`
-  return <script dangerouslySetInnerHTML={{ __html: js }} />
+  return <script nonce={nonce} dangerouslySetInnerHTML={{ __html: js }} />
 }

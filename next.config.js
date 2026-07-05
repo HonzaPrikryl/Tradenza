@@ -13,24 +13,9 @@ if (process.env.NEXT_PUBLIC_APP_URL) {
   }
 }
 
-// Content-Security-Policy. Shipped Report-Only so it cannot break Clerk/Sentry/R2
-// before it has been verified in a browser. Review violations in the console,
-// then rename the header to `Content-Security-Policy` to enforce it.
-const csp = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://*.clerk.com https://challenges.cloudflare.com",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https:",
-  "font-src 'self' data:",
-  "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.r2.cloudflarestorage.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.ingest.de.sentry.io",
-  "frame-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com",
-  "worker-src 'self' blob:",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join('; ')
-
+// The Content-Security-Policy is set per-request in middleware.ts, because it
+// carries a per-request nonce (nonce-based CSP can't be a static header). The
+// static, request-independent security headers live here.
 const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
   { key: 'X-Frame-Options', value: 'DENY' },
@@ -38,7 +23,6 @@ const securityHeaders = [
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
-  { key: 'Content-Security-Policy-Report-Only', value: csp },
 ]
 
 /** @type {import('next').NextConfig} */
