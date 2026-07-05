@@ -123,6 +123,7 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 | `R2_*`                                                    |    ▫️    | Cloudflare R2 credentials for trade screenshots                                              |
 | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                      |    ▫️    | Error monitoring & source maps                                                               |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`     |    ▫️    | Per-user rate limiting (both required together; omit to disable — see below)                 |
+| `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST`    |    ▫️    | Privacy-respecting analytics (PostHog EU, cookieless). Omit the key to disable analytics     |
 
 ✅ required · ▫️ optional. See [`.env.example`](.env.example) for the full annotated list.
 
@@ -247,7 +248,13 @@ npx vercel
 
 Add the environment variables in the Vercel dashboard, then apply migrations to your production database with `db:migrate` pointed at the production `DATABASE_URL` (`vercel env pull`, then `dotenv -e .env.production.local -- npm run db:migrate`). Adopting an already-populated production DB requires the one-time baseline seed in [`drizzle/MIGRATIONS.md`](drizzle/MIGRATIONS.md) first. The app is a standard Next.js project and will run on any platform that supports Next.js 15 (Vercel, Netlify, Fly.io, a Docker container, …).
 
-A Content-Security-Policy is shipped in **Report-Only** mode in `next.config.js`; verify it against your deployment, then switch the header to `Content-Security-Policy` to enforce it.
+A strict, nonce-based **Content-Security-Policy** is enforced per request in `src/middleware.ts` (production drops `unsafe-inline`/`unsafe-eval` in favour of a per-request nonce + `strict-dynamic`). If you add a third-party script or origin, extend the allow-list in `src/lib/csp.ts`.
+
+### Backups & monitoring
+
+The production database is the only irreplaceable state. Set up both a Neon point-in-time-recovery window and off-Neon logical dumps — the scheduled `DB Backup` workflow (`.github/workflows/db-backup.yml`) and full recovery steps are documented in [`docs/BACKUPS.md`](docs/BACKUPS.md).
+
+A public **health check** lives at `/api/health` (returns `200` with `"status":"ok"` when the app can reach its database, `503` otherwise). Point an uptime monitor (UptimeRobot, Better Stack, …) at it, or use the bundled `Uptime` workflow (`.github/workflows/uptime.yml`). To report a security issue, see [`SECURITY.md`](SECURITY.md).
 
 ## Development
 
