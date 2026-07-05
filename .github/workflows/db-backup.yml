@@ -1,0 +1,60 @@
+name: DB Backup
+
+# Scheduled logical backup of the production Neon database — an off-Neon safety
+# net that survives even if the Neon project itself is lost. Runs daily and can
+# be triggered by hand from the Actions tab.
+#
+# Required repository secret:
+#   DATABASE_URL_PROD   — production Neon connection string (pooled or direct).
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # 03:00 UTC daily
+  workflow_dispatch: {}
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: Dump production database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ubuntu-latest ships an older client; install pg17 to match Neon.
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Create dump
+        id: dump
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+        run: ./scripts/backup-db.sh backups
+
+      - name: Upload to Cloudflare R2
+        if: ${{ secrets.R2_ENDPOINT != '' }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+          FILE: ${{ steps.dump.outputs.file }}
+        run: |
+          aws s3 cp "$FILE" "s3://$R2_BACKUP_BUCKET/db/$(basename "$FILE")" \
+            --endpoint-url "$R2_ENDPOINT"
+
+      # Fallback / extra copy: keep the dump as a workflow artifact.
+      - name: Upload as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: backups/*.sql.gz
+          retention-days: 30
+          if-no-files-found: error
