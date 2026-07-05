@@ -10,8 +10,8 @@
 #   Usage:  DATABASE_URL="postgres://…" ./scripts/backup-db.sh [output_dir]
 #
 # Notes:
-#   • pg_dump's major version should be >= your server's. Neon runs PostgreSQL 17
-#     at time of writing — install the pg17 client if your distro ships older.
+#   • pg_dump's major version should be >= your server's. Neon runs PostgreSQL 18
+#     at time of writing — install the pg18 client if your distro ships older.
 #   • --no-owner / --no-privileges keep the dump portable (no Neon-specific roles),
 #     so it restores cleanly into a fresh database or a local Postgres.
 set -euo pipefail
@@ -28,7 +28,10 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 FILE="$OUT_DIR/tradenza-${STAMP}.sql.gz"
 
 echo "→ dumping database to $FILE"
-pg_dump "$DATABASE_URL" \
+# PG_DUMP lets the caller pin an exact client binary (e.g. a versioned path like
+# /usr/lib/postgresql/18/bin/pg_dump) — pg_dump must be >= the server version,
+# and the one first on PATH is often older than the caller expects.
+"${PG_DUMP:-pg_dump}" "$DATABASE_URL" \
   --no-owner \
   --no-privileges \
   --format=plain \

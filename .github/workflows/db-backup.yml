@@ -27,18 +27,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ubuntu-latest ships an older client; install pg17 to match Neon.
-      - name: Install PostgreSQL 17 client
+      # ubuntu-latest ships an older client (pg16); Neon runs pg18. pg_dump must
+      # be >= the server, so install the pg18 client from the PGDG repo.
+      - name: Install PostgreSQL 18 client
         run: |
           sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
           sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
+          sudo apt-get install -y postgresql-client-18
 
       - name: Create dump
         id: dump
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+          # Pin the exact client so PATH ordering can't pick an older pg_dump.
+          PG_DUMP: /usr/lib/postgresql/18/bin/pg_dump
         run: ./scripts/backup-db.sh backups
 
       - name: Upload to Cloudflare R2

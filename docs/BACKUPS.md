@@ -83,7 +83,7 @@ DATABASE_URL="postgres://…prod…" ./scripts/backup-db.sh ./backups
 ```
 
 You need the PostgreSQL client tools (`pg_dump`), version **>= the server's**
-(Neon runs PostgreSQL 17 at time of writing).
+(Neon runs PostgreSQL 18 at time of writing).
 
 ### Restore a dump
 
