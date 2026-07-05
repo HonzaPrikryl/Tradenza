@@ -58,6 +58,7 @@ See [`docs/UX_UI.md`](docs/UX_UI.md) for a full UX/UI walkthrough of the screens
 | Screenshots _(optional)_      | Cloudflare R2                                                                                                                    |
 | Error monitoring _(optional)_ | [Sentry](https://sentry.io)                                                                                                      |
 | Rate limiting _(optional)_    | [Upstash Redis](https://upstash.com) via `@upstash/ratelimit`                                                                    |
+| Analytics _(optional)_        | [PostHog](https://posthog.com)                                                                                                   |
 | Quality                       | Vitest, ESLint, Prettier, Husky + lint-staged, GitHub Actions CI                                                                 |
 
 ## Quick start
