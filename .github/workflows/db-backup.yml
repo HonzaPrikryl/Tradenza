@@ -42,7 +42,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
           # Pin the exact client so PATH ordering can't pick an older pg_dump.
           PG_DUMP: /usr/lib/postgresql/18/bin/pg_dump
-        run: ./scripts/backup-db.sh backups
+        run: bash scripts/backup-db.sh backups
 
       - name: Upload to Cloudflare R2
         if: ${{ env.R2_ENDPOINT != '' }}
