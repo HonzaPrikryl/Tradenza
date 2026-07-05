@@ -1,3 +1,5 @@
+import { eq } from 'drizzle-orm'
+import { currentUser } from '@clerk/nextjs/server'
 import { db, users } from '@/lib/db'
 
 // Shape of the relevant fields on a Clerk `user.created` / `user.updated`
@@ -32,4 +34,33 @@ export async function upsertUser(data: ClerkUserData): Promise<void> {
     .insert(users)
     .values({ id: data.id, ...row, ...(createdAt ? { createdAt } : {}) })
     .onConflictDoUpdate({ target: users.id, set: { ...row, updatedAt: new Date() } })
+}
+
+// Just-in-time provisioning safety net. The `user.created` webhook is the primary
+// real-time sync, but webhooks can be missed, delayed, or (in local dev) simply
+// unreachable — which would leave a real, signed-in user with no `users` row.
+// Called from the authenticated app layout, this guarantees the row exists on the
+// user's first page load, independent of webhook delivery. Fast path is a single
+// indexed PK lookup; it only hits Clerk + writes when the row is actually missing.
+export async function ensureUserRecord(userId: string): Promise<void> {
+  try {
+    const existing = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1)
+    if (existing.length > 0) return
+
+    const user = await currentUser()
+    if (!user || user.id !== userId) return
+
+    await upsertUser({
+      id: user.id,
+      email_addresses: user.emailAddresses.map((e) => ({ id: e.id, email_address: e.emailAddress })),
+      primary_email_address_id: user.primaryEmailAddressId,
+      first_name: user.firstName,
+      last_name: user.lastName,
+      username: user.username,
+      created_at: user.createdAt ?? undefined,
+    })
+  } catch {
+    // Never let provisioning break a page render — the webhook remains the
+    // backstop, and the next load will retry.
+  }
 }

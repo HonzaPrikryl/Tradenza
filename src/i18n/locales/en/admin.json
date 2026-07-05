@@ -1,0 +1,66 @@
+{
+  "users": {
+    "title": "Users",
+    "subtitle": "Internal admin overview",
+    "search": "Search name or email…",
+    "count": "{shown} of {total}",
+    "stats": {
+      "totalUsers": "Total users",
+      "activeUsers": "Active (≥1 trade)",
+      "newUsers": "New (7 days)",
+      "totalTrades": "Total trades"
+    },
+    "columns": {
+      "id": "ID",
+      "name": "User",
+      "email": "Email",
+      "trades": "Trades",
+      "journaled": "Trade notes",
+      "accounts": "Accounts",
+      "reviews": "Reviews",
+      "joined": "Joined",
+      "lastActive": "Last active"
+    }
+  },
+  "user": {
+    "back": "Back to users",
+    "joined": "Joined {date}",
+    "lastActive": "Last active {date}",
+    "kpi": {
+      "trades": "Trades",
+      "journaled": "Trade notes",
+      "netPnl": "Net P&L",
+      "winRate": "Win rate",
+      "closed": "{count} closed",
+      "accounts": "Accounts",
+      "reviews": "Reviews",
+      "rules": "Rules",
+      "imports": "Imports",
+      "tags": "{count} tags"
+    },
+    "accounts": {
+      "title": "Accounts",
+      "empty": "No accounts.",
+      "archived": "archived",
+      "columns": {
+        "name": "Name",
+        "firm": "Firm",
+        "phase": "Phase",
+        "trades": "Trades",
+        "netPnl": "Net P&L"
+      }
+    },
+    "trades": {
+      "title": "Recent trades",
+      "hint": "last {count}",
+      "empty": "No trades.",
+      "columns": {
+        "symbol": "Symbol",
+        "direction": "Direction",
+        "status": "Status",
+        "entry": "Entry",
+        "netPnl": "Net P&L"
+      }
+    }
+  }
+}

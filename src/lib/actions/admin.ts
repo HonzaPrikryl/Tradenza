@@ -1,5 +1,7 @@
+import { clerkClient } from '@clerk/nextjs/server'
 import { sql } from 'drizzle-orm'
-import { db } from '@/lib/db'
+import { db, users } from '@/lib/db'
+import { purgeUserData } from '@/lib/db/purge-user'
 import { isAdmin } from '@/lib/admin'
 
 export interface UserOverviewRow {
@@ -30,17 +32,59 @@ export async function getUserOverview(): Promise<UserOverviewRow[]> {
       count(distinct t.id)::int as "tradeCount",
       count(distinct t.id) filter (where t.notes is not null)::int as "journaledCount",
       count(distinct a.id)::int as "accountCount",
-      count(distinct dc.id) filter (where dc.note is not null and dc.note <> '')::int as "reviewCount",
-      greatest(max(t.created_at), max(dc.updated_at)) as "lastActiveAt"
+      -- A "review" = a day the user engaged with the discipline loop: either wrote
+      -- a daily note OR ticked at least one rule as done. Counted as distinct days.
+      (select count(distinct day) from (
+        select date as day from daily_checkins where user_id = u.id and note is not null and note <> ''
+        union
+        select date as day from rule_completions where user_id = u.id
+      ) reviewed_days)::int as "reviewCount",
+      greatest(
+        max(t.created_at),
+        (select max(updated_at) from daily_checkins where user_id = u.id),
+        (select max(created_at) from rule_completions where user_id = u.id)
+      ) as "lastActiveAt"
     from users u
     left join trades t on t.user_id = u.id
     left join accounts a on a.user_id = u.id
-    left join daily_checkins dc on dc.user_id = u.id
     group by u.id
     order by u.created_at desc
   `)
 
   return (res as unknown as { rows: UserOverviewRow[] }).rows ?? []
+}
+
+// Reconcile the `users` mirror against Clerk (the source of truth) and purge rows
+// for users that no longer exist there. This is the delete-side counterpart to
+// `ensureUserRecord`: it self-heals the mirror when a `user.deleted` webhook was
+// missed or never reached us (e.g. accounts deleted via Clerk's built-in UI, or
+// any deletion in local dev where the webhook can't reach localhost). Best-effort
+// and safe: any error aborts without changes, and an unexpectedly empty Clerk
+// result is ignored so a transient API blip can never wipe the whole table.
+export async function reconcileUsersWithClerk(): Promise<void> {
+  if (!(await isAdmin())) throw new Error('Forbidden')
+  try {
+    const client = await clerkClient()
+    const clerkIds = new Set<string>()
+    const limit = 100
+    let offset = 0
+    for (;;) {
+      const { data } = await client.users.getUserList({ limit, offset })
+      for (const u of data) clerkIds.add(u.id)
+      if (data.length < limit) break
+      offset += data.length
+    }
+    // Safety valve: never treat "Clerk returned nobody" as "delete everyone".
+    if (clerkIds.size === 0) return
+
+    const dbRows = await db.select({ id: users.id }).from(users)
+    const ghosts = dbRows.filter((r) => !clerkIds.has(r.id))
+    for (const g of ghosts) {
+      await purgeUserData(g.id)
+    }
+  } catch {
+    // Reconcile is best-effort — never break the admin page over it.
+  }
 }
 
 // ─── Single-user detail ─────────────────────────────────────────────────────
@@ -120,12 +164,18 @@ export async function getUserDetail(userId: string): Promise<AdminUserDetail | n
     db.execute(sql`
       select
         (select count(*) from accounts where user_id = ${userId})::int as "accountCount",
-        (select count(*) from daily_checkins where user_id = ${userId} and note is not null and note <> '')::int as "reviewCount",
+        -- A "review" = a day with a daily note OR at least one rule ticked done.
+        (select count(distinct day) from (
+          select date as day from daily_checkins where user_id = ${userId} and note is not null and note <> ''
+          union
+          select date as day from rule_completions where user_id = ${userId}
+        ) reviewed_days)::int as "reviewCount",
         (select count(*) from progress_rules where user_id = ${userId} and archived_at is null)::int as "ruleCount",
         (select count(*) from tags where user_id = ${userId})::int as "tagCount",
         (select count(*) from import_logs where user_id = ${userId})::int as "importCount",
         (select count(*) from dashboard_templates where user_id = ${userId} and is_preset = false)::int as "templateCount",
-        (select max(updated_at) from daily_checkins where user_id = ${userId}) as "lastCheckinAt"
+        (select max(updated_at) from daily_checkins where user_id = ${userId}) as "lastCheckinAt",
+        (select max(created_at) from rule_completions where user_id = ${userId}) as "lastRuleAt"
     `),
     db.execute(sql`
       select a.id, a.name, a.firm, a.phase, a.archived,
@@ -163,9 +213,10 @@ export async function getUserDetail(userId: string): Promise<AdminUserDetail | n
     importCount: number
     templateCount: number
     lastCheckinAt: string | null
+    lastRuleAt: string | null
   }>(countRes)[0]
 
-  const times = [trade?.lastTradeCreatedAt, counts?.lastCheckinAt, user.createdAt]
+  const times = [trade?.lastTradeCreatedAt, counts?.lastCheckinAt, counts?.lastRuleAt, user.createdAt]
     .filter((v): v is string => Boolean(v))
     .map((v) => new Date(v).getTime())
   const lastActiveAt = times.length ? new Date(Math.max(...times)).toISOString() : null

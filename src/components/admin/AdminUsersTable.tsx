@@ -20,7 +20,7 @@ type SortKey =
 
 interface Column {
   key: SortKey
-  label: string
+  labelKey: string
   align: 'left' | 'right'
   kind: 'text' | 'num' | 'date'
   width: string
@@ -29,15 +29,51 @@ interface Column {
 }
 
 const COLUMNS: Column[] = [
-  { key: 'id', label: 'ID', align: 'left', kind: 'text', width: 'w-[210px]', muted: true, mono: true },
-  { key: 'name', label: 'User', align: 'left', kind: 'text', width: 'w-[150px]' },
-  { key: 'email', label: 'Email', align: 'left', kind: 'text', width: 'w-[220px]', muted: true },
-  { key: 'tradeCount', label: 'Trades', align: 'right', kind: 'num', width: 'w-[90px]' },
-  { key: 'journaledCount', label: 'Journaled', align: 'right', kind: 'num', width: 'w-[100px]', muted: true },
-  { key: 'accountCount', label: 'Accounts', align: 'right', kind: 'num', width: 'w-[95px]' },
-  { key: 'reviewCount', label: 'Reviews', align: 'right', kind: 'num', width: 'w-[90px]', muted: true },
-  { key: 'createdAt', label: 'Joined', align: 'left', kind: 'date', width: 'w-[110px]', muted: true },
-  { key: 'lastActiveAt', label: 'Last active', align: 'left', kind: 'date', width: 'w-[120px]', muted: true },
+  {
+    key: 'id',
+    labelKey: 'admin.users.columns.id',
+    align: 'left',
+    kind: 'text',
+    width: 'w-[210px]',
+    muted: true,
+    mono: true,
+  },
+  { key: 'name', labelKey: 'admin.users.columns.name', align: 'left', kind: 'text', width: 'w-[150px]' },
+  { key: 'email', labelKey: 'admin.users.columns.email', align: 'left', kind: 'text', width: 'w-[220px]', muted: true },
+  { key: 'tradeCount', labelKey: 'admin.users.columns.trades', align: 'right', kind: 'num', width: 'w-[90px]' },
+  {
+    key: 'journaledCount',
+    labelKey: 'admin.users.columns.journaled',
+    align: 'right',
+    kind: 'num',
+    width: 'w-[100px]',
+    muted: true,
+  },
+  { key: 'accountCount', labelKey: 'admin.users.columns.accounts', align: 'right', kind: 'num', width: 'w-[95px]' },
+  {
+    key: 'reviewCount',
+    labelKey: 'admin.users.columns.reviews',
+    align: 'right',
+    kind: 'num',
+    width: 'w-[90px]',
+    muted: true,
+  },
+  {
+    key: 'createdAt',
+    labelKey: 'admin.users.columns.joined',
+    align: 'left',
+    kind: 'date',
+    width: 'w-[110px]',
+    muted: true,
+  },
+  {
+    key: 'lastActiveAt',
+    labelKey: 'admin.users.columns.lastActive',
+    align: 'left',
+    kind: 'date',
+    width: 'w-[120px]',
+    muted: true,
+  },
 ]
 
 function fullName(u: UserOverviewRow): string {
@@ -122,12 +158,12 @@ export default function AdminUsersTable({ users }: { users: UserOverviewRow[] })
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name or email…"
+            placeholder={t('admin.users.search')}
             className="w-full rounded-md border border-border bg-card py-2 pl-9 pr-3 text-sm outline-none focus:border-primary"
           />
         </div>
         <span className="shrink-0 text-xs text-muted-foreground">
-          {rows.length} of {users.length}
+          {t('admin.users.count', { shown: rows.length, total: users.length })}
         </span>
       </div>
 
@@ -155,7 +191,7 @@ export default function AdminUsersTable({ users }: { users: UserOverviewRow[] })
                         active && 'text-foreground',
                       )}
                     >
-                      <span className="truncate">{col.label}</span>
+                      <span className="truncate">{t(col.labelKey)}</span>
                       <span className="inline-flex w-3 shrink-0 justify-center">
                         {active &&
                           (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}

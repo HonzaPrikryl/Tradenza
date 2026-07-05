@@ -8,10 +8,12 @@ import { getTagGroups } from '@/lib/actions/tags'
 import { getTradeSymbols } from '@/lib/actions/trades'
 import { readGlobalFilters } from '@/lib/global-filters'
 import { isAdmin } from '@/lib/admin'
+import { ensureUserRecord } from '@/lib/db/sync-user'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { userId } = await auth()
   if (!userId) redirect('/sign-in')
+  await ensureUserRecord(userId)
 
   const [accounts, tagGroups, filters, symbols, admin] = await Promise.all([
     getAccounts(),

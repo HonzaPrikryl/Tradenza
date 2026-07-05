@@ -5,8 +5,10 @@ import type { Metadata } from 'next'
 import { isAdmin } from '@/lib/admin'
 import { getUserDetail, type AdminUserDetail } from '@/lib/actions/admin'
 import { formatCurrency, cn } from '@/lib/utils'
+import { t } from '@/i18n'
 
 export const metadata: Metadata = { title: 'Admin · User' }
+export const dynamic = 'force-dynamic'
 
 function displayName(u: AdminUserDetail['user']): string {
   return [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.username || u.email || u.id
@@ -39,7 +41,7 @@ export default async function AdminUserPage({ params }: { params: Promise<{ user
         className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to users
+        {t('admin.user.back')}
       </Link>
 
       {/* Identity */}
@@ -49,45 +51,61 @@ export default async function AdminUserPage({ params }: { params: Promise<{ user
         <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
           {user.username && <span>@{user.username}</span>}
           <span className="font-mono">{user.id}</span>
-          <span>Joined {formatDate(user.createdAt)}</span>
-          <span>Last active {formatDate(stats.lastActiveAt)}</span>
+          <span>{t('admin.user.joined', { date: formatDate(user.createdAt) })}</span>
+          <span>{t('admin.user.lastActive', { date: formatDate(stats.lastActiveAt) })}</span>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Tile label="Trades" value={String(stats.tradeCount)} />
+        <Tile label={t('admin.user.kpi.trades')} value={String(stats.tradeCount)} />
         <Tile
-          label="Journaled"
+          label={t('admin.user.kpi.journaled')}
           value={String(stats.journaledCount)}
           sub={pct(stats.journaledCount, stats.tradeCount)}
         />
         <Tile
-          label="Net P&L"
+          label={t('admin.user.kpi.netPnl')}
           value={formatCurrency(stats.netPnl)}
           valueClass={stats.netPnl > 0 ? 'text-profit' : stats.netPnl < 0 ? 'text-loss' : undefined}
         />
-        <Tile label="Win rate" value={winRate === null ? '—' : `${winRate}%`} sub={`${stats.closedCount} closed`} />
-        <Tile label="Accounts" value={String(stats.accountCount)} />
-        <Tile label="Reviews" value={String(stats.reviewCount)} />
-        <Tile label="Rules" value={String(stats.ruleCount)} />
-        <Tile label="Imports" value={String(stats.importCount)} sub={`${stats.tagCount} tags`} />
+        <Tile
+          label={t('admin.user.kpi.winRate')}
+          value={winRate === null ? '—' : `${winRate}%`}
+          sub={t('admin.user.kpi.closed', { count: stats.closedCount })}
+        />
+        <Tile label={t('admin.user.kpi.accounts')} value={String(stats.accountCount)} />
+        <Tile label={t('admin.user.kpi.reviews')} value={String(stats.reviewCount)} />
+        <Tile label={t('admin.user.kpi.rules')} value={String(stats.ruleCount)} />
+        <Tile
+          label={t('admin.user.kpi.imports')}
+          value={String(stats.importCount)}
+          sub={t('admin.user.kpi.tags', { count: stats.tagCount })}
+        />
       </div>
 
       {/* Accounts */}
-      <Section title="Accounts">
+      <Section title={t('admin.user.accounts.title')}>
         {accounts.length === 0 ? (
-          <Empty>No accounts.</Empty>
+          <Empty>{t('admin.user.accounts.empty')}</Empty>
         ) : (
           <Table
-            head={['Name', 'Firm', 'Phase', 'Trades', 'Net P&L']}
+            head={[
+              t('admin.user.accounts.columns.name'),
+              t('admin.user.accounts.columns.firm'),
+              t('admin.user.accounts.columns.phase'),
+              t('admin.user.accounts.columns.trades'),
+              t('admin.user.accounts.columns.netPnl'),
+            ]}
             align={['left', 'left', 'left', 'right', 'right']}
           >
             {accounts.map((a) => (
               <tr key={a.id} className="border-b border-border last:border-0">
                 <td className="px-4 py-3 font-medium">
                   {a.name}
-                  {a.archived && <span className="ml-2 text-xs text-muted-foreground">(archived)</span>}
+                  {a.archived && (
+                    <span className="ml-2 text-xs text-muted-foreground">({t('admin.user.accounts.archived')})</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-muted-foreground">{a.firm ?? '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground">{a.phase ?? '—'}</td>
@@ -102,12 +120,21 @@ export default async function AdminUserPage({ params }: { params: Promise<{ user
       </Section>
 
       {/* Recent trades */}
-      <Section title="Recent trades" hint={recentTrades.length > 0 ? `last ${recentTrades.length}` : undefined}>
+      <Section
+        title={t('admin.user.trades.title')}
+        hint={recentTrades.length > 0 ? t('admin.user.trades.hint', { count: recentTrades.length }) : undefined}
+      >
         {recentTrades.length === 0 ? (
-          <Empty>No trades.</Empty>
+          <Empty>{t('admin.user.trades.empty')}</Empty>
         ) : (
           <Table
-            head={['Symbol', 'Direction', 'Status', 'Entry', 'Net P&L']}
+            head={[
+              t('admin.user.trades.columns.symbol'),
+              t('admin.user.trades.columns.direction'),
+              t('admin.user.trades.columns.status'),
+              t('admin.user.trades.columns.entry'),
+              t('admin.user.trades.columns.netPnl'),
+            ]}
             align={['left', 'left', 'left', 'left', 'right']}
           >
             {recentTrades.map((tr) => (

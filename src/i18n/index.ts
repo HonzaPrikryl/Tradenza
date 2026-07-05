@@ -23,6 +23,7 @@ import editor from './locales/en/editor.json'
 import progress from './locales/en/progress.json'
 import onboarding from './locales/en/onboarding.json'
 import legal from './locales/en/legal.json'
+import admin from './locales/en/admin.json'
 
 const en = {
   common,
@@ -48,6 +49,7 @@ const en = {
   progress,
   onboarding,
   legal,
+  admin,
 } as const
 
 type Messages = typeof en
