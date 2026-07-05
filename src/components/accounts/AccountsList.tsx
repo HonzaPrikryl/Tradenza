@@ -473,12 +473,8 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
               </div>
               <div>
                 <label className={labelClass}>{t('accounts.currency')}</label>
-                <input
-                  value={form.currency}
-                  onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                  maxLength={8}
-                  className={inputClass}
-                />
+                {/* USD-only for now — locked so all amounts stay in one currency. */}
+                <input value="USD" readOnly disabled aria-readonly className={cn(inputClass, 'opacity-70')} />
               </div>
             </div>
           </div>

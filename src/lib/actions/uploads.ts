@@ -4,14 +4,9 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { isR2Configured, uploadToR2 } from '@/lib/r2'
 import { mutationAction } from '@/lib/safe-action'
+import { IMAGE_EXT_BY_TYPE, sniffImageMime } from '@/lib/image-mime'
 
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
-const EXT_BY_TYPE: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-}
 
 export type UploadResult =
   | { status: 'ok'; url: string }
@@ -34,13 +29,16 @@ export const uploadNoteImage = mutationAction(
     if (!(file instanceof File)) return { status: 'error', message: 'No file' }
     if (file.size > MAX_BYTES) return { status: 'error', message: 'File too large' }
 
-    const ext = EXT_BY_TYPE[file.type]
-    if (!ext) return { status: 'error', message: 'Unsupported image type' }
-
-    const key = `notes/${userId}/${randomUUID()}.${ext}`
     try {
       const bytes = new Uint8Array(await file.arrayBuffer())
-      const url = await uploadToR2(key, bytes, file.type)
+
+      // Trust the magic bytes, not the client's declared type. The verified MIME
+      // drives both the extension and the stored Content-Type.
+      const mime = sniffImageMime(bytes)
+      if (!mime) return { status: 'error', message: 'Unsupported image type' }
+
+      const key = `notes/${userId}/${randomUUID()}.${IMAGE_EXT_BY_TYPE[mime]}`
+      const url = await uploadToR2(key, bytes, mime)
       return { status: 'ok', url }
     } catch (e) {
       console.error('[uploads] R2 upload failed', e)

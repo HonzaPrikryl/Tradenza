@@ -35,7 +35,13 @@ const accountSchema = z.object({
   accountSize: z.coerce.number().min(0).optional().or(z.literal('')),
   phase: z.string().trim().max(40).optional().or(z.literal('')),
   startingBalance: z.coerce.number().optional().or(z.literal('')),
-  currency: z.string().trim().min(1).max(8).default('USD'),
+  // USD-only for now: whatever the client sends is normalised to USD so every
+  // amount is in one currency and P&L can be summed correctly. Multi-currency is
+  // a deliberate future step (would need per-currency aggregation + FX).
+  currency: z
+    .string()
+    .optional()
+    .transform(() => 'USD'),
 })
 
 export type AccountInput = z.infer<typeof accountSchema>
