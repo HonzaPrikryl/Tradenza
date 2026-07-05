@@ -8,6 +8,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/opengraph-image(.*)',
   '/api/webhooks(.*)',
+  '/api/health',
   '/privacy',
   '/terms',
 ])
@@ -24,6 +25,7 @@ const isMarketingRoute = createRouteMatcher([
   '/robots.txt',
   '/sitemap.xml',
   '/api/webhooks(.*)',
+  '/api/health',
   '/privacy',
   '/terms',
 ])
