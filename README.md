@@ -28,6 +28,7 @@ It is designed for traders who want to improve through data rather than feelings
 
 - **Customizable dashboard** — drag-and-drop widget grid (powered by dnd-kit) with savable layout templates. KPI tiles (net P&L, win rate, profit factor, expectancy, average R:R, max drawdown, current streak…) plus larger widgets: a Zella-style score, cumulative P&L curve, net daily P&L, a P&L calendar, top symbols, and a performance breakdown.
 - **Rich trade journal** — per-trade detail with an interactive price chart, multi-execution / multi-leg editor, running P&L, star rating, and structured notes (setup, emotions before/after, mistakes, lessons).
+- **Strategies & playbooks** — define each setup you trade as a reusable strategy with its own entry and exit checklists, reference screenshots, and color. Assign a strategy to a trade, tick off the checklist you actually followed, and review per-strategy statistics alongside how closely your executions matched the plan. Retired setups can be archived without losing their trade history.
 - **Deep statistics** — win rate (overall, longs, shorts), profit factor, expectancy, planned vs. realized R-multiples, hold-time analysis, consecutive win/loss streaks, day-level stats, fees/commissions breakdown, and more.
 - **Discipline tracking** — define your trading rules, check them off each day, write daily reviews, and watch your streaks on a year-long heatmap. Rules can be paused or archived without losing history.
 - **Trading accounts** — built around the prop-firm workflow (firm, phase, account size, starting balance, currency). Assign trades to accounts and filter everything by account.
@@ -50,7 +51,7 @@ See [`docs/UX_UI.md`](docs/UX_UI.md) for a full UX/UI walkthrough of the screens
 | ORM                           | [Drizzle ORM](https://orm.drizzle.team) + drizzle-kit                                                                            |
 | Auth                          | [Clerk](https://clerk.com)                                                                                                       |
 | Charts                        | [Recharts](https://recharts.org) (analytics) + [Lightweight Charts](https://tradingview.github.io/lightweight-charts/) (candles) |
-| Forms & validation            | React Hook Form-style server actions + [Zod](https://zod.dev)                                                                    |
+| Forms & validation            | Type-safe Server Actions with schema validation via [Zod](https://zod.dev)                                                       |
 | CSV                           | [PapaParse](https://www.papaparse.com)                                                                                           |
 | Drag & drop                   | [dnd-kit](https://dndkit.com)                                                                                                    |
 | Notifications                 | [Sonner](https://sonner.emilkowal.ski)                                                                                           |
@@ -125,6 +126,7 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                      |    ▫️    | Error monitoring & source maps                                                               |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`     |    ▫️    | Per-user rate limiting (both required together; omit to disable — see below)                 |
 | `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST`    |    ▫️    | Privacy-respecting analytics (PostHog EU, cookieless). Omit the key to disable analytics     |
+| `ADMIN_EMAILS`                                            |    ▫️    | Comma-separated e-mails allowed into the internal `/admin` overview. Omit to disable admin   |
 | `RESEND_API_KEY` / `FEEDBACK_*`                           |    ▫️    | Feedback e-mail notifications (Resend). Omit to disable.                                     |
 
 ✅ required · ▫️ optional. See [`.env.example`](.env.example) for the full annotated list.
@@ -145,7 +147,7 @@ Only write actions are limited; browsing and reading are never throttled. If som
 
 Product analytics is **optional** and privacy-respecting, via [PostHog](https://posthog.com) on its **EU** cloud. When `NEXT_PUBLIC_POSTHOG_KEY` is unset it is disabled and nothing is loaded. To enable it, create a project in the PostHog EU region and set `NEXT_PUBLIC_POSTHOG_KEY` (host defaults to `https://eu.i.posthog.com`).
 
-It is deliberately minimal and cookieless: `persistence: 'memory'` (no cookies → no consent banner), autocapture and session recording are **off** (we never capture DOM text/inputs, which for a trading app could be financial data), and only a small set of meaningful product events is sent
+It is deliberately minimal and cookieless: `persistence: 'memory'` (no cookies → no consent banner), autocapture and session recording are **off** (we never capture DOM text/inputs, which for a trading app could be financial data), and only a small set of meaningful product events is sent.
 
 ## Account & data deletion
 
@@ -181,7 +183,9 @@ src/
 │   │   ├── add-trade/          # Quick add entry
 │   │   ├── stats/              # Detailed statistics
 │   │   ├── progress/           # Discipline tracking + daily reviews
+│   │   ├── strategies/         # Strategy playbooks + per-strategy stats [id]
 │   │   ├── accounts/           # Trading accounts
+│   │   ├── admin/              # Internal user & feedback overview
 │   │   └── settings/           # Accounts, tags, trade & global settings, import history
 │   ├── (wizard)/trade-import/  # Guided import flow (method → account → upload / manual)
 │   ├── layout.tsx              # Root layout (Clerk, fonts, providers)
@@ -191,7 +195,7 @@ src/
 ├── components/                 # Feature + UI components (dashboard, trades, stats, progress, settings, ui…)
 ├── lib/
 │   ├── db/                     # Drizzle schema + Neon client
-│   ├── actions/                # Server Actions (trades, stats, import, accounts, tags, progress, dashboard, candles, wizard)
+│   ├── actions/                # Server Actions (trades, stats, import, accounts, tags, progress, dashboard, candles, strategies, wizard, admin, feedback)
 │   ├── dashboard/              # Widget compute + default templates
 │   ├── stats-compute.ts        # Pure statistics engine (unit-tested)
 │   ├── progress-compute.ts     # Streak / discipline math
@@ -226,16 +230,19 @@ Adopting migrations on an **existing** database (already has the tables but no m
 
 ### Schema overview
 
-| Table                                                    | Purpose                                                         |
-| -------------------------------------------------------- | --------------------------------------------------------------- |
-| `accounts`                                               | Trading accounts (prop-firm model: firm, phase, size, currency) |
-| `trades`                                                 | Core trade records (entry/exit, P&L, risk, journaling fields)   |
-| `tag_groups` / `tags` / `trade_tags`                     | Color-coded tags grouped into categories, linked to trades      |
-| `screenshots`                                            | Trade screenshots (R2 URLs)                                     |
-| `candle_cache`                                           | Cached OHLC data for the trade detail chart                     |
-| `import_logs`                                            | One row per import — counts, errors, created trade IDs          |
-| `dashboard_templates`                                    | Saved dashboard layouts per user                                |
-| `progress_rules` / `rule_completions` / `daily_checkins` | Discipline rules, daily completions, and daily review notes     |
+| Table                                                    | Purpose                                                                              |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `users`                                                  | User records synced from Clerk (email, name) — used by admin & data purge            |
+| `accounts`                                               | Trading accounts (prop-firm model: firm, phase, size, currency)                      |
+| `trades`                                                 | Core trade records (entry/exit, P&L, risk, journaling fields)                        |
+| `strategies`                                             | Reusable playbooks: entry/exit checklists, reference images, color; linked to trades |
+| `tag_groups` / `tags` / `trade_tags`                     | Color-coded tags grouped into categories, linked to trades                           |
+| `screenshots`                                            | Trade screenshots (R2 URLs)                                                          |
+| `market_candles`                                         | Cached OHLC data for the trade detail chart                                          |
+| `import_logs`                                            | One row per import — counts, errors, created trade IDs                               |
+| `dashboard_templates`                                    | Saved dashboard layouts per user                                                     |
+| `progress_rules` / `rule_completions` / `daily_checkins` | Discipline rules, daily completions, and daily review notes                          |
+| `feedback`                                               | In-app user feedback submissions (surfaced in the admin panel)                       |
 
 ## Importing trades
 

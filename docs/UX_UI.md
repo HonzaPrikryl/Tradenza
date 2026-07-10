@@ -59,7 +59,7 @@ The UI is assembled from three layers:
 
 1. **Primitives** (`src/components/ui/`) — Radix-based building blocks (Dialog, Select, Tooltip, Popover, Tabs, Switch) plus app-specific inputs (DateRangePicker, MultiSelect, ComboCreate, RichTextEditor, Pagination, ActionMenu).
 2. **MUI** — used where its mature components add value, primarily date/time pickers, themed via `mui-theme.ts` to match the token palette.
-3. **Feature components** — composed per domain: `dashboard/`, `trades/`, `stats/`, `progress/`, `settings/`, `accounts/`, `trade-import/`.
+3. **Feature components** — composed per domain: `dashboard/`, `trades/`, `stats/`, `progress/`, `strategies/`, `settings/`, `accounts/`, `trade-import/`.
 
 ---
 
@@ -77,7 +77,7 @@ The app uses three route groups that map to three distinct contexts:
 
 Inside `(app)`, every screen shares:
 
-- **Left sidebar** (`Sidebar`) — primary navigation: Dashboard, Trades, Statistics, Discipline, Accounts, Settings, plus the prominent **Add trade** action. It can collapse (state held in `SidebarContext`) and has a subtle primary "glow".
+- **Left sidebar** (`Sidebar`) — primary navigation: Dashboard, Trades, Statistics, Discipline, Strategies, Accounts, Settings, plus the prominent **Add trade** action. It can collapse (state held in `SidebarContext`) and has a subtle primary "glow".
 - **Global header** (`AppHeader`) — app-wide controls that filter _every_ data screen at once:
   - **Account selector** — scope all data to one trading account or view all.
   - **Date range** — with quick presets (today, this week, month, etc.).
@@ -123,12 +123,13 @@ Trades list → Trade detail [id]
 
 The trade detail screen is the journaling heart of the app:
 
-- **Price chart** (`TradeChart`, lightweight-charts) with the entry/exit marked. Candles are fetched on demand via Databento and cached per trade (`candle_cache`); if no market-data key is configured, the chart degrades gracefully.
+- **Price chart** (`TradeChart`, lightweight-charts) with the entry/exit marked. Candles are fetched on demand via Databento and cached (`market_candles`); if no market-data key is configured, the chart degrades gracefully.
 - **Executions / legs editor** — multi-fill and multi-leg trades are supported, with a **running P&L** chart as the position is built and reduced.
 - **Stats panel** — per-trade metrics (R, hold time, fees, etc.).
 - **Notes tabs** — structured journaling split into setup, emotions (before / after), mistakes, and lessons, with a rich-text editor and **autosave** (`useAutosave`).
 - **Star rating** — a quick subjective grade of execution quality.
 - **Tags panel** — assign color-coded tags/categories.
+- **Strategy & playbook** — link the trade to one of your strategies, then tick off its **entry** and **exit** checklist items as you review. The trade records how faithfully you followed the plan, which rolls up into per-strategy adherence stats.
 
 The structure nudges the trader past "did I win?" toward "did I execute well, and what do I repeat or avoid?".
 
@@ -153,23 +154,40 @@ Dashboard (glanceable) ↔ Statistics (deep dive)
 - The **Dashboard** answers "how am I doing right now?" at a glance, and is fully customizable (see §5).
 - The **Statistics** page answers "where exactly is my edge — and my leak?" with the full metric set: win rate by direction, profit factor, expectancy, planned vs realized R, hold-time analysis, consecutive streaks, day-level breakdowns, and fees. Both screens obey the global account/date/unit filters.
 
+### 4.6 Building and following a strategy
+
+```
+Strategies → Strategy [id] ↔ Trade detail (assign + tick checklist)
+```
+
+Where Discipline tracks daily process, **Strategies** capture the specific setups a trader repeats — turning a loose "plan" into something measurable:
+
+- Define a **strategy** with a name, a written description of its rules, a color, and up to a handful of **reference screenshots** of the ideal setup.
+- Split the plan into the two decisions it actually governs: an **entry checklist** (what makes a valid entry) and an **exit checklist** (how and when to get out). Both are optional.
+- Assign a strategy to each trade and, during review, tick off the checklist items you genuinely followed. Adherence is stored per trade, so the strategy page can show not just _how_ that setup performs (its own P&L, win rate, expectancy) but _how closely you actually traded it_ — separating a losing edge from poor execution of a good one.
+- Retired setups can be **archived**: they leave the active list and their trades keep the (now-unlinked) history, so past statistics stay intact — the same non-destructive pattern used for accounts and discipline rules.
+
+This closes the loop with the journal: the strategy defines the plan, the trade detail records the execution, and the stats reveal the gap between the two.
+
 ---
 
 ## 5. Screen reference
 
-| Screen                | Route                                  | Purpose                                                                            |
-| --------------------- | -------------------------------------- | ---------------------------------------------------------------------------------- |
-| **Landing**           | `/`                                    | Marketing + entry point; CTAs to sign up / dashboard.                              |
-| **Sign in / Sign up** | `/sign-in`, `/sign-up`                 | Clerk-hosted auth, themed to match the app.                                        |
-| **Dashboard**         | `/dashboard`                           | Customizable widget grid; glanceable performance overview.                         |
-| **Trades**            | `/trades`                              | Filterable, sortable, paginated trade table with summary stat cards; bulk actions. |
-| **Trade detail**      | `/trades/[id]`                         | Chart, executions, running P&L, structured notes, rating, tags.                    |
-| **Add trade**         | `/add-trade`, `/add-trade/[accountId]` | Quick single-trade entry.                                                          |
-| **Trade import**      | `/trade-import/*`                      | Guided multi-step CSV/manual import wizard.                                        |
-| **Statistics**        | `/stats`                               | Full statistical breakdown of the filtered trade set.                              |
-| **Discipline**        | `/progress`, `/progress/[date]`        | Rules, daily check-ins/reviews, streaks, year heatmap.                             |
-| **Accounts**          | `/accounts`                            | List and manage trading accounts (prop-firm model).                                |
-| **Settings**          | `/settings/*`                          | Accounts, tags & categories, trade settings, global settings, import history.      |
+| Screen                 | Route                                  | Purpose                                                                            |
+| ---------------------- | -------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Landing**            | `/`                                    | Marketing + entry point; CTAs to sign up / dashboard.                              |
+| **Sign in / Sign up**  | `/sign-in`, `/sign-up`                 | Clerk-hosted auth, themed to match the app.                                        |
+| **Dashboard**          | `/dashboard`                           | Customizable widget grid; glanceable performance overview.                         |
+| **Trades**             | `/trades`                              | Filterable, sortable, paginated trade table with summary stat cards; bulk actions. |
+| **Trade detail**       | `/trades/[id]`                         | Chart, executions, running P&L, structured notes, rating, tags.                    |
+| **Add trade**          | `/add-trade`, `/add-trade/[accountId]` | Quick single-trade entry.                                                          |
+| **Trade import**       | `/trade-import/*`                      | Guided multi-step CSV/manual import wizard.                                        |
+| **Statistics**         | `/stats`                               | Full statistical breakdown of the filtered trade set.                              |
+| **Discipline**         | `/progress`, `/progress/[date]`        | Rules, daily check-ins/reviews, streaks, year heatmap.                             |
+| **Strategies**         | `/strategies`, `/strategies/[id]`      | Strategy playbooks (entry/exit checklists, reference images) + per-strategy stats. |
+| **Accounts**           | `/accounts`                            | List and manage trading accounts (prop-firm model).                                |
+| **Settings**           | `/settings/*`                          | Accounts, tags & categories, trade settings, global settings, import history.      |
+| **Admin** _(internal)_ | `/admin`, `/admin/feedback`            | Maintainer-only user & feedback overview.                                          |
 
 ### The customizable dashboard (in depth)
 
