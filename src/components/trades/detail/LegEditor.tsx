@@ -7,7 +7,7 @@ import { t } from '@/i18n'
 import Select from '@/components/ui/Select'
 import type { RiskPlanLeg } from './executions'
 
-export type LegMode = 'ticks' | 'price'
+export type LegMode = 'ticks' | 'price' | 'money'
 
 function decimalsOf(n: number): number {
   if (!Number.isFinite(n) || n <= 0) return 2
@@ -22,6 +22,7 @@ export default function LegEditor({
   onModeChange,
   entryPrice,
   tickSize,
+  tickValue,
   priceSign,
   totalQty,
   kind,
@@ -32,18 +33,28 @@ export default function LegEditor({
   onModeChange: (mode: LegMode) => void
   entryPrice: number
   tickSize: number
+  tickValue: number
   priceSign: number
   totalQty: number
   kind: 'tp' | 'sl'
   onChange: (legs: RiskPlanLeg[]) => void
 }) {
   const priceAvailable = tickSize > 0 && entryPrice > 0
-  const effectiveMode: LegMode = priceAvailable ? mode : 'ticks'
+  const moneyAvailable = tickValue > 0
+  const effectiveMode: LegMode =
+    (mode === 'price' && !priceAvailable) || (mode === 'money' && !moneyAvailable) ? 'ticks' : mode
   const decimals = decimalsOf(tickSize)
 
   const ticksToPrice = (ticks: number) => entryPrice + priceSign * ticks * tickSize
   const priceToTicks = (price: number) => {
     const tk = Math.round(((price - entryPrice) * priceSign) / tickSize)
+    return tk > 0 ? tk : 0
+  }
+  const ticksToMoney = (ticks: number, qty: number) => ticks * qty * tickValue
+  const moneyToTicks = (money: number, qty: number) => {
+    const denom = qty * tickValue
+    if (denom <= 0) return 0
+    const tk = Math.round(money / denom)
     return tk > 0 ? tk : 0
   }
 
@@ -57,14 +68,29 @@ export default function LegEditor({
   const usedQty = legs.reduce((s, l) => s + (l.qty || 0), 0)
   const exceeds = usedQty > totalQty
 
-  const [priceDrafts, setPriceDrafts] = useState<string[]>([])
+  const converted = effectiveMode !== 'ticks'
+  const qtyKey = legs.map((l) => l.qty).join(',')
+  const [drafts, setDrafts] = useState<string[]>([])
   useEffect(() => {
-    if (effectiveMode !== 'price') return
-    setPriceDrafts(legs.map((l) => (l.ticks > 0 ? ticksToPrice(l.ticks).toFixed(decimals) : '')))
+    if (!converted) return
+    setDrafts(
+      legs.map((l) => {
+        if (l.ticks <= 0) return ''
+        return effectiveMode === 'price'
+          ? ticksToPrice(l.ticks).toFixed(decimals)
+          : String(Math.round(ticksToMoney(l.ticks, l.qty)))
+      }),
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveMode, legs.length, entryPrice, tickSize, priceSign])
+  }, [effectiveMode, legs.length, entryPrice, tickSize, priceSign, tickValue, qtyKey])
 
   const setLeg = (i: number, patch: Partial<RiskPlanLeg>) => legs.map((l, idx) => (idx === i ? { ...l, ...patch } : l))
+  const setDraft = (i: number, raw: string) =>
+    setDrafts((d) => {
+      const n = [...d]
+      n[i] = raw
+      return n
+    })
 
   const updateTicks = (i: number, raw: string) => {
     const v = raw === '' ? 0 : Math.max(0, Number(raw))
@@ -74,14 +100,11 @@ export default function LegEditor({
     const v = raw === '' ? 0 : Math.max(0, Number(raw))
     onChange(recalc(setLeg(i, { qty: Number.isFinite(v) ? v : 0 })))
   }
-  const updatePrice = (i: number, raw: string) => {
-    setPriceDrafts((d) => {
-      const n = [...d]
-      n[i] = raw
-      return n
-    })
-    const price = Number(raw.replace(',', '.'))
-    const ticks = raw.trim() === '' || !Number.isFinite(price) ? 0 : priceToTicks(price)
+  const updateConverted = (i: number, raw: string) => {
+    setDraft(i, raw)
+    const num = Number(raw.replace(',', '.'))
+    const empty = raw.trim() === '' || !Number.isFinite(num)
+    const ticks = empty ? 0 : effectiveMode === 'price' ? priceToTicks(num) : moneyToTicks(num, legs[i]?.qty ?? 0)
     onChange(setLeg(i, { ticks }))
   }
   const remove = (i: number) => onChange(recalc(legs.filter((_, idx) => idx !== i)))
@@ -98,20 +121,21 @@ export default function LegEditor({
           onValueChange={(v) => onModeChange(v as LegMode)}
           align="end"
           className="h-7 w-28 py-1 text-xs"
-          options={
-            priceAvailable
-              ? [
-                  { value: 'ticks', label: t('trades.detail.risk.unitTicks') },
-                  { value: 'price', label: t('trades.detail.risk.unitPrice') },
-                ]
-              : [{ value: 'ticks', label: t('trades.detail.risk.unitTicks') }]
-          }
+          options={[
+            { value: 'ticks', label: t('trades.detail.risk.unitTicks') },
+            ...(priceAvailable ? [{ value: 'price', label: t('trades.detail.risk.unitPrice') }] : []),
+            ...(moneyAvailable ? [{ value: 'money', label: t('trades.detail.risk.unitMoney') }] : []),
+          ]}
         />
       </div>
 
       <div className="grid grid-cols-[1fr_72px_28px] items-center gap-2 px-0.5">
         <span className="text-[11px] text-muted-foreground">
-          {effectiveMode === 'price' ? t('trades.detail.risk.price') : t('trades.detail.risk.ticks')}
+          {effectiveMode === 'price'
+            ? t('trades.detail.risk.price')
+            : effectiveMode === 'money'
+              ? t('trades.detail.risk.money')
+              : t('trades.detail.risk.ticks')}
         </span>
         <span className="text-[11px] text-muted-foreground">{t('trades.detail.risk.qty')}</span>
         <span />
@@ -122,16 +146,23 @@ export default function LegEditor({
         return (
           <div key={i} className="grid grid-cols-[1fr_72px_28px] items-center gap-2">
             <div className="relative">
-              {effectiveMode === 'price' ? (
-                <input
-                  type="number"
-                  step="any"
-                  inputMode="decimal"
-                  value={priceDrafts[i] ?? ''}
-                  onChange={(e) => updatePrice(i, e.target.value)}
-                  placeholder={entryPrice ? entryPrice.toFixed(decimals) : '0'}
-                  className={inputCls}
-                />
+              {converted ? (
+                <>
+                  {effectiveMode === 'money' && (
+                    <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      $
+                    </span>
+                  )}
+                  <input
+                    type="number"
+                    step="any"
+                    inputMode="decimal"
+                    value={drafts[i] ?? ''}
+                    onChange={(e) => updateConverted(i, e.target.value)}
+                    placeholder={effectiveMode === 'price' ? (0).toFixed(decimals) : '0'}
+                    className={cn(inputCls, effectiveMode === 'money' && 'pl-5')}
+                  />
+                </>
               ) : (
                 <input
                   type="number"

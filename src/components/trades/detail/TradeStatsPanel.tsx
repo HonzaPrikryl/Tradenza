@@ -341,6 +341,7 @@ export default function TradeStatsPanel({
               onModeChange={setTargetMode}
               entryPrice={entryPrice}
               tickSize={ts}
+              tickValue={tickValue}
               priceSign={dirSign}
               totalQty={defaultQty}
               kind="tp"
@@ -356,6 +357,7 @@ export default function TradeStatsPanel({
               onModeChange={setStopMode}
               entryPrice={entryPrice}
               tickSize={ts}
+              tickValue={tickValue}
               priceSign={-dirSign}
               totalQty={defaultQty}
               kind="sl"
