@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getTradeById } from '@/lib/actions/trades'
 import { getTagGroups } from '@/lib/actions/tags'
+import { getStrategies } from '@/lib/actions/strategies'
 import { getDailyNote } from '@/lib/actions/progress'
 import { readGlobalSettings } from '@/lib/global-settings'
 import TradeDetailClient from '@/components/trades/TradeDetailClient'
@@ -31,7 +32,12 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
   const { id } = await params
   if (isDemoId(id)) return <DemoTradeDetail />
 
-  const [trade, tagGroups, settings] = await Promise.all([getTradeById(id), getTagGroups(), readGlobalSettings()])
+  const [trade, tagGroups, strategies, settings] = await Promise.all([
+    getTradeById(id),
+    getTagGroups(),
+    getStrategies(),
+    readGlobalSettings(),
+  ])
   if (!trade) notFound()
 
   const dayKey = dayKeyInTz(trade.entryDatetime, settings.timezone)
@@ -41,6 +47,7 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
     <TradeDetailClient
       trade={trade}
       tagGroups={tagGroups}
+      strategies={strategies}
       timezone={settings.timezone}
       dayKey={dayKey}
       dailyNote={dailyNote}

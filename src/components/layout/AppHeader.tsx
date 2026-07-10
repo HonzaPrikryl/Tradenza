@@ -35,11 +35,18 @@ interface AccountOpt {
   name: string
 }
 
+interface StrategyOpt {
+  id: string
+  name: string
+  color: string
+}
+
 interface Props {
   accounts: AccountOpt[]
   tagGroups: TagGroupWithValues[]
   filters: GlobalFilters
   symbols: string[]
+  strategies: StrategyOpt[]
 }
 
 const prettyDate = (s?: string) => (s ? format(new Date(s), 'd. M. yyyy') : null)
@@ -133,7 +140,7 @@ function Dropdown({
   )
 }
 
-export default function AppHeader({ accounts, tagGroups, filters, symbols }: Props) {
+export default function AppHeader({ accounts, tagGroups, filters, symbols, strategies }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const { toggle } = useSidebar()
@@ -192,6 +199,7 @@ export default function AppHeader({ accounts, tagGroups, filters, symbols }: Pro
     (filters.outcomes.length > 0 ? 1 : 0) +
     (filters.instruments.length > 0 ? 1 : 0) +
     (filters.symbolsInclude.length > 0 || filters.symbolsExclude.length > 0 ? 1 : 0) +
+    (filters.strategiesInclude.length > 0 || filters.strategiesExclude.length > 0 ? 1 : 0) +
     (filters.ratings.length > 0 ? 1 : 0) +
     (filters.rMin !== undefined || filters.rMax !== undefined || filters.rNone ? 1 : 0) +
     (filters.daysOfWeek.length > 0 ? 1 : 0) +
@@ -268,7 +276,7 @@ export default function AppHeader({ accounts, tagGroups, filters, symbols }: Pro
   )
 
   const renderFilters = (close: () => void) => (
-    <FiltersPanel tagGroups={tagGroups} filters={filters} symbols={symbols} onClose={close} />
+    <FiltersPanel tagGroups={tagGroups} filters={filters} symbols={symbols} strategies={strategies} onClose={close} />
   )
 
   const renderUnit = (close: () => void) => (

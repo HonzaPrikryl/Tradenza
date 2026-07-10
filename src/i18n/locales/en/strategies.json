@@ -1,0 +1,87 @@
+{
+  "nav": "Strategies",
+  "title": "Strategies",
+  "subtitle": "Your trading playbooks — define a setup once, then assign it to trades and see which ones actually work.",
+  "search": "Search strategies…",
+  "view": {
+    "cards": "Cards",
+    "list": "List"
+  },
+  "list": {
+    "name": "Strategy"
+  },
+  "new": "New strategy",
+  "edit": "Edit strategy",
+  "empty": {
+    "title": "No strategies yet",
+    "description": "Create your first playbook: name it and describe its rules. You'll then be able to assign trades to it.",
+    "cta": "New strategy"
+  },
+  "form": {
+    "name": "Name",
+    "namePlaceholder": "e.g. Opening range breakout",
+    "description": "Definition / rules",
+    "descriptionPlaceholder": "Entry criteria, exit rules, what makes this setup valid…",
+    "checklist": "Setup checklist",
+    "addCriterion": "Add criterion",
+    "criterionPlaceholder": "e.g. Price above VWAP",
+    "image": "Reference screenshot",
+    "images": "Reference screenshots",
+    "attachImage": "Upload image",
+    "attachImages": "Upload images",
+    "uploading": "Uploading…",
+    "removeImage": "Remove image",
+    "selectImage": "Select image",
+    "selected": "{count} selected",
+    "removeSelected": "Remove selected",
+    "clearSelection": "Clear",
+    "dragToReorder": "Drag to reorder",
+    "limitReached": "You can attach up to {max} images.",
+    "imageUnavailable": "Image upload isn't available (storage not configured).",
+    "color": "Color",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel"
+  },
+  "delete": {
+    "title": "Delete strategy?",
+    "body": "\"{name}\" will be removed from your list. Trades already assigned to it keep their history.",
+    "confirm": "Delete"
+  },
+  "toast": {
+    "created": "Strategy created",
+    "updated": "Strategy updated",
+    "deleted": "Strategy deleted"
+  },
+  "panel": {
+    "title": "Strategy",
+    "none": "No strategy"
+  },
+  "column": "Strategy",
+  "stats": {
+    "trades": "Trades",
+    "netPnl": "Net P&L",
+    "winRate": "Win rate",
+    "expectancy": "Expectancy",
+    "avgR": "Avg R",
+    "profitFactor": "Profit factor"
+  },
+  "detail": {
+    "back": "Back to strategies",
+    "checklistTitle": "Setup checklist",
+    "referenceTitle": "Reference",
+    "galleryPrev": "Previous image",
+    "galleryNext": "Next image",
+    "galleryClose": "Close",
+    "equity": "Cumulative net P&L",
+    "recent": "Recent trades",
+    "noTrades": "No trades assigned to this strategy yet.",
+    "columns": {
+      "symbol": "Symbol",
+      "direction": "Direction",
+      "status": "Status",
+      "entry": "Entry",
+      "netPnl": "Net P&L"
+    }
+  }
+}

@@ -250,7 +250,6 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
         fees: fees.toString(),
         grossPnl,
         netPnl,
-        setupName: get('setupName')?.trim() || null,
         notes: get('notes')?.trim() || null,
         importSource: 'csv',
         externalId,

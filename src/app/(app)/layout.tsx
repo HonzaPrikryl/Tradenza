@@ -6,6 +6,7 @@ import { SidebarProvider } from '@/components/layout/SidebarContext'
 import { getAccounts } from '@/lib/actions/accounts'
 import { getTagGroups } from '@/lib/actions/tags'
 import { getTradeSymbols } from '@/lib/actions/trades'
+import { getStrategies } from '@/lib/actions/strategies'
 import { readGlobalFilters } from '@/lib/global-filters'
 import { isAdmin } from '@/lib/admin'
 import { ensureUserRecord } from '@/lib/db/sync-user'
@@ -15,11 +16,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (!userId) redirect('/sign-in')
   await ensureUserRecord(userId)
 
-  const [accounts, tagGroups, filters, symbols, admin] = await Promise.all([
+  const [accounts, tagGroups, filters, symbols, strategies, admin] = await Promise.all([
     getAccounts(),
     getTagGroups(),
     readGlobalFilters(),
     getTradeSymbols(),
+    getStrategies(),
     isAdmin(),
   ])
 
@@ -33,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             tagGroups={tagGroups}
             filters={filters}
             symbols={symbols}
+            strategies={strategies.map((s) => ({ id: s.id, name: s.name, color: s.color }))}
           />
           {children}
         </main>

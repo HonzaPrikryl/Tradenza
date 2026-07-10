@@ -18,6 +18,7 @@ const { EXPECTED_TABLES, deleted, batchMock, r2, captureMock } = vi.hoisted(() =
     'ruleCompletions',
     'dailyCheckins',
     'feedback',
+    'strategies',
     'users',
   ],
   deleted: [] as string[],

@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowUp, ArrowDown, Search } from 'lucide-react'
+import { Search } from 'lucide-react'
+import SortableTh from '@/components/ui/SortableTh'
+import { useTableSort } from '@/hooks/useTableSort'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import type { UserOverviewRow } from '@/lib/actions/admin'
@@ -17,6 +19,19 @@ type SortKey =
   | 'reviewCount'
   | 'createdAt'
   | 'lastActiveAt'
+
+const SORT_KEYS: SortKey[] = [
+  'id',
+  'name',
+  'email',
+  'tradeCount',
+  'journaledCount',
+  'accountCount',
+  'reviewCount',
+  'createdAt',
+  'lastActiveAt',
+]
+const STORAGE_KEY = 'tradenza-admin-users-sort'
 
 interface Column {
   key: SortKey
@@ -123,32 +138,31 @@ function cellText(u: UserOverviewRow, key: SortKey): string {
 export default function AdminUsersTable({ users }: { users: UserOverviewRow[] }) {
   const router = useRouter()
   const [query, setQuery] = useState('')
-  const [sortKey, setSortKey] = useState<SortKey>('createdAt')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-
-  function toggleSort(key: SortKey) {
-    if (key === sortKey) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      const col = COLUMNS.find((c) => c.key === key)
-      setSortDir(col?.kind === 'text' ? 'asc' : 'desc')
-    }
-  }
+  const { sortBy, sortOrder, toggleSort } = useTableSort({
+    storageKey: STORAGE_KEY,
+    defaultSortBy: 'createdAt',
+    defaultSortOrder: 'desc',
+    validSortKeys: SORT_KEYS,
+    orderForColumn: (column) => {
+      const col = COLUMNS.find((c) => c.key === column)
+      return col?.kind === 'text' ? 'asc' : 'desc'
+    },
+  })
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
     const filtered = q
       ? users.filter((u) => [fullName(u), u.email ?? '', u.username ?? ''].some((f) => f.toLowerCase().includes(q)))
       : users
+    const key = sortBy as SortKey
     return [...filtered].sort((a, b) => {
-      const va = sortValue(a, sortKey)
-      const vb = sortValue(b, sortKey)
-      if (va < vb) return sortDir === 'asc' ? -1 : 1
-      if (va > vb) return sortDir === 'asc' ? 1 : -1
+      const va = sortValue(a, key)
+      const vb = sortValue(b, key)
+      if (va < vb) return sortOrder === 'asc' ? -1 : 1
+      if (va > vb) return sortOrder === 'asc' ? 1 : -1
       return 0
     })
-  }, [users, query, sortKey, sortDir])
+  }, [users, query, sortBy, sortOrder])
 
   return (
     <div>
@@ -176,30 +190,17 @@ export default function AdminUsersTable({ users }: { users: UserOverviewRow[] })
           </colgroup>
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-              {COLUMNS.map((col) => {
-                const active = col.key === sortKey
-                return (
-                  <th
-                    key={col.key}
-                    className={cn('px-4 py-3 font-medium', col.align === 'right' ? 'text-right' : 'text-left')}
-                  >
-                    <button
-                      onClick={() => toggleSort(col.key)}
-                      className={cn(
-                        'inline-flex items-center gap-1 transition-colors hover:text-foreground',
-                        col.align === 'right' && 'flex-row-reverse',
-                        active && 'text-foreground',
-                      )}
-                    >
-                      <span className="truncate">{t(col.labelKey)}</span>
-                      <span className="inline-flex w-3 shrink-0 justify-center">
-                        {active &&
-                          (sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />)}
-                      </span>
-                    </button>
-                  </th>
-                )
-              })}
+              {COLUMNS.map((col) => (
+                <SortableTh
+                  key={col.key}
+                  label={t(col.labelKey)}
+                  column={col.key}
+                  activeColumn={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={toggleSort}
+                  align={col.align}
+                />
+              ))}
             </tr>
           </thead>
           <tbody>

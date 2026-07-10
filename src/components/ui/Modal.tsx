@@ -16,6 +16,7 @@ export default function Modal({
   confirmLabel,
   confirmDisabled = false,
   cancelLabel,
+  className,
 }: {
   title: string
   onClose: () => void
@@ -24,9 +25,10 @@ export default function Modal({
   confirmLabel: string
   confirmDisabled?: boolean
   cancelLabel: string
+  className?: string
 }) {
   return (
-    <Dialog onClose={onClose}>
+    <Dialog onClose={onClose} className={className}>
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
         <h2 className="text-base font-semibold">{title}</h2>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">

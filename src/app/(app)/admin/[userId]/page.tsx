@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
+import AdminUserAccountsTable from '@/components/admin/AdminUserAccountsTable'
+import SortableTradesTable from '@/components/trades/SortableTradesTable'
 import { isAdmin } from '@/lib/admin'
 import { getUserDetail, type AdminUserDetail } from '@/lib/actions/admin'
 import { formatCurrency, cn } from '@/lib/utils'
@@ -89,33 +91,7 @@ export default async function AdminUserPage({ params }: { params: Promise<{ user
         {accounts.length === 0 ? (
           <Empty>{t('admin.user.accounts.empty')}</Empty>
         ) : (
-          <Table
-            head={[
-              t('admin.user.accounts.columns.name'),
-              t('admin.user.accounts.columns.firm'),
-              t('admin.user.accounts.columns.phase'),
-              t('admin.user.accounts.columns.trades'),
-              t('admin.user.accounts.columns.netPnl'),
-            ]}
-            align={['left', 'left', 'left', 'right', 'right']}
-          >
-            {accounts.map((a) => (
-              <tr key={a.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3 font-medium">
-                  {a.name}
-                  {a.archived && (
-                    <span className="ml-2 text-xs text-muted-foreground">({t('admin.user.accounts.archived')})</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{a.firm ?? '—'}</td>
-                <td className="px-4 py-3 text-muted-foreground">{a.phase ?? '—'}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{a.tradeCount}</td>
-                <td className={cn('px-4 py-3 text-right tabular-nums', pnlClass(a.netPnl))}>
-                  {formatCurrency(a.netPnl)}
-                </td>
-              </tr>
-            ))}
-          </Table>
+          <AdminUserAccountsTable accounts={accounts} />
         )}
       </Section>
 
@@ -127,37 +103,15 @@ export default async function AdminUserPage({ params }: { params: Promise<{ user
         {recentTrades.length === 0 ? (
           <Empty>{t('admin.user.trades.empty')}</Empty>
         ) : (
-          <Table
-            head={[
-              t('admin.user.trades.columns.symbol'),
-              t('admin.user.trades.columns.direction'),
-              t('admin.user.trades.columns.status'),
-              t('admin.user.trades.columns.entry'),
-              t('admin.user.trades.columns.netPnl'),
-            ]}
-            align={['left', 'left', 'left', 'left', 'right']}
-          >
-            {recentTrades.map((tr) => (
-              <tr key={tr.id} className="border-b border-border last:border-0">
-                <td className="px-4 py-3 font-medium">{tr.symbol}</td>
-                <td className="px-4 py-3 capitalize text-muted-foreground">{tr.direction}</td>
-                <td className="px-4 py-3 capitalize text-muted-foreground">{tr.status}</td>
-                <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{formatDate(tr.entryDatetime)}</td>
-                <td className={cn('px-4 py-3 text-right tabular-nums', pnlClass(tr.netPnl))}>
-                  {tr.netPnl === null ? '—' : formatCurrency(tr.netPnl)}
-                </td>
-              </tr>
-            ))}
-          </Table>
+          <SortableTradesTable
+            trades={recentTrades}
+            storageKey="tradenza-admin-user-trades-sort"
+            columnsKey="admin.user.trades.columns"
+          />
         )}
       </Section>
     </div>
   )
-}
-
-function pnlClass(v: number | null): string | undefined {
-  if (v === null || v === 0) return undefined
-  return v > 0 ? 'text-profit' : 'text-loss'
 }
 
 function Tile({ label, value, sub, valueClass }: { label: string; value: string; sub?: string; valueClass?: string }) {
@@ -180,25 +134,6 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
         {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </div>
       {children}
-    </div>
-  )
-}
-
-function Table({ head, align, children }: { head: string[]; align: ('left' | 'right')[]; children: React.ReactNode }) {
-  return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-            {head.map((h, i) => (
-              <th key={h} className={cn('px-4 py-3 font-medium', align[i] === 'right' ? 'text-right' : 'text-left')}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
     </div>
   )
 }

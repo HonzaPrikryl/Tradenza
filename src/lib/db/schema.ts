@@ -75,6 +75,9 @@ export const trades = pgTable(
     userId: text('user_id').notNull(), // Clerk user ID
 
     accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    // The primary setup/playbook this trade was taken under. One strategy per
+    // trade → clean per-strategy stats. Nulled if the strategy is deleted.
+    strategyId: uuid('strategy_id').references(() => strategies.id, { onDelete: 'set null' }),
 
     symbol: text('symbol').notNull(),
     direction: directionEnum('direction').notNull(),
@@ -124,6 +127,7 @@ export const trades = pgTable(
     symbolIdx: index('trades_symbol_idx').on(t.symbol),
     entryDatetimeIdx: index('trades_entry_datetime_idx').on(t.entryDatetime),
     accountIdIdx: index('trades_account_id_idx').on(t.accountId),
+    strategyIdIdx: index('trades_strategy_id_idx').on(t.strategyId),
     // Composite index for deduplication
     externalIdIdx: index('trades_external_id_idx').on(t.userId, t.externalId),
   }),
@@ -306,6 +310,34 @@ export const dailyCheckins = pgTable(
   }),
 )
 
+// ─── Strategies (playbooks) ───────────────────────────────────────────────────
+// A named, described trading setup/playbook the user takes trades under. Unlike
+// tags (orthogonal, many-to-many), a trade has one primary strategy, which makes
+// per-strategy analytics ("which playbook actually makes money?") clean.
+export const strategies = pgTable(
+  'strategies',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    name: text('name').notNull(), // "Opening range breakout"
+    description: text('description'), // definition / rules (plain text)
+    // Structured playbook: the entry/exit criteria that define a valid setup.
+    checklist: jsonb('checklist').$type<string[]>(), // null = none
+    imageUrl: text('image_url'), // deprecated single image (superseded by imageUrls)
+    imageUrls: jsonb('image_urls').$type<string[]>(), // R2 URLs of reference screenshots
+    color: text('color').notNull().default('#6366f1'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    // Soft-delete: archived strategies leave the list but their trades keep the
+    // (now-nulled) link + history. null = live.
+    archivedAt: timestamp('archived_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    userIdIdx: index('strategies_user_id_idx').on(t.userId),
+  }),
+)
+
 // ─── Feedback ─────────────────────────────────────────────────────────────────
 // User-submitted bug reports / ideas / wishes. Stored in-app (self-hosted, no
 // external dependency); an optional e-mail notification is sent on submit when
@@ -332,6 +364,11 @@ export const tradesRelations = relations(trades, ({ many, one }) => ({
   tradeTags: many(tradeTags),
   screenshots: many(screenshots),
   account: one(accounts, { fields: [trades.accountId], references: [accounts.id] }),
+  strategy: one(strategies, { fields: [trades.strategyId], references: [strategies.id] }),
+}))
+
+export const strategiesRelations = relations(strategies, ({ many }) => ({
+  trades: many(trades),
 }))
 
 export const accountsRelations = relations(accounts, ({ many }) => ({
@@ -385,3 +422,5 @@ export type DailyCheckin = typeof dailyCheckins.$inferSelect
 export type MarketCandles = typeof marketCandles.$inferSelect
 export type Feedback = typeof feedback.$inferSelect
 export type NewFeedback = typeof feedback.$inferInsert
+export type Strategy = typeof strategies.$inferSelect
+export type NewStrategy = typeof strategies.$inferInsert

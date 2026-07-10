@@ -23,6 +23,9 @@
     "notToday": "Rules can only be tracked for the current day.",
     "notScheduled": "This rule is not scheduled for that day."
   },
+  "strategy": {
+    "notFound": "Strategy not found."
+  },
   "execution": {
     "invalidDate": "One of the executions has an invalid date."
   }

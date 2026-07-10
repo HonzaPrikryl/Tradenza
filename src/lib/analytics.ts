@@ -28,6 +28,7 @@ export type AnalyticsEvent =
   | { name: 'progress_rule_created' }
   // — Feature adoption —
   | { name: 'dashboard_customized'; props?: { kind?: 'create' | 'edit' } }
+  | { name: 'strategy_created' }
 
 // Analytics is optional: when the PostHog key is unset the provider never
 // initialises, so this is a no-op. Wrapped in try/catch because analytics must

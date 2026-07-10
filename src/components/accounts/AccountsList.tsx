@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
+import { useTableSort } from '@/hooks/useTableSort'
 import {
   Plus,
   Pencil,
@@ -39,6 +40,8 @@ import {
 
 // ─── Accounts list ────────────────────────────────────────────────────────────
 
+const ACCOUNT_SORT_KEYS = ['name', 'balance', 'createdAt'] as const
+
 interface AccountsListProps {
   accounts: AccountWithStats[]
   title: string
@@ -52,6 +55,12 @@ const labelClass = 'mb-1 block text-xs font-medium text-muted-foreground'
 export default function AccountsList({ accounts, title, subtitle }: AccountsListProps) {
   const router = useRouter()
   const confirm = useConfirm()
+  const { sortBy, sortOrder, toggleSort } = useTableSort({
+    storageKey: 'tradenza-accounts-sort',
+    defaultSortBy: 'createdAt',
+    defaultSortOrder: 'desc',
+    validSortKeys: ACCOUNT_SORT_KEYS,
+  })
   const [showArchived, setShowArchived] = useState(false)
   const [editing, setEditing] = useState<AccountWithStats | null>(null)
   const [form, setForm] = useState<AccountInput | null>(null)
@@ -60,7 +69,18 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
   const [transferTarget, setTransferTarget] = useState('')
   const [transferSaving, setTransferSaving] = useState(false)
 
-  const rows = accounts.filter((r) => showArchived || !r.archived)
+  const balanceOf = (a: AccountWithStats): number => (a.startingBalance ? Number(a.startingBalance) : 0) + a.netPnl
+
+  const rows = useMemo(() => {
+    const filtered = accounts.filter((r) => showArchived || !r.archived)
+    return [...filtered].sort((a, b) => {
+      let cmp: number
+      if (sortBy === 'name') cmp = a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      else if (sortBy === 'balance') cmp = balanceOf(a) - balanceOf(b)
+      else cmp = new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+      return sortOrder === 'asc' ? cmp : -cmp
+    })
+  }, [accounts, showArchived, sortBy, sortOrder])
 
   const activeCount = accounts.filter((r) => !r.archived).length
   const isLastActive = (a: AccountWithStats) => !a.archived && activeCount === 1
@@ -224,8 +244,6 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
     },
   ]
 
-  const balanceOf = (a: AccountWithStats): number => (a.startingBalance ? Number(a.startingBalance) : 0) + a.netPnl
-
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
       {/* Card header */}
@@ -258,9 +276,29 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-xs text-muted-foreground">
-              <th className="px-5 py-3 text-left font-medium">{t('tradingAccounts.col.name')}</th>
+              <th
+                className="px-5 py-3 text-left font-medium cursor-pointer hover:text-foreground"
+                onClick={() => toggleSort('name')}
+              >
+                <div className="flex items-center gap-1">
+                  {t('tradingAccounts.col.name')}
+                  {sortBy === 'name' && (
+                    <span className="text-muted-foreground">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
               <th className="px-5 py-3 text-left font-medium">{t('tradingAccounts.col.broker')}</th>
-              <th className="px-5 py-3 text-left font-medium">{t('tradingAccounts.col.balance')}</th>
+              <th
+                className="px-5 py-3 text-left font-medium cursor-pointer hover:text-foreground"
+                onClick={() => toggleSort('balance')}
+              >
+                <div className="flex items-center gap-1">
+                  {t('tradingAccounts.col.balance')}
+                  {sortBy === 'balance' && (
+                    <span className="text-muted-foreground">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </th>
               <th className="px-5 py-3 text-left font-medium">{t('tradingAccounts.col.lastUpdate')}</th>
               <th className="px-5 py-3 text-left font-medium">{t('tradingAccounts.col.type')}</th>
               <th className="px-5 py-3 text-right font-medium">{t('tradingAccounts.col.actions')}</th>

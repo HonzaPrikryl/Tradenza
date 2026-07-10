@@ -22,7 +22,6 @@ export const COLUMN_CANDIDATES: Record<string, string[]> = {
   fees: ['commission', 'commissions', 'comm', 'fees', 'fee', 'total fees'],
   grossPnl: ['gross p&l', 'gross pnl'],
   netPnl: ['net p&l', 'net pnl', 'pnl', 'p&l', 'profit', 'realized p&l', 'profit/loss', 'realized pnl'],
-  setupName: ['setup', 'strategy'],
   notes: ['notes', 'note', 'comment', 'comments'],
 }
 
@@ -54,7 +53,6 @@ export const IMPORT_FIELDS = [
   'fees',
   'grossPnl',
   'netPnl',
-  'setupName',
   'notes',
 ] as const
 export type ImportField = (typeof IMPORT_FIELDS)[number]
@@ -177,7 +175,6 @@ export function buildImportMapping(headers: string[]): Partial<Record<ImportFiel
   if (det.fees) map.fees = det.fees
   if (det.grossPnl) map.grossPnl = det.grossPnl
   if (det.netPnl) map.netPnl = det.netPnl
-  if (det.setupName) map.setupName = det.setupName
   if (det.notes) map.notes = det.notes
 
   const entryDate =

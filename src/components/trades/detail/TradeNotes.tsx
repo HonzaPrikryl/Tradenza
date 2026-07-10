@@ -9,15 +9,7 @@ import { updateTradeJournal } from '@/lib/actions/trades'
 import { track } from '@/lib/analytics'
 import { useAutosave } from '@/hooks/useAutosave'
 import RichTextEditor from '@/components/ui/RichTextEditor'
-
-function isEmptyHtml(html: string): boolean {
-  return (
-    html
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .trim() === '' && !/<img/i.test(html)
-  )
-}
+import { isEmptyHtml } from '@/lib/html'
 
 export default function TradeNotes({ tradeId, initialNotes }: { tradeId: string; initialNotes: string | null }) {
   const journaledRef = useRef(false)

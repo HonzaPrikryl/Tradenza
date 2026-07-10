@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Users, Tag as TagIcon, CalendarClock, Check, X } from 'lucide-react'
+import { Users, Tag as TagIcon, CalendarClock, BookMarked, Check, X } from 'lucide-react'
 import { applyFilters, resetFilters } from '@/lib/global-filters'
 import type { GlobalFilters, TimeRange } from '@/lib/global-filters-types'
 import type { TagGroupWithValues } from '@/lib/actions/tags'
@@ -10,6 +10,12 @@ import MultiSelect from './MultiSelect'
 import { Box, TimeRangeRow } from './filters/FilterControls'
 import { cn } from '@/lib/utils'
 import { t, tList } from '@/i18n'
+
+interface StrategyOpt {
+  id: string
+  name: string
+  color: string
+}
 
 const WEEKDAYS = tList('datepicker.weekdays')
 const WEEKDAYS_SHORT = tList('datepicker.weekdaysShort')
@@ -20,6 +26,7 @@ interface Props {
   tagGroups: TagGroupWithValues[]
   filters: GlobalFilters
   symbols: string[]
+  strategies: StrategyOpt[]
   onClose: () => void
 }
 
@@ -38,7 +45,7 @@ interface Badge {
   clear: () => void
 }
 
-export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: Props) {
+export default function FiltersPanel({ tagGroups, filters, symbols, strategies, onClose }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [cat, setCat] = useState<Cat>('general')
@@ -49,6 +56,11 @@ export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: P
   const [instruments, setInstruments] = useState<string[]>(filters.instruments)
   const [symInc, setSymInc] = useState<string[]>(filters.symbolsInclude)
   const [symExc, setSymExc] = useState<string[]>(filters.symbolsExclude)
+  const [stratInc, setStratInc] = useState<string[]>(filters.strategiesInclude)
+  const [stratExc, setStratExc] = useState<string[]>(filters.strategiesExclude)
+  const [stratExpanded, setStratExpanded] = useState(
+    filters.strategiesInclude.length > 0 || filters.strategiesExclude.length > 0,
+  )
   const [ratings, setRatings] = useState<string[]>(filters.ratings.map(String))
   const [rMin, setRMin] = useState(filters.rMin !== undefined ? String(filters.rMin) : '')
   const [rMax, setRMax] = useState(filters.rMax !== undefined ? String(filters.rMax) : '')
@@ -110,6 +122,15 @@ export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: P
     setSymInc((prev) => prev.filter((s) => !next.includes(s)))
   }
 
+  const setStratIncOnly = (next: string[]) => {
+    setStratInc(next)
+    setStratExc((prev) => prev.filter((s) => !next.includes(s)))
+  }
+  const setStratExcOnly = (next: string[]) => {
+    setStratExc(next)
+    setStratInc((prev) => prev.filter((s) => !next.includes(s)))
+  }
+
   // Tags helpers
   const groupSelected = (g: TagGroupWithValues, arr: string[]) =>
     g.values.filter((v) => arr.includes(v.id)).map((v) => v.id)
@@ -133,6 +154,8 @@ export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: P
         instruments,
         symbolsInclude: symInc,
         symbolsExclude: symExc,
+        strategiesInclude: stratInc,
+        strategiesExclude: stratExc,
         ratings: ratings.map(Number),
         rMin: rMin.trim() !== '' ? Number(rMin) : null,
         rMax: rMax.trim() !== '' ? Number(rMax) : null,
@@ -164,6 +187,9 @@ export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: P
       setInstruments([])
       setSymInc([])
       setSymExc([])
+      setStratInc([])
+      setStratExc([])
+      setStratExpanded(false)
       setRatings([])
       setRMin('')
       setRMax('')
@@ -447,6 +473,27 @@ export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: P
     })
     .filter((b): b is Badge => b !== null)
 
+  const strategyName = (id: string) => strategies.find((s) => s.id === id)
+  const strategyBadges: Badge[] = [
+    ...stratInc.map((id) => ({ id, mode: 'inc' as const })),
+    ...stratExc.map((id) => ({ id, mode: 'exc' as const })),
+  ]
+    .map(({ id, mode }): Badge | null => {
+      const s = strategyName(id)
+      if (!s) return null
+      return {
+        key: id,
+        label: s.name,
+        tone: mode === 'exc' ? 'loss' : 'primary',
+        dot: s.color,
+        clear: () => {
+          setStratInc((prev) => prev.filter((x) => x !== id))
+          setStratExc((prev) => prev.filter((x) => x !== id))
+        },
+      }
+    })
+    .filter((b): b is Badge => b !== null)
+
   const dtBadges: Badge[] = [
     ...daysOfWeek.map((d) => ({
       key: `d:${d}`,
@@ -521,6 +568,7 @@ export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: P
   const cats: { key: Cat; label: string; icon: typeof Users; enabled: boolean }[] = [
     { key: 'general', label: t('filters.categories.general'), icon: Users, enabled: true },
     { key: 'tags', label: t('filters.categories.tags'), icon: TagIcon, enabled: true },
+    { key: 'strategy', label: t('filters.categories.strategy'), icon: BookMarked, enabled: true },
     { key: 'dayTime', label: t('filters.categories.dayTime'), icon: CalendarClock, enabled: true },
   ]
 
@@ -530,7 +578,15 @@ export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: P
         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3 sm:w-52 sm:shrink-0 sm:flex-col sm:gap-0 sm:space-y-2 sm:overflow-visible sm:pb-0 sm:pr-3">
           {cats.map((c) => {
             const badges =
-              c.key === 'general' ? generalBadges : c.key === 'tags' ? tagBadges : c.key === 'dayTime' ? dtBadges : []
+              c.key === 'general'
+                ? generalBadges
+                : c.key === 'tags'
+                  ? tagBadges
+                  : c.key === 'strategy'
+                    ? strategyBadges
+                    : c.key === 'dayTime'
+                      ? dtBadges
+                      : []
             return (
               <div
                 key={c.key}
@@ -703,6 +759,62 @@ export default function FiltersPanel({ tagGroups, filters, symbols, onClose }: P
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {cat === 'strategy' && (
+            <div className="space-y-0.5">
+              {strategies.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('filters.strategy.none')}</p>
+              ) : (
+                (() => {
+                  const hasValue = stratInc.length > 0 || stratExc.length > 0
+                  const on = stratExpanded || hasValue
+                  const options = strategies.map((s) => ({ value: s.id, label: s.name, dot: s.color }))
+                  return (
+                    <div className="rounded-md">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (on) {
+                            setStratInc([])
+                            setStratExc([])
+                            setStratExpanded(false)
+                          } else {
+                            setStratExpanded(true)
+                          }
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-1 py-1.5 text-sm transition-colors hover:bg-accent"
+                      >
+                        <Box checked={on} />
+                        <span className={cn(on && 'font-medium')}>{t('filters.strategy.label')}</span>
+                      </button>
+                      {on && (
+                        <div className="mb-2 mt-1 grid grid-cols-2 gap-2 pl-6">
+                          <div>
+                            <span className="mb-1 block text-[11px] text-primary">{t('filters.strategy.include')}</span>
+                            <MultiSelect
+                              options={options}
+                              value={stratInc}
+                              disabledIds={stratExc}
+                              onChange={setStratIncOnly}
+                            />
+                          </div>
+                          <div>
+                            <span className="mb-1 block text-[11px] text-loss">{t('filters.strategy.exclude')}</span>
+                            <MultiSelect
+                              options={options}
+                              value={stratExc}
+                              disabledIds={stratInc}
+                              onChange={setStratExcOnly}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()
+              )}
             </div>
           )}
 

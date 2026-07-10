@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatCurrency, formatDateTimeTz, cn } from '@/lib/utils'
 import { deleteTrade, deleteTrades, addTagToTrades, setTradesAccount, getFilteredTradeIds } from '@/lib/actions/trades'
+import { setTradesStrategy, type StrategyDTO } from '@/lib/actions/strategies'
 import { createTag, createTagGroup, type TagGroupWithValues } from '@/lib/actions/tags'
 import { exportTradesToCsv } from '@/lib/actions/export'
 import { track } from '@/lib/analytics'
-import { Trash2, ExternalLink, Download, Tag, ArrowRightLeft } from 'lucide-react'
+import Link from 'next/link'
+import { Trash2, ExternalLink, Download, Tag, ArrowRightLeft, BookMarked } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
@@ -39,6 +41,7 @@ const PALETTE = [
 
 type TradeRow = Trade & {
   tradeTags?: { tag: { id: string; name: string; color: string } }[]
+  strategy?: { id: string; name: string; color: string } | null
 }
 
 interface Props {
@@ -51,8 +54,12 @@ interface Props {
   timezone?: string | null
   accounts?: { id: string; name: string }[]
   tagGroups?: TagGroupWithValues[]
+  strategies?: StrategyDTO[]
   listFilters?: TradeFilters
   breakeven?: BreakevenConfig | null
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+  onSort?: (column: string) => void
 }
 
 export default function TradesTable({
@@ -65,8 +72,12 @@ export default function TradesTable({
   timezone,
   accounts = [],
   tagGroups = [],
+  strategies = [],
   listFilters = {},
   breakeven = null,
+  sortBy,
+  sortOrder,
+  onSort,
 }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
@@ -74,8 +85,9 @@ export default function TradesTable({
 
   const sel = useSelection()
   const [busy, setBusy] = useState(false)
-  const [dialog, setDialog] = useState<'tag' | 'transfer' | null>(null)
+  const [dialog, setDialog] = useState<'tag' | 'transfer' | 'strategy' | null>(null)
   const [dialogIds, setDialogIds] = useState<string[]>([])
+  const [strategyId, setStrategyId] = useState('')
   const [groups, setGroups] = useState<TagGroupWithValues[]>(tagGroups)
   const [categoryId, setCategoryId] = useState('')
   const [tagId, setTagId] = useState('')
@@ -197,6 +209,30 @@ export default function TradesTable({
     try {
       if (handleRateLimit(await setTradesAccount(dialogIds, accountId))) return
       toast.success(t('trades.bulk.transferred', { count }))
+      setDialog(null)
+      clearSel()
+      router.refresh()
+    } catch (err) {
+      toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const openStrategy = (targetIds: string[]) => {
+    setDialogIds(targetIds)
+    setStrategyId('')
+    setDialog('strategy')
+  }
+
+  const applyStrategy = async () => {
+    if (!strategyId || dialogIds.length === 0) return
+    const count = dialogIds.length
+    const next = strategyId === '__none__' ? null : strategyId
+    setBusy(true)
+    try {
+      if (handleRateLimit(await setTradesStrategy(dialogIds, next))) return
+      toast.success(t('trades.bulk.strategySet', { count }))
       setDialog(null)
       clearSel()
       router.refresh()
@@ -346,6 +382,14 @@ export default function TradesTable({
               {t('trades.bulk.transfer')}
             </button>
             <button
+              onClick={() => openStrategy(ids())}
+              disabled={busy || strategies.length === 0}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              <BookMarked className="h-3.5 w-3.5" />
+              {t('trades.bulk.setStrategy')}
+            </button>
+            <button
               onClick={bulkDelete}
               disabled={busy}
               className="flex items-center gap-1.5 rounded-md border border-loss/40 px-3 py-1.5 text-xs font-medium text-loss transition-colors hover:bg-loss/10 disabled:opacity-50"
@@ -366,17 +410,30 @@ export default function TradesTable({
                   <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-primary" />
                 </th>
                 {[
-                  t('trades.col.symbol'),
-                  t('trades.col.dir'),
-                  t('trades.col.entry'),
-                  t('trades.col.qty'),
-                  t('trades.col.exit'),
-                  t('trades.col.date'),
-                  t('trades.col.setup'),
-                  t('trades.col.pnl'),
-                ].map((h, i) => (
-                  <th key={i} className="text-left text-xs font-medium text-muted-foreground px-4 py-3">
-                    {h}
+                  { key: 'symbol', label: t('trades.col.symbol') },
+                  { key: 'dir', label: t('trades.col.dir') },
+                  { key: 'entry', label: t('trades.col.entry') },
+                  { key: 'qty', label: t('trades.col.qty') },
+                  { key: 'exit', label: t('trades.col.exit') },
+                  { key: 'date', label: t('trades.col.date'), sortable: true, sortKey: 'entryDatetime' },
+                  { key: 'strategy', label: t('trades.col.strategy') },
+                  { key: 'rmultiple', label: t('trades.col.rmultiple'), sortable: true, sortKey: 'riskRewardRatio' },
+                  { key: 'pnl', label: t('trades.col.pnl'), sortable: true, sortKey: 'netPnl' },
+                ].map((col, i) => (
+                  <th
+                    key={i}
+                    className={cn(
+                      'text-left text-xs font-medium px-4 py-3',
+                      col.sortable && onSort ? 'cursor-pointer hover:text-foreground' : 'text-muted-foreground',
+                    )}
+                    onClick={() => col.sortable && onSort && onSort(col.sortKey!)}
+                  >
+                    <div className="flex items-center gap-1">
+                      {col.label}
+                      {col.sortable && sortBy === col.sortKey && (
+                        <span className="text-muted-foreground">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
                   </th>
                 ))}
                 <th className="w-px px-3 py-3" />
@@ -451,8 +508,21 @@ export default function TradesTable({
                     <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                       {formatDateTimeTz(trade.entryDatetime, timezone)}
                     </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[120px] truncate">
-                      {trade.setupName ?? '—'}
+                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate">
+                      {trade.strategy ? (
+                        <Link
+                          href={`/trades?strategyId=${trade.strategy.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="truncate text-foreground hover:underline"
+                        >
+                          {trade.strategy.name}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-muted-foreground">
+                      {trade.riskRewardRatio ? Number(trade.riskRewardRatio).toFixed(2) : '—'}
                     </td>
                     <td className="px-4 py-3">
                       {trade.netPnl !== null ? (
@@ -546,6 +616,31 @@ export default function TradesTable({
               onValueChange={setAccountId}
               placeholder={t('trades.bulk.selectAccount')}
               options={accounts.map((a) => ({ value: a.id, label: a.name }))}
+            />
+          </div>
+        </BulkModal>
+      )}
+
+      {/* Set-strategy dialog */}
+      {dialog === 'strategy' && (
+        <BulkModal
+          title={t('trades.bulk.setStrategyTitle', { count: sel.size })}
+          onClose={() => setDialog(null)}
+          onApply={applyStrategy}
+          applyDisabled={!strategyId || busy}
+        >
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+              {t('trades.bulk.strategy')}
+            </label>
+            <Select
+              value={strategyId}
+              onValueChange={setStrategyId}
+              placeholder={t('trades.bulk.selectStrategy')}
+              options={[
+                ...strategies.map((s) => ({ value: s.id, label: s.name })),
+                { value: '__none__', label: t('strategies.panel.none') },
+              ]}
             />
           </div>
         </BulkModal>

@@ -16,13 +16,40 @@ export default function Loading() {
       {/* Body: sidebar + main */}
       <div className="flex flex-col items-start gap-4 xl:flex-row">
         <aside className="w-full shrink-0 space-y-4 xl:w-[340px]">
+          {/* Stats panel (with stats/executions tab header) */}
           <div className="rounded-xl border border-border bg-card p-4">
-            <div className="skeleton mb-4 h-4 w-28 rounded" />
+            <div className="mb-4 flex gap-2">
+              <div className="skeleton h-8 w-24 rounded-md" />
+              <div className="skeleton h-8 w-24 rounded-md" />
+            </div>
             <div className="space-y-3">
-              {Array.from({ length: 7 }).map((_, i) => (
+              {Array.from({ length: 9 }).map((_, i) => (
                 <div key={i} className="flex items-center justify-between">
                   <div className="skeleton h-3 w-24 rounded" />
                   <div className="skeleton h-3 w-16 rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Strategy panel */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="skeleton mb-2 h-4 w-20 rounded" />
+            <div className="skeleton h-9 w-full rounded-md" />
+          </div>
+
+          {/* Tags panel */}
+          <div className="rounded-xl border border-border bg-card p-4">
+            <div className="skeleton mb-3 h-4 w-16 rounded" />
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i}>
+                  <div className="skeleton mb-1.5 h-3 w-20 rounded" />
+                  <div className="flex flex-wrap gap-1.5">
+                    <div className="skeleton h-6 w-16 rounded-full" />
+                    <div className="skeleton h-6 w-20 rounded-full" />
+                    <div className="skeleton h-6 w-14 rounded-full" />
+                  </div>
                 </div>
               ))}
             </div>

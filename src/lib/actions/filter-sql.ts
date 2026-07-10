@@ -49,6 +49,14 @@ export function generalConditions(
   if (gf.symbolsInclude.length > 0) out.push(inArray(trades.symbol, gf.symbolsInclude))
   if (gf.symbolsExclude.length > 0) out.push(notInArray(trades.symbol, gf.symbolsExclude))
 
+  // Strategy include / exclude. Exclude keeps trades with no strategy (a null
+  // strategyId isn't "one of the excluded"), so it only drops the named ones.
+  if (gf.strategiesInclude.length > 0) out.push(inArray(trades.strategyId, gf.strategiesInclude))
+  if (gf.strategiesExclude.length > 0) {
+    const keep = or(isNull(trades.strategyId), notInArray(trades.strategyId, gf.strategiesExclude))
+    if (keep) out.push(keep)
+  }
+
   // Trade rating
   if (gf.ratings.length > 0) out.push(inArray(trades.rating, gf.ratings))
 

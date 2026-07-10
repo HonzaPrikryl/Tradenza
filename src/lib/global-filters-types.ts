@@ -23,6 +23,8 @@ export interface GlobalFilters {
   instruments: string[]
   symbolsInclude: string[]
   symbolsExclude: string[]
+  strategiesInclude: string[] // strategy IDs
+  strategiesExclude: string[] // strategy IDs
   ratings: number[] // 0.5 – 5 in 0.5 steps
   rMin?: number
   rMax?: number
@@ -45,6 +47,8 @@ export interface FilterInput {
   instruments: string[]
   symbolsInclude: string[]
   symbolsExclude: string[]
+  strategiesInclude: string[]
+  strategiesExclude: string[]
   ratings: number[]
   rMin?: number | null
   rMax?: number | null

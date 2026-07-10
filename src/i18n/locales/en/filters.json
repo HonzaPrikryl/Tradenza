@@ -41,6 +41,12 @@
     "addAnother": "Add another",
     "days": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
   },
+  "strategy": {
+    "label": "Strategies",
+    "include": "Include",
+    "exclude": "Exclude",
+    "none": "No strategies yet."
+  },
   "tags": {
     "include": "Include tags",
     "exclude": "Exclude tags",

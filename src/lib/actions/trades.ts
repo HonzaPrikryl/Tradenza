@@ -1,6 +1,6 @@
 'use server'
 
-import { db, trades, tags, tradeTags, accounts } from '@/lib/db'
+import { db, trades, tags, tradeTags, accounts, strategies } from '@/lib/db'
 import { eq, and, or, desc, asc, gte, lte, ilike, inArray, count } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { tradeFormSchema, type TradeFilters } from '@/types'
@@ -69,7 +69,6 @@ function buildTradeColumns(v: TradeFormInput) {
     takeProfit: v.takeProfit ? v.takeProfit.toString() : null,
     riskRewardRatio,
     riskAmount: v.riskAmount ? v.riskAmount.toString() : null,
-    setupName: v.setupName || null,
     notes: v.notes || null,
     rating: v.rating ? Number(v.rating) : null,
     emotionBefore: v.emotionBefore || null,
@@ -380,20 +379,20 @@ const tradeFiltersSchema = z
     status: z.enum(['open', 'closed', 'cancelled', 'all']).optional(),
     assetClass: z.string().optional(),
     tagId: z.string().optional(),
+    strategyId: z.string().optional(),
     dateFrom: z.string().optional(),
     dateTo: z.string().optional(),
-    setupName: z.string().optional(),
     minPnl: z.number().optional(),
     maxPnl: z.number().optional(),
     page: z.number().int().positive().optional(),
     pageSize: z.number().int().positive().max(500).optional(),
-    sortBy: z.enum(['entryDatetime', 'netPnl', 'symbol']).optional(),
+    sortBy: z.enum(['entryDatetime', 'netPnl', 'symbol', 'riskRewardRatio']).optional(),
     sortOrder: z.enum(['asc', 'desc']).optional(),
   })
   .default({})
 
 async function buildTradeConditions(userId: string, filters: TradeFilters) {
-  const { direction, status, assetClass, tagId, dateFrom, dateTo, setupName, minPnl, maxPnl, search } = filters
+  const { direction, status, assetClass, tagId, strategyId, dateFrom, dateTo, minPnl, maxPnl, search } = filters
 
   const conditions = [eq(trades.userId, userId)]
 
@@ -407,14 +406,19 @@ async function buildTradeConditions(userId: string, filters: TradeFilters) {
       inArray(trades.id, db.select({ id: tradeTags.tradeId }).from(tradeTags).where(eq(tradeTags.tagId, tagId))),
     )
   }
+  if (strategyId && strategyId !== 'all') conditions.push(eq(trades.strategyId, strategyId))
   if (dateFrom) conditions.push(gte(trades.entryDatetime, new Date(dateFrom)))
   if (dateTo) conditions.push(lte(trades.entryDatetime, new Date(`${dateTo}T23:59:59.999`)))
-  if (setupName) conditions.push(ilike(trades.setupName, `%${setupName}%`))
   if (minPnl !== undefined && !Number.isNaN(minPnl)) conditions.push(gte(trades.netPnl, minPnl.toString()))
   if (maxPnl !== undefined && !Number.isNaN(maxPnl)) conditions.push(lte(trades.netPnl, maxPnl.toString()))
   if (search) {
     const term = `%${search}%`
-    conditions.push(or(ilike(trades.symbol, term), ilike(trades.setupName, term))!)
+    // Match on symbol or the assigned strategy's name (mirrors the search placeholder).
+    const strategyMatch = db
+      .select({ id: strategies.id })
+      .from(strategies)
+      .where(and(eq(strategies.userId, userId), ilike(strategies.name, term)))
+    conditions.push(or(ilike(trades.symbol, term), inArray(trades.strategyId, strategyMatch))!)
   }
 
   const gf = await readGlobalFilters()
@@ -423,17 +427,15 @@ async function buildTradeConditions(userId: string, filters: TradeFilters) {
   return conditions
 }
 
-export const getFilteredTradeIds = authedAction(
-  [tradeFiltersSchema],
-  async ({ userId }, filters): Promise<string[]> => {
-    const conditions = await buildTradeConditions(userId, filters)
-    const rows = await db
-      .select({ id: trades.id })
-      .from(trades)
-      .where(and(...conditions))
-    return rows.map((r) => r.id)
-  },
-)
+export const getFilteredTradeIds = authedAction([tradeFiltersSchema], async ({ userId }, input): Promise<string[]> => {
+  const filters = input as TradeFilters
+  const conditions = await buildTradeConditions(userId, filters)
+  const rows = await db
+    .select({ id: trades.id })
+    .from(trades)
+    .where(and(...conditions))
+  return rows.map((r) => r.id)
+})
 
 export const getTradeSymbols = authedAction([], async ({ userId }): Promise<string[]> => {
   const rows = await db
@@ -466,7 +468,7 @@ export const getTrades = authedAction([tradeFiltersSchema], async ({ userId }, f
     const total = all.length
     const start = (page - 1) * pageSize
     return {
-      trades: all.slice(start, start + pageSize).map((t) => ({ ...t, tradeTags: [], screenshots: [] })),
+      trades: all.slice(start, start + pageSize).map((t) => ({ ...t, tradeTags: [], screenshots: [], strategy: null })),
       total,
       page,
       pageSize,
@@ -477,7 +479,14 @@ export const getTrades = authedAction([tradeFiltersSchema], async ({ userId }, f
   const conditions = await buildTradeConditions(userId, filters)
 
   const orderFn = sortOrder === 'asc' ? asc : desc
-  const orderColumn = sortBy === 'netPnl' ? trades.netPnl : sortBy === 'symbol' ? trades.symbol : trades.entryDatetime
+  const orderColumn =
+    sortBy === 'netPnl'
+      ? trades.netPnl
+      : sortBy === 'symbol'
+        ? trades.symbol
+        : sortBy === 'riskRewardRatio'
+          ? trades.riskRewardRatio
+          : trades.entryDatetime
 
   const [rows, totalResult] = await Promise.all([
     db.query.trades.findMany({
@@ -488,6 +497,7 @@ export const getTrades = authedAction([tradeFiltersSchema], async ({ userId }, f
       with: {
         tradeTags: { with: { tag: true } },
         screenshots: true,
+        strategy: { columns: { id: true, name: true, color: true } },
       },
     }),
     db
@@ -514,6 +524,7 @@ export const getTradeById = authedAction([uuid], async ({ userId }, id) => {
       tradeTags: { with: { tag: true } },
       screenshots: true,
       account: true,
+      strategy: { columns: { id: true, name: true, color: true } },
     },
   })
 

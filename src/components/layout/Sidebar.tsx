@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserButton } from '@clerk/nextjs'
-import { LayoutDashboard, List, BarChart3, Target, Settings, Plus, X, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, List, BarChart3, Target, BookMarked, Settings, Plus, X, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import Logo from '@/components/ui/Logo'
@@ -16,6 +16,7 @@ const NAV = [
   { href: '/dashboard', labelKey: 'nav.dashboard', icon: LayoutDashboard },
   { href: '/trades', labelKey: 'nav.trades', icon: List },
   { href: '/stats', labelKey: 'nav.stats', icon: BarChart3 },
+  { href: '/strategies', labelKey: 'nav.strategies', icon: BookMarked },
   { href: '/progress', labelKey: 'nav.progress', icon: Target },
   { href: '/settings/accounts', labelKey: 'nav.settings', icon: Settings },
 ]

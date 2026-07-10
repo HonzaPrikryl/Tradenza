@@ -25,6 +25,7 @@ export interface AccountWithStats {
   netPnl: number
   lastTradeAt: string | null
   importedCount: number
+  createdAt: string | null
 }
 
 const accountSchema = z.object({
@@ -89,13 +90,14 @@ export const getAccounts = authedAction(
         netPnl: sql<number>`coalesce(sum(${trades.netPnl}), 0)`.mapWith(Number),
         lastTradeAt: sql<string | null>`max(${trades.updatedAt})::text`,
         importedCount: sql<number>`count(${trades.id}) filter (where ${trades.importSource} = 'csv')`.mapWith(Number),
+        createdAt: sql<string | null>`${accounts.createdAt}::text`,
       })
       .from(accounts)
       .leftJoin(trades, eq(trades.accountId, accounts.id))
       .where(
         includeArchived ? eq(accounts.userId, userId) : and(eq(accounts.userId, userId), eq(accounts.archived, false)),
       )
-      .groupBy(accounts.id)
+      .groupBy(accounts.id, accounts.createdAt)
       .orderBy(accounts.createdAt)
 
     return rows

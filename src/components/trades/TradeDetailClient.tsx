@@ -11,7 +11,9 @@ import { getTradeCandles, type CandlesResult } from '@/lib/actions/candles'
 import type { TagGroupWithValues } from '@/lib/actions/tags'
 import TradeStatsPanel from './detail/TradeStatsPanel'
 import TradeTagsPanel from './detail/TradeTagsPanel'
+import StrategyPanel from './detail/StrategyPanel'
 import NotesTabs from './detail/NotesTabs'
+import type { StrategyDTO } from '@/lib/actions/strategies'
 import { normalizeExecutions } from './detail/executions'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
@@ -29,14 +31,16 @@ interface Props {
     tradeTags: { tag: { id: string; name: string; color: string } }[]
     screenshots: { id: string; url: string; label: string | null }[]
     account?: { id: string; name: string } | null
+    strategy?: { id: string; name: string; color: string } | null
   }
   tagGroups: TagGroupWithValues[]
+  strategies: StrategyDTO[]
   timezone?: string | null
   dayKey: string
   dailyNote: string
 }
 
-export default function TradeDetailClient({ trade, tagGroups, timezone, dayKey, dailyNote }: Props) {
+export default function TradeDetailClient({ trade, tagGroups, strategies, timezone, dayKey, dailyNote }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const [sidebarTab, setSidebarTab] = useState<'stats' | 'executions'>('stats')
@@ -135,7 +139,10 @@ export default function TradeDetailClient({ trade, tagGroups, timezone, dayKey, 
             timezone={timezone}
           />
           {sidebarTab === 'stats' && (
-            <TradeTagsPanel tradeId={trade.id} groups={tagGroups} selectedTagIds={selectedTagIds} />
+            <>
+              <StrategyPanel tradeId={trade.id} strategies={strategies} current={trade.strategy ?? null} />
+              <TradeTagsPanel tradeId={trade.id} groups={tagGroups} selectedTagIds={selectedTagIds} />
+            </>
           )}
         </aside>
 

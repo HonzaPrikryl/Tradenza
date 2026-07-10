@@ -9,15 +9,7 @@ import { setDayNote } from '@/lib/actions/progress'
 import { track } from '@/lib/analytics'
 import { useAutosave, type SaveState } from '@/hooks/useAutosave'
 import RichTextEditor from '@/components/ui/RichTextEditor'
-
-function isEmptyHtml(html: string): boolean {
-  return (
-    html
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .trim() === '' && !/<img/i.test(html)
-  )
-}
+import { isEmptyHtml } from '@/lib/html'
 
 export default function DailyNoteEditor({
   date,

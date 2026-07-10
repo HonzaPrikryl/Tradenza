@@ -145,12 +145,17 @@ export default function RichTextEditor({
     emit()
   }
 
-  const onResizeStart = (e: React.PointerEvent) => {
+  type Corner = 'nw' | 'ne' | 'sw' | 'se'
+
+  const onResizeStart = (e: React.PointerEvent, corner: Corner) => {
     if (!selImg) return
     e.preventDefault()
     const img = selImg
     const startX = e.clientX
     const startW = img.getBoundingClientRect().width
+    // Left-edge corners grow the image as the pointer moves left; right-edge
+    // corners as it moves right. Height stays auto, so the aspect ratio holds.
+    const dir = corner === 'ne' || corner === 'se' ? 1 : -1
     // Width of the editor's text column (excludes padding), so the image can't
     // be dragged wider than the content. Store as % → stays responsive and never
     // overflows on narrower views (mobile, the read-only detail).
@@ -159,7 +164,7 @@ export default function RichTextEditor({
     const pad = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : 0
     const contentW = Math.max(1, (editor?.clientWidth ?? 1000) - pad)
     const onMove = (ev: PointerEvent) => {
-      const wPx = Math.max(48, Math.min(startW + (ev.clientX - startX), contentW))
+      const wPx = Math.max(48, Math.min(startW + dir * (ev.clientX - startX), contentW))
       const pct = Math.round((wPx / contentW) * 1000) / 10
       img.style.width = `${pct}%`
       img.style.height = 'auto'
@@ -418,6 +423,14 @@ export default function RichTextEditor({
             { key: 'center', label: t('editor.alignCenter'), icon: AlignCenter },
             { key: 'right', label: t('editor.alignRight'), icon: AlignRight },
           ]
+          // A drag handle on every corner — resize the image from whichever
+          // corner feels natural. Diagonal cursors mirror the corner direction.
+          const handles: { key: Corner; top: number; left: number; cursor: string }[] = [
+            { key: 'nw', top, left, cursor: 'cursor-nwse-resize' },
+            { key: 'ne', top, left: left + ir.width, cursor: 'cursor-nesw-resize' },
+            { key: 'sw', top: top + ir.height, left, cursor: 'cursor-nesw-resize' },
+            { key: 'se', top: top + ir.height, left: left + ir.width, cursor: 'cursor-nwse-resize' },
+          ]
           return (
             <>
               {/* Selection ring */}
@@ -425,15 +438,21 @@ export default function RichTextEditor({
                 className="pointer-events-none absolute z-20 rounded-sm ring-2 ring-primary ring-offset-1 ring-offset-background"
                 style={{ top, left, width: ir.width, height: ir.height }}
               />
-              {/* Resize handle (bottom-right) */}
-              <div
-                role="button"
-                aria-label={t('editor.imgResize')}
-                title={t('editor.imgResize')}
-                onPointerDown={onResizeStart}
-                className="absolute z-30 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize rounded-full border-2 border-background bg-primary shadow"
-                style={{ top: top + ir.height, left: left + ir.width }}
-              />
+              {/* Resize handles (all four corners) */}
+              {handles.map((h) => (
+                <div
+                  key={h.key}
+                  role="button"
+                  aria-label={t('editor.imgResize')}
+                  title={t('editor.imgResize')}
+                  onPointerDown={(e) => onResizeStart(e, h.key)}
+                  className={cn(
+                    'absolute z-30 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-primary shadow',
+                    h.cursor,
+                  )}
+                  style={{ top: h.top, left: h.left }}
+                />
+              ))}
               {/* Floating toolbar */}
               <div
                 onMouseDown={(e) => e.preventDefault()}

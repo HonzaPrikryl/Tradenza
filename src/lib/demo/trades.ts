@@ -86,6 +86,7 @@ function generate(now: Date): Trade[] {
         id: `demo-${String(idx).padStart(4, '0')}`,
         userId: 'demo',
         accountId: null,
+        strategyId: null,
         symbol: sym.s,
         direction,
         status: 'closed',

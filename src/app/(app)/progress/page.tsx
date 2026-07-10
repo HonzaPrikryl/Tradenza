@@ -56,9 +56,8 @@ export default async function ProgressPage({
 }) {
   const sp = await searchParams
   const initialTab = sp.tab === 'rules' ? 'rules' : 'overview'
-  const today = await getTodayKey()
+  const [today, rules] = await Promise.all([getTodayKey(), getRules()])
   const currentYear = Number(today.slice(0, 4))
-  const rules = await getRules()
 
   if (!rules.some((r) => r.active)) {
     return (

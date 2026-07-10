@@ -21,7 +21,6 @@ export const tradeFormSchema = z.object({
   takeProfit: z.coerce.number().positive().optional().or(z.literal('')),
   riskAmount: z.coerce.number().positive().optional().or(z.literal('')),
 
-  setupName: z.string().max(100).optional(),
   notes: z.string().max(10000).optional(),
   rating: z.coerce.number().min(0.5).max(5).multipleOf(0.5).optional().or(z.literal('')),
   emotionBefore: z.string().max(500).optional(),
@@ -86,13 +85,13 @@ export interface TradeFilters {
   status?: 'open' | 'closed' | 'cancelled' | 'all'
   assetClass?: string
   tagId?: string
+  strategyId?: string
   dateFrom?: string
   dateTo?: string
-  setupName?: string
   minPnl?: number
   maxPnl?: number
   page?: number
   pageSize?: number
-  sortBy?: 'entryDatetime' | 'netPnl' | 'symbol'
+  sortBy?: 'entryDatetime' | 'netPnl' | 'symbol' | 'riskRewardRatio'
   sortOrder?: 'asc' | 'desc'
 }

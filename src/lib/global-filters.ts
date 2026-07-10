@@ -15,6 +15,8 @@ const COOKIE = {
   instruments: 'tz_instruments',
   symInc: 'tz_sym_inc',
   symExc: 'tz_sym_exc',
+  stratInc: 'tz_strat_inc',
+  stratExc: 'tz_strat_exc',
   ratings: 'tz_ratings',
   rMin: 'tz_rmin',
   rMax: 'tz_rmax',
@@ -37,6 +39,8 @@ const GENERAL_COOKIES = [
   'tz_instruments',
   'tz_sym_inc',
   'tz_sym_exc',
+  'tz_strat_inc',
+  'tz_strat_exc',
   'tz_ratings',
   'tz_rmin',
   'tz_rmax',
@@ -105,6 +109,8 @@ export async function readGlobalFilters(): Promise<GlobalFilters> {
     instruments: parseIds(c.get(COOKIE.instruments)?.value),
     symbolsInclude: parseIds(c.get(COOKIE.symInc)?.value),
     symbolsExclude: parseIds(c.get(COOKIE.symExc)?.value),
+    strategiesInclude: parseIds(c.get(COOKIE.stratInc)?.value),
+    strategiesExclude: parseIds(c.get(COOKIE.stratExc)?.value),
     ratings: parseNums(c.get(COOKIE.ratings)?.value),
     rMin: rMinRaw !== undefined && rMinRaw !== '' && !Number.isNaN(Number(rMinRaw)) ? Number(rMinRaw) : undefined,
     rMax: rMaxRaw !== undefined && rMaxRaw !== '' && !Number.isNaN(Number(rMaxRaw)) ? Number(rMaxRaw) : undefined,
@@ -206,6 +212,8 @@ export async function applyFilters(input: FilterInput) {
   setArr(COOKIE.instruments, input.instruments)
   setArr(COOKIE.symInc, input.symbolsInclude)
   setArr(COOKIE.symExc, input.symbolsExclude)
+  setArr(COOKIE.stratInc, input.strategiesInclude)
+  setArr(COOKIE.stratExc, input.strategiesExclude)
   setArr(COOKIE.ratings, input.ratings)
   setNum(COOKIE.rMin, input.rMin)
   setNum(COOKIE.rMax, input.rMax)
