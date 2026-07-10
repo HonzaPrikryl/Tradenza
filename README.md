@@ -22,6 +22,8 @@ Tradenza is an open-source trading journal I originally built for my own trading
 
 It is designed for traders who want to improve through data rather than feelings: log every trade, review the chart and your execution, track the statistics that actually matter, and hold yourself accountable to your own trading rules.
 
+> **Two ways to use Tradenza:** use the hosted version at **[tradenza.dev](https://tradenza.dev)** — sign up and start journaling, no setup required — or self-host your own instance (see [Quick start](#quick-start)). Both run the same open-source code, and it's free either way.
+
 > **Status:** Active development by a solo maintainer. The app is feature-rich and used daily, but it is pre-1.0 — expect rough edges and breaking changes. Issues and pull requests are very welcome.
 
 ## Highlights
