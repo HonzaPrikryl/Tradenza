@@ -9,7 +9,15 @@ import { roundMoney } from '@/lib/trade-pnl'
 import { contractMultiplier } from '@/lib/futures'
 import { IMPORT_REQUIRED, FILL_REQUIRED } from '@/lib/csv-columns'
 import { t } from '@/i18n'
-import { stripTzAbbrev, parseDirection, parseNumber, parseBuySell, parseDateInTz } from './wizard-helpers'
+import {
+  stripTzAbbrev,
+  resolveSideAndQuantity,
+  parseNumber,
+  parseBuySell,
+  parseDateInTz,
+  mergeRoundTripPartials,
+  type RoundTripLeg,
+} from './wizard-helpers'
 import { uuid } from '@/lib/validation'
 import { authedAction, mutationAction, importAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
@@ -182,6 +190,9 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
   let skipped = 0
   const toInsert: (typeof trades.$inferInsert)[] = []
 
+  // Phase 1 — parse each valid row into a normalized round-trip leg. One CSV row
+  // is one exit fill; several rows can share a single position (partials).
+  const legs: RoundTripLeg[] = []
   for (let i = 0; i < v.rows.length; i++) {
     const row = v.rows[i]
     const rowNum = i + 2
@@ -209,53 +220,26 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
         continue
       }
 
-      const direction = parseDirection(get('side') ?? 'long')
-      const externalId = `${symbol.toUpperCase()}_${entryDatetime.toISOString()}_${direction}`
-      if (existingIds.has(externalId)) {
-        skipped++
-        continue
-      }
-
+      // Direction + size. A mapped `side` column wins; otherwise the direction is
+      // inferred from the sign of the quantity (e.g. DeepCharts encodes short as a
+      // negative quantity and ships no side column). Quantity is always positive.
+      const { direction, quantity } = resolveSideAndQuantity(get('side'), parseNumber(get('quantity')))
       const exitPrice = parseNumber(get('exitPrice'))
-      const quantity = parseNumber(get('quantity')) ?? 1
-      const fees = parseNumber(get('fees')) ?? 0
       const exitDatetime = resolveDate(row, 'exitDate', 'exitTime')
 
-      let grossPnl = parseNumber(get('grossPnl'))?.toString() ?? null
-      let netPnl = parseNumber(get('netPnl'))?.toString() ?? null
-      if (!netPnl && exitPrice !== null) {
-        const pnl = calculatePnl(direction, entryPrice, exitPrice, quantity, fees)
-        grossPnl = roundMoney(pnl.grossPnl).toString()
-        netPnl = roundMoney(pnl.netPnl).toString()
-      }
-
-      // Futures detection → asset class + contract multiplier (chart, R-multiple)
-      const symUpper = symbol.toUpperCase()
-      const mult = contractMultiplier(symUpper)
-      const isFutures = mult > 0
-
-      toInsert.push({
-        userId,
-        accountId: v.accountId,
-        symbol: symUpper,
+      legs.push({
+        symbol: symbol.toUpperCase(),
         direction,
-        status: exitPrice !== null || netPnl !== null ? 'closed' : 'open',
-        assetClass: isFutures ? 'futures' : v.assetClass,
-        entryPrice: entryPrice.toString(),
-        entryQuantity: quantity.toString(),
         entryDatetime,
-        exitPrice: exitPrice?.toString() ?? null,
-        exitQuantity: exitPrice !== null ? quantity.toString() : null,
-        exitDatetime,
-        fees: fees.toString(),
-        grossPnl,
-        netPnl,
+        entryPrice,
+        exitDatetime: exitPrice !== null ? exitDatetime : null,
+        exitPrice,
+        quantity,
+        fees: parseNumber(get('fees')) ?? 0,
+        grossPnl: parseNumber(get('grossPnl')),
+        netPnl: parseNumber(get('netPnl')),
         notes: get('notes')?.trim() || null,
-        importSource: 'csv',
-        externalId,
-        extra: isFutures ? { contractMultiplier: mult } : undefined,
       })
-      existingIds.add(externalId)
     } catch (err) {
       errors.push(
         t('validation.import.unknownError', {
@@ -265,6 +249,66 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
       )
       skipped++
     }
+  }
+
+  // Phase 2 — merge partials that share a position (same symbol/direction/entry)
+  // into one trade, then build the insert rows. Non-partial rows merge to a group
+  // of one, so single round-trip exports are unchanged.
+  for (const trade of mergeRoundTripPartials(legs)) {
+    const externalId = `${trade.symbol}_${trade.entryDatetime.toISOString()}_${trade.direction}`
+    if (existingIds.has(externalId)) {
+      skipped += trade.legCount
+      continue
+    }
+
+    // Futures detection → asset class + contract multiplier (chart, R-multiple)
+    const mult = contractMultiplier(trade.symbol)
+    const isFutures = mult > 0
+
+    // Prefer the broker-provided P&L (summed across partials); only compute from
+    // prices when none was supplied.
+    let grossPnl = trade.grossPnl !== null ? roundMoney(trade.grossPnl).toString() : null
+    let netPnl = trade.netPnl !== null ? roundMoney(trade.netPnl).toString() : null
+    if (netPnl === null && trade.exitPrice !== null) {
+      const matched = Math.min(trade.entryQuantity, trade.exitQuantity)
+      const pnl = calculatePnl(trade.direction, trade.entryPrice, trade.exitPrice, matched, trade.fees)
+      grossPnl = roundMoney(pnl.grossPnl).toString()
+      netPnl = roundMoney(pnl.netPnl).toString()
+    }
+
+    // Persist the individual fills only when a position was actually scaled
+    // (more than one leg), so single round-trip trades keep a minimal `extra`.
+    const hasPartials = trade.legCount > 1
+    const extra =
+      isFutures || hasPartials
+        ? {
+            ...(isFutures ? { contractMultiplier: mult } : {}),
+            ...(hasPartials ? { executions: trade.executions } : {}),
+          }
+        : undefined
+
+    toInsert.push({
+      userId,
+      accountId: v.accountId,
+      symbol: trade.symbol,
+      direction: trade.direction,
+      status: trade.exitPrice !== null || netPnl !== null ? 'closed' : 'open',
+      assetClass: isFutures ? 'futures' : v.assetClass,
+      entryPrice: trade.entryPrice.toString(),
+      entryQuantity: trade.entryQuantity.toString(),
+      entryDatetime: trade.entryDatetime,
+      exitPrice: trade.exitPrice?.toString() ?? null,
+      exitQuantity: trade.exitQuantity > 0 ? trade.exitQuantity.toString() : null,
+      exitDatetime: trade.exitDatetime,
+      fees: trade.fees.toString(),
+      grossPnl,
+      netPnl,
+      notes: trade.notes,
+      importSource: 'csv',
+      externalId,
+      extra,
+    })
+    existingIds.add(externalId)
   }
 
   let imported = 0

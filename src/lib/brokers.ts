@@ -90,6 +90,14 @@ export const BROKERS: Broker[] = [
     assets: ['futures'],
   },
   { id: 'atas', name: 'ATAS', short: 'A', className: 'bg-blue-500/20 text-blue-300', assets: ['futures'] },
+  {
+    id: 'deepcharts',
+    name: 'DeepCharts',
+    short: 'D',
+    className: 'bg-violet-500/20 text-violet-300',
+    assets: ['futures'],
+    popular: true,
+  },
   { id: 'bybit', name: 'ByBit', short: 'B', className: 'bg-amber-500/20 text-amber-300', assets: ['crypto'] },
   {
     id: 'bybit-mt5',

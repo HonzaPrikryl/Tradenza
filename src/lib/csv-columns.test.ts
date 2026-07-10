@@ -122,6 +122,31 @@ describe('buildImportMapping', () => {
     expect(m.entryDate).toBe('Date/Time')
     expect(m.entryTime).toBeUndefined()
   })
+
+  it('auto-maps a DeepCharts export (combined Entry/Exit DT, ProfitLoss, sign-encoded side)', () => {
+    // DeepCharts ships no side column (direction lives in the quantity sign) and
+    // uses combined datetime columns + a "ProfitLoss" P&L header.
+    const m = buildImportMapping([
+      'Symbol',
+      'Quantity',
+      'Entry DT',
+      'Entry Price',
+      'Exit DT',
+      'Exit Price',
+      'ProfitLoss',
+    ])
+    expect(m).toEqual({
+      symbol: 'Symbol',
+      quantity: 'Quantity',
+      entryPrice: 'Entry Price',
+      exitPrice: 'Exit Price',
+      entryDate: 'Entry DT',
+      exitDate: 'Exit DT',
+      netPnl: 'ProfitLoss',
+    })
+    // No side column is mapped — direction is resolved from the quantity sign at import.
+    expect(m).not.toHaveProperty('side')
+  })
 })
 
 describe('extractTable', () => {

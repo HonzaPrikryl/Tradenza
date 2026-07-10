@@ -11,6 +11,7 @@ export const COLUMN_CANDIDATES: Record<string, string[]> = {
     'open time',
     'open date',
     'entry date',
+    'entry dt',
     'opened',
     'date/time',
     'datetime',
@@ -18,10 +19,10 @@ export const COLUMN_CANDIDATES: Record<string, string[]> = {
     'time',
     'date',
   ],
-  exitDatetime: ['exit time', 'close time', 'close date', 'exit date', 'closed', 'exit datetime'],
+  exitDatetime: ['exit time', 'close time', 'close date', 'exit date', 'exit dt', 'closed', 'exit datetime'],
   fees: ['commission', 'commissions', 'comm', 'fees', 'fee', 'total fees'],
   grossPnl: ['gross p&l', 'gross pnl'],
-  netPnl: ['net p&l', 'net pnl', 'pnl', 'p&l', 'profit', 'realized p&l', 'profit/loss', 'realized pnl'],
+  netPnl: ['net p&l', 'net pnl', 'pnl', 'p&l', 'profit', 'realized p&l', 'profit/loss', 'profitloss', 'realized pnl'],
   notes: ['notes', 'note', 'comment', 'comments'],
 }
 
@@ -178,9 +179,10 @@ export function buildImportMapping(headers: string[]): Partial<Record<ImportFiel
   if (det.notes) map.notes = det.notes
 
   const entryDate =
-    find(['open date', 'entry date', 'opened', 'date/time', 'datetime', 'entry datetime']) || det.entryDatetime
+    find(['open date', 'entry date', 'entry dt', 'opened', 'date/time', 'datetime', 'entry datetime']) ||
+    det.entryDatetime
   const entryTime = find(['open time', 'entry time'])
-  const exitDate = find(['close date', 'exit date', 'closed', 'exit datetime']) || det.exitDatetime
+  const exitDate = find(['close date', 'exit date', 'exit dt', 'closed', 'exit datetime']) || det.exitDatetime
   const exitTime = find(['close time', 'exit time'])
   if (entryDate) map.entryDate = entryDate
   if (entryTime && entryTime !== entryDate) map.entryTime = entryTime

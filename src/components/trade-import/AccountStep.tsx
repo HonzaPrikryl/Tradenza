@@ -30,6 +30,7 @@ export default function AccountStep({ brokerId, brokerName }: { brokerId: string
   const router = useRouter()
   const [form, setForm] = useState<AccountInput>({ ...emptyForm, firm: brokerName ?? '' })
   const [saving, setSaving] = useState(false)
+  const [balanceEdited, setBalanceEdited] = useState(false)
 
   const canContinue = form.name.trim().length > 0
 
@@ -93,7 +94,10 @@ export default function AccountStep({ brokerId, brokerName }: { brokerId: string
               type="number"
               step="any"
               value={form.accountSize as number | string}
-              onChange={(e) => setForm({ ...form, accountSize: e.target.value === '' ? '' : Number(e.target.value) })}
+              onChange={(e) => {
+                const val = e.target.value === '' ? '' : Number(e.target.value)
+                setForm((f) => ({ ...f, accountSize: val, startingBalance: balanceEdited ? f.startingBalance : val }))
+              }}
               placeholder="50000"
               className={inputClass}
             />
@@ -105,25 +109,18 @@ export default function AccountStep({ brokerId, brokerName }: { brokerId: string
                 type="number"
                 step="any"
                 value={form.startingBalance as number | string}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    startingBalance: e.target.value === '' ? '' : Number(e.target.value),
-                  })
-                }
+                onChange={(e) => {
+                  setBalanceEdited(true)
+                  setForm((f) => ({ ...f, startingBalance: e.target.value === '' ? '' : Number(e.target.value) }))
+                }}
                 placeholder="50000"
                 className={inputClass}
               />
             </div>
             <div>
               <label className={labelClass}>{t('accounts.currency')}</label>
-              <input
-                value={form.currency}
-                onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })}
-                maxLength={8}
-                placeholder={t('common.currencyPlaceholder')}
-                className={inputClass}
-              />
+              {/* USD-only for now — locked so all amounts stay in one currency. */}
+              <input value="USD" readOnly disabled aria-readonly className={cn(inputClass, 'opacity-70')} />
             </div>
           </div>
         </div>
