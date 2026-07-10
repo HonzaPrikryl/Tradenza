@@ -13,17 +13,40 @@ export function compactCurrency(n: number, currency = 'USD'): string {
   return `${sign}${sym}${abs.toFixed(0)}`
 }
 
-export function AreaSparkline({ points, className }: { points: number[]; className?: string }) {
+export function AreaSparkline({
+  points,
+  className,
+  baseline = true,
+}: {
+  points: number[]
+  className?: string
+  baseline?: boolean
+}) {
   const W = 320
   const H = 72
-  if (points.length < 2) return <div className={cn('h-[72px] w-full', className)} />
-  const min = Math.min(...points, 0)
-  const max = Math.max(...points, 0)
+  const series = baseline ? [0, ...points] : points
+  if (series.length < 2) {
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} className={cn('h-[72px] w-full', className)} preserveAspectRatio="none">
+        <line
+          x1="0"
+          y1={H / 2}
+          x2={W}
+          y2={H / 2}
+          className="stroke-border"
+          strokeWidth="1.5"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    )
+  }
+  const min = Math.min(...series, 0)
+  const max = Math.max(...series, 0)
   const span = max - min || 1
-  const x = (i: number) => (i / (points.length - 1)) * W
+  const x = (i: number) => (i / (series.length - 1)) * W
   const y = (v: number) => H - ((v - min) / span) * H
-  const last = points[points.length - 1]
-  const line = points.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
+  const last = series[series.length - 1]
+  const line = series.map((v, i) => `${i === 0 ? 'M' : 'L'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')
   const area = `${line} L${W},${H} L0,${H} Z`
   const up = last >= 0
   return (

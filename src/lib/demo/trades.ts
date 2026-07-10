@@ -104,6 +104,7 @@ function generate(now: Date): Trade[] {
         takeProfit: String(takeProfit),
         riskRewardRatio: String(rr),
         riskAmount: String(riskAmount),
+        checklistProgress: null,
         setupName: SETUPS[Math.floor(rng() * SETUPS.length)],
         notes: null,
         rating: Math.round((2 + rng() * 3) * 2) / 2,

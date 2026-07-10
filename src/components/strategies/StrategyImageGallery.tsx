@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { t } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -9,8 +10,11 @@ import { cn } from '@/lib/utils'
 // user's saved order) is the cover; the rest sit beneath as thumbnails.
 export default function StrategyImageGallery({ images }: { images: string[] }) {
   const [index, setIndex] = useState<number | null>(null)
+  const [mounted, setMounted] = useState(false)
   const open = index !== null
   const count = images.length
+
+  useEffect(() => setMounted(true), [])
 
   const close = useCallback(() => setIndex(null), [])
   const step = useCallback((delta: number) => setIndex((i) => (i === null ? i : (i + delta + count) % count)), [count])
@@ -25,6 +29,15 @@ export default function StrategyImageGallery({ images }: { images: string[] }) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, close, step])
+
+  useEffect(() => {
+    if (!open) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [open])
 
   if (count === 0) return null
 
@@ -55,44 +68,70 @@ export default function StrategyImageGallery({ images }: { images: string[] }) {
         </div>
       )}
 
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          onClick={close}
-          role="dialog"
-          aria-modal="true"
-        >
-          <button
-            type="button"
+      {open &&
+        mounted &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex flex-col bg-black/80 p-4 backdrop-blur-sm"
             onClick={close}
-            aria-label={t('strategies.detail.galleryClose')}
-            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            role="dialog"
+            aria-modal="true"
           >
-            <X className="h-5 w-5" />
-          </button>
+            <button
+              type="button"
+              onClick={close}
+              aria-label={t('strategies.detail.galleryClose')}
+              className="absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
+            >
+              <X className="h-5 w-5" />
+            </button>
 
-          {count > 1 && (
-            <>
-              <GalleryNav side="left" label={t('strategies.detail.galleryPrev')} onClick={() => step(-1)} />
-              <GalleryNav side="right" label={t('strategies.detail.galleryNext')} onClick={() => step(1)} />
-            </>
-          )}
+            {count > 1 && (
+              <>
+                <GalleryNav side="left" label={t('strategies.detail.galleryPrev')} onClick={() => step(-1)} />
+                <GalleryNav side="right" label={t('strategies.detail.galleryNext')} onClick={() => step(1)} />
+              </>
+            )}
 
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={images[index]}
-            alt=""
-            onClick={(e) => e.stopPropagation()}
-            className="max-h-[85vh] max-w-full rounded-lg object-contain shadow-2xl"
-          />
-
-          {count > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/50 px-3 py-1 text-xs tabular-nums text-white">
-              {index + 1} / {count}
+            {/* Image area — flexes to fill, image centred and fully contained. */}
+            <div className="flex min-h-0 flex-1 items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={images[index]}
+                alt=""
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-full max-w-full rounded-lg object-contain shadow-2xl"
+              />
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Thumbnail strip + counter, pinned below the image. */}
+            {count > 1 && (
+              <div className="mt-3 flex shrink-0 flex-col items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                <div className="text-xs tabular-nums text-white/70">
+                  {index + 1} / {count}
+                </div>
+                <div className="flex max-w-full gap-2 overflow-x-auto rounded-lg bg-black/40 p-2">
+                  {images.map((url, i) => (
+                    <button
+                      type="button"
+                      key={url}
+                      onClick={() => setIndex(i)}
+                      aria-current={i === index}
+                      className={cn(
+                        'h-14 w-14 shrink-0 overflow-hidden rounded-md border-2 transition',
+                        i === index ? 'border-white opacity-100' : 'border-transparent opacity-50 hover:opacity-90',
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt="" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
     </>
   )
 }

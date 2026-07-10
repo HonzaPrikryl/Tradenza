@@ -110,7 +110,14 @@ export default function DayDetailDialog({
             </h3>
             <div className="h-48 rounded-lg border border-border bg-background/40 p-2">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={detail.cumulative} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <AreaChart
+                  data={
+                    detail.cumulative.length
+                      ? [{ label: '', cumulative: 0, pnl: 0 }, ...detail.cumulative]
+                      : detail.cumulative
+                  }
+                  margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+                >
                   <defs>
                     <linearGradient id="dayCum" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor={color} stopOpacity={0.2} />

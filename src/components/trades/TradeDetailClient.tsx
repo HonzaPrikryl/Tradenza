@@ -9,9 +9,9 @@ import { formatDateTz, cn } from '@/lib/utils'
 import { deleteTrade } from '@/lib/actions/trades'
 import { getTradeCandles, type CandlesResult } from '@/lib/actions/candles'
 import type { TagGroupWithValues } from '@/lib/actions/tags'
-import TradeStatsPanel from './detail/TradeStatsPanel'
+import TradeStatsPanel, { type SidebarTab } from './detail/TradeStatsPanel'
 import TradeTagsPanel from './detail/TradeTagsPanel'
-import StrategyPanel from './detail/StrategyPanel'
+import TradePlaybookPanel from './detail/TradePlaybookPanel'
 import NotesTabs from './detail/NotesTabs'
 import type { StrategyDTO } from '@/lib/actions/strategies'
 import { normalizeExecutions } from './detail/executions'
@@ -43,7 +43,7 @@ interface Props {
 export default function TradeDetailClient({ trade, tagGroups, strategies, timezone, dayKey, dailyNote }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
-  const [sidebarTab, setSidebarTab] = useState<'stats' | 'executions'>('stats')
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('stats')
 
   const executions = useMemo(() => normalizeExecutions(trade), [trade])
   const selectedTagIds = useMemo(() => trade.tradeTags.map(({ tag }) => tag.id), [trade.tradeTags])
@@ -137,12 +137,17 @@ export default function TradeDetailClient({ trade, tagGroups, strategies, timezo
             tab={sidebarTab}
             onTabChange={setSidebarTab}
             timezone={timezone}
+            playbookSlot={
+              <TradePlaybookPanel
+                tradeId={trade.id}
+                strategies={strategies}
+                current={trade.strategy ?? null}
+                initialProgress={trade.checklistProgress ?? null}
+              />
+            }
           />
           {sidebarTab === 'stats' && (
-            <>
-              <StrategyPanel tradeId={trade.id} strategies={strategies} current={trade.strategy ?? null} />
-              <TradeTagsPanel tradeId={trade.id} groups={tagGroups} selectedTagIds={selectedTagIds} />
-            </>
+            <TradeTagsPanel tradeId={trade.id} groups={tagGroups} selectedTagIds={selectedTagIds} />
           )}
         </aside>
 

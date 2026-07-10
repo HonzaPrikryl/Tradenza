@@ -531,3 +531,22 @@ export const getTradeById = authedAction([uuid], async ({ userId }, id) => {
   if (!trade) return null
   return trade
 })
+
+const checklistProgressSchema = z.object({
+  entry: z.array(z.string().trim().min(1).max(200)).max(30),
+  exit: z.array(z.string().trim().min(1).max(200)).max(30),
+})
+
+export const setTradeChecklistProgress = mutationAction(
+  [uuid, checklistProgressSchema],
+  async ({ userId }, tradeId, progress) => {
+    const empty = progress.entry.length === 0 && progress.exit.length === 0
+    await db
+      .update(trades)
+      .set({ checklistProgress: empty ? null : progress, updatedAt: new Date() })
+      .where(and(eq(trades.id, tradeId), eq(trades.userId, userId)))
+    revalidatePath('/trades')
+    revalidatePath('/strategies')
+    return { success: true }
+  },
+)

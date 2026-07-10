@@ -19,7 +19,8 @@ export interface StrategyFormValue {
   id: string
   name: string
   description: string | null
-  checklist: string[]
+  entryChecklist: string[]
+  exitChecklist: string[]
   imageUrls: string[]
 }
 
@@ -34,8 +35,58 @@ type FormState = {
   id: string
   name: string
   description: string
-  checklist: string[]
+  entryChecklist: string[]
+  exitChecklist: string[]
   imageUrls: string[]
+}
+
+function ChecklistField({
+  label,
+  items,
+  onChange,
+}: {
+  label: string
+  items: string[]
+  onChange: (next: string[]) => void
+}) {
+  return (
+    <div>
+      <label className={labelClass}>{label}</label>
+      <div className="space-y-2">
+        {items.map((item, idx) => (
+          <div key={idx} className="flex items-center gap-2">
+            <input
+              value={item}
+              onChange={(e) => {
+                const next = [...items]
+                next[idx] = e.target.value
+                onChange(next)
+              }}
+              placeholder={t('strategies.form.criterionPlaceholder')}
+              maxLength={200}
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={() => onChange(items.filter((_, i) => i !== idx))}
+              aria-label={t('strategies.form.removeCriterion')}
+              className="shrink-0 rounded p-1.5 text-muted-foreground hover:text-loss"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange([...items, ''])}
+          className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary text-xs"
+        >
+          <Plus className="h-4 w-4" />
+          {t('strategies.form.addCriterion')}
+        </button>
+      </div>
+    </div>
+  )
 }
 
 export default function StrategyFormModal({ strategy, onClose, onSaved }: Props) {
@@ -43,7 +94,8 @@ export default function StrategyFormModal({ strategy, onClose, onSaved }: Props)
     id: strategy?.id ?? '',
     name: strategy?.name ?? '',
     description: strategy?.description ?? '',
-    checklist: strategy?.checklist ?? [],
+    entryChecklist: strategy?.entryChecklist ?? [],
+    exitChecklist: strategy?.exitChecklist ?? [],
     imageUrls: strategy?.imageUrls ?? [],
   }))
   const [saving, startSaving] = useTransition()
@@ -57,7 +109,8 @@ export default function StrategyFormModal({ strategy, onClose, onSaved }: Props)
     const payload = {
       name,
       description: isEmptyHtml(form.description) ? null : form.description,
-      checklist: form.checklist.map((c) => c.trim()).filter(Boolean),
+      entryChecklist: form.entryChecklist.map((c) => c.trim()).filter(Boolean),
+      exitChecklist: form.exitChecklist.map((c) => c.trim()).filter(Boolean),
       imageUrls: form.imageUrls,
     }
     startSaving(async () => {
@@ -105,42 +158,17 @@ export default function StrategyFormModal({ strategy, onClose, onSaved }: Props)
         </div>
       </div>
 
-      <div>
-        <label className={labelClass}>{t('strategies.form.checklist')}</label>
-        <div className="space-y-2">
-          {form.checklist.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <input
-                value={item}
-                onChange={(e) => {
-                  const next = [...form.checklist]
-                  next[idx] = e.target.value
-                  patch({ checklist: next })
-                }}
-                placeholder={t('strategies.form.criterionPlaceholder')}
-                maxLength={200}
-                className={inputClass}
-              />
-              <button
-                type="button"
-                onClick={() => patch({ checklist: form.checklist.filter((_, i) => i !== idx) })}
-                aria-label={t('strategies.form.removeImage')}
-                className="shrink-0 rounded p-1.5 text-muted-foreground hover:text-loss"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={() => patch({ checklist: [...form.checklist, ''] })}
-            className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary text-xs"
-          >
-            <Plus className="h-4 w-4" />
-            {t('strategies.form.addCriterion')}
-          </button>
-        </div>
-      </div>
+      <ChecklistField
+        label={t('strategies.form.entryChecklist')}
+        items={form.entryChecklist}
+        onChange={(entryChecklist) => patch({ entryChecklist })}
+      />
+
+      <ChecklistField
+        label={t('strategies.form.exitChecklist')}
+        items={form.exitChecklist}
+        onChange={(exitChecklist) => patch({ exitChecklist })}
+      />
 
       <StrategyImagesField value={form.imageUrls} onChange={(urls) => patch({ imageUrls: urls })} />
     </UiModal>

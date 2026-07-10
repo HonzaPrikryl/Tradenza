@@ -8,6 +8,12 @@ import { t } from '@/i18n'
 import { useDashboardData } from '../DashboardDataContext'
 import { WidgetShell, WidgetEmpty, useChartColors, makeTooltipStyle, useMounted, ChartSkeleton } from './shared'
 
+function priorDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 function CumulativePnlWidget() {
   const { data, currency, unit, editing } = useDashboardData()
   const CHART = useChartColors()
@@ -15,6 +21,12 @@ function CumulativePnlWidget() {
   const series = data.daily
   const last = series.length ? series[series.length - 1].cumulative : 0
   const color = last >= 0 ? CHART.profit : CHART.loss
+  const chartData = series.length
+    ? [
+        { date: priorDay(series[0].date), cumulative: 0 },
+        ...series.map((d) => ({ date: d.date, cumulative: d.cumulative })),
+      ]
+    : []
 
   return (
     <WidgetShell
@@ -31,7 +43,7 @@ function CumulativePnlWidget() {
             <ChartSkeleton />
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={series} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+              <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                 <defs>
                   <linearGradient id="cumGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={color} stopOpacity={0.2} />

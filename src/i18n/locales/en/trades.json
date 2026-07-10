@@ -183,7 +183,12 @@
     },
     "tabs": {
       "stats": "Statistics",
-      "executions": "Executions"
+      "executions": "Executions",
+      "playbook": "Playbook"
+    },
+    "playbook": {
+      "checklistTitle": "Setup checklist",
+      "progress": "{done}/{total}"
     },
     "exec": {
       "title": "Executions",

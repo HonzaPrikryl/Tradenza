@@ -49,6 +49,8 @@ function SectionTitle({ icon, label, hint }: { icon: React.ReactNode; label: str
   )
 }
 
+export type SidebarTab = 'stats' | 'executions' | 'playbook'
+
 export default function TradeStatsPanel({
   trade,
   executions,
@@ -57,14 +59,16 @@ export default function TradeStatsPanel({
   tab,
   onTabChange,
   timezone,
+  playbookSlot,
 }: {
   trade: Trade
   executions: NormalizedExecution[]
   accountName: string | null
   candlesResult?: CandlesResult | null
-  tab: 'stats' | 'executions'
-  onTabChange: (tab: 'stats' | 'executions') => void
+  tab: SidebarTab
+  onTabChange: (tab: SidebarTab) => void
   timezone?: string | null
+  playbookSlot?: React.ReactNode
 }) {
   const [rating, setRating] = useState(trade.rating ?? 0)
 
@@ -195,24 +199,26 @@ export default function TradeStatsPanel({
 
   return (
     <div className="space-y-4">
-      {/* ── Tabs: Stats / Executions ── */}
+      {/* ── Tabs: Stats / Executions / Playbook ── */}
       <div className="inline-flex rounded-lg border border-border bg-card p-1">
-        {(['stats', 'executions'] as const).map((tb) => (
+        {(['stats', 'executions', 'playbook'] as const).map((tb) => (
           <button
             key={tb}
             type="button"
             onClick={() => onTabChange(tb)}
             className={cn(
-              'rounded-md px-5 py-1.5 text-sm font-medium transition-colors',
+              'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
               tab === tb ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            {t(tb === 'stats' ? 'trades.detail.tabs.stats' : 'trades.detail.tabs.executions')}
+            {t(`trades.detail.tabs.${tb}`)}
           </button>
         ))}
       </div>
 
-      {tab === 'executions' ? (
+      {tab === 'playbook' ? (
+        playbookSlot
+      ) : tab === 'executions' ? (
         <ExecutionsEditor trade={trade} executions={executions} />
       ) : (
         <>

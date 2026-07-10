@@ -105,6 +105,11 @@ export const trades = pgTable(
     riskRewardRatio: numeric('risk_reward_ratio', { precision: 8, scale: 4 }),
     riskAmount: numeric('risk_amount', { precision: 18, scale: 8 }),
 
+    // Which of the strategy's entry/exit criteria the user actually ticked off for
+    // this trade. Stored by criterion text (robust to reordering); stale entries
+    // left over after the strategy's checklist changes are simply ignored on read.
+    checklistProgress: jsonb('checklist_progress').$type<{ entry: string[]; exit: string[] }>(),
+
     // Journaling
     setupName: text('setup_name'),
     notes: text('notes'),
@@ -321,8 +326,13 @@ export const strategies = pgTable(
     userId: text('user_id').notNull(),
     name: text('name').notNull(), // "Opening range breakout"
     description: text('description'), // definition / rules (plain text)
-    // Structured playbook: the entry/exit criteria that define a valid setup.
+    // Deprecated flat playbook checklist (superseded by entry/exitChecklist).
+    // Kept for backward-compat reads; new writes leave it null.
     checklist: jsonb('checklist').$type<string[]>(), // null = none
+    // Structured playbook split into the two decisions it actually governs:
+    // what makes a valid entry vs. how/when to exit. Both optional (null = none).
+    entryChecklist: jsonb('entry_checklist').$type<string[]>(),
+    exitChecklist: jsonb('exit_checklist').$type<string[]>(),
     imageUrl: text('image_url'), // deprecated single image (superseded by imageUrls)
     imageUrls: jsonb('image_urls').$type<string[]>(), // R2 URLs of reference screenshots
     color: text('color').notNull().default('#6366f1'),

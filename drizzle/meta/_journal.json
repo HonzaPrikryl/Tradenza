@@ -64,6 +64,20 @@
       "when": 1783343085565,
       "tag": "0008_strategy_images",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783695151127,
+      "tag": "0009_strategy_entry_exit_checklist",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783696893253,
+      "tag": "0010_trade_checklist_progress",
+      "breakpoints": true
     }
   ]
 }

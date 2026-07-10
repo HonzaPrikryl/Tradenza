@@ -12,11 +12,12 @@ import StrategyFormModal from '@/components/strategies/StrategyFormModal'
 import { useTableSort } from '@/hooks/useTableSort'
 import { deleteStrategy, type StrategyDTO, type StrategyOverviewRow } from '@/lib/actions/strategies'
 import { formatCurrency, cn } from '@/lib/utils'
+import { AreaSparkline } from '@/components/stats/StatVisuals'
 import { t } from '@/i18n'
 
 type View = 'cards' | 'list'
-type SortKey = 'name' | 'tradeCount' | 'netPnl' | 'winRate'
-const STRATEGY_SORT_KEYS: SortKey[] = ['name', 'tradeCount', 'netPnl', 'winRate']
+type SortKey = 'name' | 'tradeCount' | 'netPnl' | 'winRate' | 'adherence'
+const STRATEGY_SORT_KEYS: SortKey[] = ['name', 'tradeCount', 'netPnl', 'winRate', 'adherence']
 const VIEW_KEY = 'tz_strategies_view'
 
 export default function StrategiesClient({ strategies }: { strategies: StrategyOverviewRow[] }) {
@@ -58,6 +59,7 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
       let cmp: number
       const key = sortKey as SortKey
       if (key === 'name') cmp = a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      else if (key === 'adherence') cmp = (a.adherence ?? -1) - (b.adherence ?? -1)
       else cmp = (a[key] as number) - (b[key] as number)
       return sortDir === 'asc' ? cmp : -cmp
     })
@@ -82,6 +84,7 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
   }
 
   const winRateText = (s: StrategyOverviewRow) => (s.tradeCount > 0 ? `${Math.round(s.winRate)}%` : '—')
+  const adherenceText = (s: StrategyOverviewRow) => (s.adherence !== null ? `${Math.round(s.adherence)}%` : '—')
 
   return (
     <div>
@@ -144,6 +147,7 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
               href={`/strategies/${s.id}`}
               className="group block rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
             >
+              {/* Title */}
               <div className="flex items-start justify-between gap-2">
                 <h3 className="min-w-0 truncate font-medium">{s.name}</h3>
                 <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -151,14 +155,21 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
                   <IconBtn label={t('strategies.delete.confirm')} onClick={() => remove(s)} icon={Trash2} danger />
                 </div>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-xs">
-                <Metric label={t('strategies.stats.trades')} value={String(s.tradeCount)} />
-                <Metric
-                  label={t('strategies.stats.netPnl')}
-                  value={formatCurrency(s.netPnl)}
-                  valueClass={s.netPnl > 0 ? 'text-profit' : s.netPnl < 0 ? 'text-loss' : undefined}
-                />
-                <Metric label={t('strategies.stats.winRate')} value={winRateText(s)} />
+              {/* Two groups under the title, vertically centred: metrics · chart */}
+              <div className="mt-3 flex items-center gap-4 border-t border-border pt-3">
+                <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 text-xs">
+                  <Metric label={t('strategies.stats.trades')} value={String(s.tradeCount)} />
+                  <Metric
+                    label={t('strategies.stats.netPnl')}
+                    value={formatCurrency(s.netPnl)}
+                    valueClass={s.netPnl > 0 ? 'text-profit' : s.netPnl < 0 ? 'text-loss' : undefined}
+                  />
+                  <Metric label={t('strategies.stats.winRate')} value={winRateText(s)} />
+                  <Metric label={t('strategies.stats.adherence')} value={adherenceText(s)} />
+                </div>
+                <div className="w-1/2 max-w-[180px] shrink-0">
+                  <AreaSparkline points={s.daily.map((d) => d.cumulative)} className="h-14 w-full" />
+                </div>
               </div>
             </Link>
           ))}
@@ -199,6 +210,14 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
                   onSort={toggleSort}
                   align="right"
                 />
+                <SortableTh
+                  label={t('strategies.stats.adherence')}
+                  column="adherence"
+                  activeColumn={sortKey}
+                  sortOrder={sortDir}
+                  onSort={toggleSort}
+                  align="right"
+                />
                 <th className="w-20 px-4 py-3" />
               </tr>
             </thead>
@@ -220,6 +239,7 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
                     {formatCurrency(s.netPnl)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{winRateText(s)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{adherenceText(s)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <IconBtn

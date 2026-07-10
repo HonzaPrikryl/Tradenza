@@ -13,6 +13,12 @@ import { readGlobalFilters } from '@/lib/global-filters'
 import { generalConditions } from './filter-sql'
 import { computeBundle, type StatsBundle, type TradeRow } from '@/lib/stats-compute'
 import { multiplierFor, tradeNotional } from '@/lib/breakeven'
+import {
+  adherenceOf,
+  computeChecklistAnalytics,
+  type ChecklistAnalytics,
+  type ChecklistTrade,
+} from '@/lib/strategy-checklist'
 
 // Columns needed to build a `TradeRow` for `computeBundle` (the shared, tested
 // P&L/stats engine). Kept in one place so per-strategy stats are computed exactly
@@ -31,6 +37,7 @@ const STAT_COLUMNS = {
   entryPrice: true,
   entryQuantity: true,
   extra: true,
+  checklistProgress: true,
 } as const
 
 type StatTradeRow = {
@@ -47,6 +54,7 @@ type StatTradeRow = {
   entryPrice: string | null
   entryQuantity: string | null
   extra: unknown
+  checklistProgress: { entry: string[]; exit: string[] } | null
 }
 
 function toTradeRow(r: StatTradeRow): TradeRow {
@@ -68,10 +76,17 @@ export interface StrategyDTO {
   id: string
   name: string
   description: string | null
-  checklist: string[]
+  entryChecklist: string[]
+  exitChecklist: string[]
   imageUrls: string[]
   color: string
   sortOrder: number
+}
+
+// Backward-compat: strategies created before the entry/exit split stored a single
+// flat `checklist`. Surface those legacy items as entry criteria until re-saved.
+function entryOf(r: { entryChecklist: string[] | null; checklist: string[] | null }): string[] {
+  return r.entryChecklist ?? r.checklist ?? []
 }
 
 // Keep only images we produced ourselves (under the R2 public base) — never store
@@ -87,7 +102,8 @@ const strategySchema = z.object({
   // Rich-text HTML; large cap because the editor can embed inline (data-URL)
   // images, exactly like trade notes.
   description: z.string().trim().max(8_000_000).optional().nullable(),
-  checklist: z.array(z.string().trim().min(1).max(200)).max(30).optional(),
+  entryChecklist: z.array(z.string().trim().min(1).max(200)).max(30).optional(),
+  exitChecklist: z.array(z.string().trim().min(1).max(200)).max(30).optional(),
   imageUrls: z.array(z.string().url().max(2048)).max(8).optional(),
   color: z.string().trim().max(20).default('#6366f1'),
 })
@@ -102,16 +118,20 @@ export const getStrategies = authedAction([], async ({ userId }): Promise<Strate
     id: r.id,
     name: r.name,
     description: r.description,
-    checklist: r.checklist ?? [],
+    entryChecklist: entryOf(r),
+    exitChecklist: r.exitChecklist ?? [],
     imageUrls: r.imageUrls ?? (r.imageUrl ? [r.imageUrl] : []),
     color: r.color,
     sortOrder: r.sortOrder,
   }))
 })
 
+// null-if-empty so an empty list clears the column rather than storing `[]`.
+const nonEmpty = (list: string[] | undefined): string[] | null => (list && list.length > 0 ? list : null)
+
 export const createStrategy = mutationAction(
   [strategySchema],
-  async ({ userId }, { name, description, checklist, imageUrls, color }) => {
+  async ({ userId }, { name, description, entryChecklist, exitChecklist, imageUrls, color }) => {
     const maxRow = await db
       .select({ m: sql<number>`coalesce(max(${strategies.sortOrder}), -1)`.mapWith(Number) })
       .from(strategies)
@@ -125,7 +145,9 @@ export const createStrategy = mutationAction(
         userId,
         name,
         description: description || null,
-        checklist: checklist && checklist.length > 0 ? checklist : null,
+        checklist: null, // legacy column — new writes use entry/exit only
+        entryChecklist: nonEmpty(entryChecklist),
+        exitChecklist: nonEmpty(exitChecklist),
         imageUrls: images.length > 0 ? images : null,
         color,
         sortOrder: nextOrder,
@@ -138,14 +160,16 @@ export const createStrategy = mutationAction(
 
 export const updateStrategy = mutationAction(
   [uuid, strategySchema],
-  async ({ userId }, id, { name, description, checklist, imageUrls, color }) => {
+  async ({ userId }, id, { name, description, entryChecklist, exitChecklist, imageUrls, color }) => {
     const images = safeImageUrls(imageUrls)
     const [strategy] = await db
       .update(strategies)
       .set({
         name,
         description: description || null,
-        checklist: checklist && checklist.length > 0 ? checklist : null,
+        checklist: null, // migrate off the legacy column on any save
+        entryChecklist: nonEmpty(entryChecklist),
+        exitChecklist: nonEmpty(exitChecklist),
         imageUrls: images.length > 0 ? images : null,
         color,
         updatedAt: new Date(),
@@ -228,6 +252,8 @@ export interface StrategyOverviewRow extends StrategyDTO {
   tradeCount: number
   netPnl: number
   winRate: number
+  adherence: number | null
+  daily: { date: string; cumulative: number }[]
 }
 
 // Every (live) strategy with its headline numbers, computed via the shared stats
@@ -250,27 +276,50 @@ export const getStrategyOverview = authedAction([], async ({ userId }): Promise<
     }),
   ])
 
-  const grouped = new Map<string, TradeRow[]>()
+  // Keep the checklist progress alongside each TradeRow so we can measure both
+  // headline stats and playbook adherence from the same grouped data.
+  const grouped = new Map<string, ChecklistTrade[]>()
   for (const r of rows) {
     if (!r.strategyId) continue
     const arr = grouped.get(r.strategyId) ?? []
-    arr.push(toTradeRow(r))
+    arr.push({ row: toTradeRow(r), progress: r.checklistProgress ?? null })
     grouped.set(r.strategyId, arr)
   }
 
   return list.map((s) => {
-    const bundle = grouped.has(s.id) ? computeBundle(grouped.get(s.id)!, 'net', settings.breakeven) : null
+    const group = grouped.get(s.id) ?? []
+    const bundle = group.length
+      ? computeBundle(
+          group.map((g) => g.row),
+          'net',
+          settings.breakeven,
+        )
+      : null
+    const entryChecklist = entryOf(s)
+    const exitChecklist = s.exitChecklist ?? []
+
+    const byDay = new Map<string, number>()
+    for (const g of group) {
+      const key = (g.row.exitDatetime ?? g.row.entryDatetime).toISOString().slice(0, 10)
+      byDay.set(key, (byDay.get(key) ?? 0) + g.row.netPnl)
+    }
+    let running = 0
+    const daily = [...byDay.keys()].sort().map((date) => ({ date, cumulative: (running += byDay.get(date)!) }))
+
     return {
       id: s.id,
       name: s.name,
       description: s.description,
-      checklist: s.checklist ?? [],
+      entryChecklist,
+      exitChecklist,
       imageUrls: s.imageUrls ?? (s.imageUrl ? [s.imageUrl] : []),
       color: s.color,
       sortOrder: s.sortOrder,
       tradeCount: bundle?.totalTrades ?? 0,
       netPnl: bundle?.totalPnl ?? 0,
       winRate: bundle?.winPct ?? 0,
+      adherence: adherenceOf(group, entryChecklist, exitChecklist),
+      daily,
     }
   })
 })
@@ -280,12 +329,14 @@ export interface StrategyDetail {
     id: string
     name: string
     description: string | null
-    checklist: string[]
+    entryChecklist: string[]
+    exitChecklist: string[]
     imageUrls: string[]
     color: string
   }
   stats: StatsBundle
   curve: { i: number; value: number }[]
+  checklist: ChecklistAnalytics
   recentTrades: {
     id: string
     symbol: string
@@ -307,6 +358,8 @@ export const getStrategyDetail = authedAction([uuid], async ({ userId }, id): Pr
       name: true,
       description: true,
       checklist: true,
+      entryChecklist: true,
+      exitChecklist: true,
       imageUrl: true,
       imageUrls: true,
       color: true,
@@ -318,7 +371,8 @@ export const getStrategyDetail = authedAction([uuid], async ({ userId }, id): Pr
     name: row.name,
     description: row.description,
     color: row.color,
-    checklist: row.checklist ?? [],
+    entryChecklist: entryOf(row),
+    exitChecklist: row.exitChecklist ?? [],
     imageUrls: row.imageUrls ?? (row.imageUrl ? [row.imageUrl] : []),
   }
 
@@ -332,6 +386,16 @@ export const getStrategyDetail = authedAction([uuid], async ({ userId }, id): Pr
     columns: STAT_COLUMNS,
   })
   const stats = computeBundle(closed.map(toTradeRow), 'net', settings.breakeven)
+
+  // Playbook adherence: how following each criterion relates to outcomes, plus a
+  // full-vs-partial compliance split. Uses the same closed trades as the stats.
+  const checklist = computeChecklistAnalytics(
+    closed.map((c) => ({ row: toTradeRow(c), progress: c.checklistProgress ?? null })),
+    strategy.entryChecklist,
+    strategy.exitChecklist,
+    'net',
+    settings.breakeven,
+  )
 
   // Equity curve: cumulative net P&L over closed trades in chronological order.
   // Starts at a zero baseline (index 0) so the line visually begins from 0 —
@@ -363,5 +427,5 @@ export const getStrategyDetail = authedAction([uuid], async ({ userId }, id): Pr
     entryDatetime: r.entryDatetime.toISOString(),
   }))
 
-  return { strategy, stats, curve, recentTrades }
+  return { strategy, stats, curve, checklist, recentTrades }
 })
