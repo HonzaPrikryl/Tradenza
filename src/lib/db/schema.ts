@@ -13,6 +13,7 @@ import {
   jsonb,
 } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
+import type { SidebarPrefs } from '../trade-sidebar'
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,7 @@ export const users = pgTable('users', {
   lastName: text('last_name'),
   username: text('username'),
   onboardingDismissedAt: timestamp('onboarding_dismissed_at', { withTimezone: true }),
+  sidebarPrefs: jsonb('sidebar_prefs').$type<SidebarPrefs>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })

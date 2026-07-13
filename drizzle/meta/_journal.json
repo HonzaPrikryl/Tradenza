@@ -85,6 +85,13 @@
       "when": 1783963032399,
       "tag": "0011_asset_class_cfd",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1783982950496,
+      "tag": "0012_sidebar_prefs",
+      "breakpoints": true
     }
   ]
 }

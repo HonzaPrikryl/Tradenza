@@ -1,31 +1,28 @@
 'use server'
 
-import { cookies } from 'next/headers'
+import { auth } from '@clerk/nextjs/server'
+import { eq } from 'drizzle-orm'
+import { db, users } from '@/lib/db'
 import { sanitizePrefs, type SidebarPrefs } from './trade-sidebar'
 
-const COOKIE = 'tz_pref_sidebar'
-const ONE_YEAR = 60 * 60 * 24 * 365
+const EMPTY: SidebarPrefs = { hidden: [], order: {} }
 
 /** Global (per-user) trade-detail sidebar preferences: hidden keys + order. */
 export async function readSidebarPrefs(): Promise<SidebarPrefs> {
-  const c = await cookies()
-  const raw = c.get(COOKIE)?.value
-  if (!raw) return { hidden: [], order: {} }
-  try {
-    return sanitizePrefs(JSON.parse(raw))
-  } catch {
-    return { hidden: [], order: {} }
-  }
+  const { userId } = await auth()
+  if (!userId) return EMPTY
+  const rows = await db.select({ prefs: users.sidebarPrefs }).from(users).where(eq(users.id, userId)).limit(1)
+  return sanitizePrefs(rows[0]?.prefs ?? null)
 }
 
 export async function setSidebarPrefs(prefs: SidebarPrefs) {
-  const c = await cookies()
+  const { userId } = await auth()
+  if (!userId) return { success: false }
   const clean = sanitizePrefs(prefs)
   const isEmpty = clean.hidden.length === 0 && Object.keys(clean.order).length === 0
-  if (isEmpty) {
-    c.delete(COOKIE)
-  } else {
-    c.set(COOKIE, JSON.stringify(clean), { path: '/', maxAge: ONE_YEAR })
-  }
+  await db
+    .update(users)
+    .set({ sidebarPrefs: isEmpty ? null : clean, updatedAt: new Date() })
+    .where(eq(users.id, userId))
   return { success: true }
 }
