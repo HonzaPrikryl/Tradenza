@@ -12,8 +12,10 @@ import type { TagGroupWithValues } from '@/lib/actions/tags'
 import TradeStatsPanel, { type SidebarTab } from './detail/TradeStatsPanel'
 import TradeTagsPanel from './detail/TradeTagsPanel'
 import TradePlaybookPanel from './detail/TradePlaybookPanel'
+import StrategyPanel from './detail/StrategyPanel'
 import NotesTabs from './detail/NotesTabs'
 import type { StrategyDTO } from '@/lib/actions/strategies'
+import type { SidebarPrefs } from '@/lib/trade-sidebar'
 import { normalizeExecutions } from './detail/executions'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
@@ -38,9 +40,18 @@ interface Props {
   timezone?: string | null
   dayKey: string
   dailyNote: string
+  sidebarPrefs?: SidebarPrefs
 }
 
-export default function TradeDetailClient({ trade, tagGroups, strategies, timezone, dayKey, dailyNote }: Props) {
+export default function TradeDetailClient({
+  trade,
+  tagGroups,
+  strategies,
+  timezone,
+  dayKey,
+  dailyNote,
+  sidebarPrefs,
+}: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('stats')
@@ -137,6 +148,7 @@ export default function TradeDetailClient({ trade, tagGroups, strategies, timezo
             tab={sidebarTab}
             onTabChange={setSidebarTab}
             timezone={timezone}
+            initialPrefs={sidebarPrefs}
             playbookSlot={
               <TradePlaybookPanel
                 tradeId={trade.id}
@@ -145,10 +157,9 @@ export default function TradeDetailClient({ trade, tagGroups, strategies, timezo
                 initialProgress={trade.checklistProgress ?? null}
               />
             }
+            tagsSlot={<TradeTagsPanel tradeId={trade.id} groups={tagGroups} selectedTagIds={selectedTagIds} />}
+            strategySlot={<StrategyPanel tradeId={trade.id} strategies={strategies} current={trade.strategy ?? null} />}
           />
-          {sidebarTab === 'stats' && (
-            <TradeTagsPanel tradeId={trade.id} groups={tagGroups} selectedTagIds={selectedTagIds} />
-          )}
         </aside>
 
         <section className="w-full min-w-0 flex-1 space-y-4">

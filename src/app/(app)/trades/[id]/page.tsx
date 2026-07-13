@@ -4,6 +4,7 @@ import { getTagGroups } from '@/lib/actions/tags'
 import { getStrategies } from '@/lib/actions/strategies'
 import { getDailyNote } from '@/lib/actions/progress'
 import { readGlobalSettings } from '@/lib/global-settings'
+import { readSidebarPrefs } from '@/lib/sidebar-prefs'
 import TradeDetailClient from '@/components/trades/TradeDetailClient'
 import DemoTradeDetail from '@/components/onboarding/DemoTradeDetail'
 import { t } from '@/i18n'
@@ -32,11 +33,12 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
   const { id } = await params
   if (isDemoId(id)) return <DemoTradeDetail />
 
-  const [trade, tagGroups, strategies, settings] = await Promise.all([
+  const [trade, tagGroups, strategies, settings, sidebarPrefs] = await Promise.all([
     getTradeById(id),
     getTagGroups(),
     getStrategies(),
     readGlobalSettings(),
+    readSidebarPrefs(),
   ])
   if (!trade) notFound()
 
@@ -51,6 +53,7 @@ export default async function TradeDetailPage({ params }: { params: Promise<{ id
       timezone={settings.timezone}
       dayKey={dayKey}
       dailyNote={dailyNote}
+      sidebarPrefs={sidebarPrefs}
     />
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { Info, Target, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
@@ -14,6 +14,9 @@ import ExecutionsEditor from './ExecutionsEditor'
 import StarRating from './StarRating'
 import RunningPnlChart from './RunningPnlChart'
 import LegEditor, { type LegMode } from './LegEditor'
+import SidebarSettings from './SidebarSettings'
+import { setSidebarPrefs } from '@/lib/sidebar-prefs'
+import { resolveListOrder, SIDEBAR_LISTS, type SidebarListId, type SidebarPrefs } from '@/lib/trade-sidebar'
 import type { Trade } from '@/lib/db'
 import { storedMultiplier, storedRiskPlan, type NormalizedExecution, type RiskPlanLeg } from './executions'
 
@@ -60,6 +63,9 @@ export default function TradeStatsPanel({
   onTabChange,
   timezone,
   playbookSlot,
+  tagsSlot,
+  strategySlot,
+  initialPrefs = { hidden: [], order: {} },
 }: {
   trade: Trade
   executions: NormalizedExecution[]
@@ -69,8 +75,73 @@ export default function TradeStatsPanel({
   onTabChange: (tab: SidebarTab) => void
   timezone?: string | null
   playbookSlot?: React.ReactNode
+  tagsSlot?: React.ReactNode
+  strategySlot?: React.ReactNode
+  initialPrefs?: SidebarPrefs
 }) {
   const [rating, setRating] = useState(trade.rating ?? 0)
+
+  // Global (per-user) sidebar visibility + order. Optimistic local state, persisted via cookie.
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(initialPrefs.hidden))
+  const [order, setOrder] = useState<Record<SidebarListId, string[]>>(() => ({
+    sections: resolveListOrder('sections', initialPrefs.order.sections),
+    detailsRows: resolveListOrder('detailsRows', initialPrefs.order.detailsRows),
+    riskRows: resolveListOrder('riskRows', initialPrefs.order.riskRows),
+  }))
+  const show = (key: string) => !hidden.has(key)
+
+  const dirty = hidden.size > 0 || SIDEBAR_LISTS.some((l) => order[l.id].join() !== resolveListOrder(l.id).join())
+
+  // Debounce cookie writes so rapid toggles/reorders coalesce into a single request.
+  const pendingPrefs = useRef<SidebarPrefs | null>(null)
+  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const persist = (nextHidden: Set<string>, nextOrder: Record<SidebarListId, string[]>) => {
+    pendingPrefs.current = { hidden: [...nextHidden], order: nextOrder }
+    if (persistTimer.current) clearTimeout(persistTimer.current)
+    persistTimer.current = setTimeout(() => {
+      persistTimer.current = null
+      const p = pendingPrefs.current
+      if (p) void setSidebarPrefs(p).catch(() => {})
+    }, 400)
+  }
+  // Flush any pending write on unmount so a quick change isn't lost.
+  useEffect(
+    () => () => {
+      if (persistTimer.current) {
+        clearTimeout(persistTimer.current)
+        const p = pendingPrefs.current
+        if (p) void setSidebarPrefs(p).catch(() => {})
+      }
+    },
+    [],
+  )
+  const toggleHidden = (key: string) => {
+    setHidden((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      persist(next, order)
+      return next
+    })
+  }
+  const reorder = (listId: SidebarListId, keys: string[]) => {
+    setOrder((prev) => {
+      const next = { ...prev, [listId]: keys }
+      persist(hidden, next)
+      return next
+    })
+  }
+  const resetPrefs = () => {
+    const nextHidden = new Set<string>()
+    const nextOrder: Record<SidebarListId, string[]> = {
+      sections: resolveListOrder('sections'),
+      detailsRows: resolveListOrder('detailsRows'),
+      riskRows: resolveListOrder('riskRows'),
+    }
+    setHidden(nextHidden)
+    setOrder(nextOrder)
+    persist(nextHidden, nextOrder)
+  }
 
   const netPnl = trade.netPnl !== null ? Number(trade.netPnl) : null
   const grossPnl = trade.grossPnl !== null ? Number(trade.grossPnl) : null
@@ -222,23 +293,210 @@ export default function TradeStatsPanel({
     }
   }
 
+  // Rows keyed by stable key; null when the row has no meaningful value to show.
+  const detailRowNodes: Record<string, React.ReactNode> = {
+    'row.side': (
+      <Row
+        label={t('trades.detail.stats.side')}
+        value={
+          <span className={cn('uppercase', trade.direction === 'long' ? 'text-profit' : 'text-loss')}>
+            {trade.direction}
+          </span>
+        }
+      />
+    ),
+    'row.account': accountName ? (
+      <Row
+        label={t('trades.detail.stats.account')}
+        value={<span className="text-right text-sm font-medium">{accountName}</span>}
+      />
+    ) : null,
+    'row.contracts': <Row label={t('trades.detail.stats.contracts')} value={contractsTraded || null} />,
+    'row.points': (
+      <Row
+        label={t('trades.detail.stats.points')}
+        value={points !== null ? points.toFixed(2).replace(/\.?0+$/, '') : null}
+      />
+    ),
+    'row.priceMaeMfe':
+      priceLow !== null && priceHigh !== null ? (
+        <Row
+          label={t('trades.detail.risk.priceMaeMfe')}
+          value={
+            <span className="text-xs">
+              <span className="text-loss">{formatCurrency(priceLow)}</span>
+              <span className="mx-0.5 text-muted-foreground">/</span>
+              <span className="text-profit">{formatCurrency(priceHigh)}</span>
+            </span>
+          }
+        />
+      ) : null,
+    'row.multiplier': <Row label={t('trades.detail.stats.multiplier')} value={mult !== 1 ? mult : null} />,
+    'row.commissions': <Row label={t('trades.detail.stats.commissions')} value={formatCurrency(fees)} />,
+    'row.netRoi': (
+      <Row label={t('trades.detail.stats.netRoi')} value={netRoi !== null ? formatPercent(netRoi, 2) : null} />
+    ),
+    'row.grossPnl': (
+      <Row label={t('trades.detail.grossPnl')} value={grossPnl !== null ? formatCurrency(grossPnl) : null} />
+    ),
+  }
+
+  const riskRowNodes: Record<string, React.ReactNode> = {
+    'row.initialTarget': (
+      <Row
+        label={t('trades.detail.risk.initialTarget')}
+        value={<span className="text-profit">{formatCurrency(targetUsd)}</span>}
+      />
+    ),
+    'row.tradeRisk': (
+      <Row
+        label={t('trades.detail.risk.tradeRisk')}
+        value={<span className="text-loss">-{formatCurrency(riskUsd)}</span>}
+      />
+    ),
+    'row.plannedR': (
+      <Row label={t('trades.detail.risk.plannedR')} value={plannedR !== null ? `${plannedR.toFixed(2)}R` : null} />
+    ),
+    'row.realizedR': (
+      <Row
+        label={t('trades.detail.risk.realizedR')}
+        value={
+          realizedR !== null ? (
+            <span className={cn(realizedR >= 0 ? 'text-profit' : 'text-loss')}>{realizedR.toFixed(2)}R</span>
+          ) : null
+        }
+      />
+    ),
+    'row.avgEntry': <Row label={t('trades.detail.stats.avgEntry')} value={formatCurrency(entryPrice)} />,
+    'row.avgExit': (
+      <Row label={t('trades.detail.stats.avgExit')} value={exitPrice !== null ? formatCurrency(exitPrice) : null} />
+    ),
+    'row.entryTime': (
+      <Row label={t('trades.detail.stats.entryTime')} value={formatDateTimeTz(trade.entryDatetime, timezone)} />
+    ),
+    'row.exitTime': (
+      <Row
+        label={t('trades.detail.stats.exitTime')}
+        value={trade.exitDatetime ? formatDateTimeTz(trade.exitDatetime, timezone) : null}
+      />
+    ),
+  }
+
+  const renderRows = (listId: SidebarListId, nodes: Record<string, React.ReactNode>) =>
+    order[listId].map((key) => (show(key) && nodes[key] ? <Fragment key={key}>{nodes[key]}</Fragment> : null))
+
+  // Top-level sidebar sections keyed by stable key (rendered after the pinned P&L header).
+  const sectionNodes: Record<string, React.ReactNode> = {
+    'block.runningPnl':
+      candlesLoading || showRunning ? (
+        <div className="rounded-xl border border-border bg-card px-5 py-4">
+          <div className="mb-2 flex items-center justify-between">
+            <SectionTitle
+              icon={<span className="text-muted-foreground">~</span>}
+              label={t('trades.detail.risk.runningPnl')}
+            />
+            {showRunning && (
+              <span
+                className={cn(
+                  'text-sm font-semibold tabular',
+                  runningPnl[runningPnl.length - 1] >= 0 ? 'text-profit' : 'text-loss',
+                )}
+              >
+                {formatCurrency(runningPnl[runningPnl.length - 1])}
+              </span>
+            )}
+          </div>
+          {candlesLoading ? (
+            <div className="h-[76px] w-full animate-pulse rounded-md bg-muted/30" />
+          ) : (
+            <RunningPnlChart
+              points={runningPnl}
+              target={targetUsd > 0 ? targetUsd : null}
+              risk={riskUsd > 0 ? -riskUsd : null}
+            />
+          )}
+        </div>
+      ) : null,
+    'block.strategy': strategySlot ?? null,
+    'block.details': (
+      <div className="rounded-xl border border-border bg-card px-5 py-3">
+        <dl>{renderRows('detailsRows', detailRowNodes)}</dl>
+      </div>
+    ),
+    'block.risk': (
+      <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <SectionTitle icon={<Target className="h-3.5 w-3.5 text-profit" />} label={t('trades.detail.takeProfit')} />
+        </div>
+        <LegEditor
+          legs={profitTargets}
+          mode={targetMode}
+          onModeChange={setTargetMode}
+          entryPrice={entryPrice}
+          tickSize={ts}
+          tickValue={tickValue}
+          priceSign={dirSign}
+          totalQty={defaultQty}
+          kind="tp"
+          onChange={setProfitTargets}
+        />
+
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <SectionTitle icon={<Shield className="h-3.5 w-3.5 text-loss" />} label={t('trades.detail.stopLoss')} />
+        </div>
+        <LegEditor
+          legs={stopLosses}
+          mode={stopMode}
+          onModeChange={setStopMode}
+          entryPrice={entryPrice}
+          tickSize={ts}
+          tickValue={tickValue}
+          priceSign={-dirSign}
+          totalQty={defaultQty}
+          kind="sl"
+          onChange={setStopLosses}
+        />
+
+        <div className="h-3 text-right text-[11px] text-muted-foreground">
+          {saveState === 'saving' && t('trades.detail.savingNote')}
+          {saveState === 'saved' && t('trades.detail.savedNote')}
+        </div>
+
+        <dl className="border-t border-border pt-3">{renderRows('riskRows', riskRowNodes)}</dl>
+      </div>
+    ),
+    'block.tags': tagsSlot ?? null,
+  }
+
   return (
     <div className="space-y-4">
       {/* ── Tabs: Stats / Executions / Playbook ── */}
-      <div className="inline-flex rounded-lg border border-border bg-card p-1">
-        {(['stats', 'executions', 'playbook'] as const).map((tb) => (
-          <button
-            key={tb}
-            type="button"
-            onClick={() => onTabChange(tb)}
-            className={cn(
-              'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
-              tab === tb ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {t(`trades.detail.tabs.${tb}`)}
-          </button>
-        ))}
+      <div className="flex items-stretch gap-2">
+        <div className="flex min-w-0 flex-1 rounded-lg border border-border bg-card p-1">
+          {(['stats', 'executions', 'playbook'] as const).map((tb) => (
+            <button
+              key={tb}
+              type="button"
+              onClick={() => onTabChange(tb)}
+              className={cn(
+                'min-w-0 flex-1 truncate rounded-md px-2 py-1.5 text-sm font-medium transition-colors',
+                tab === tb ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t(`trades.detail.tabs.${tb}`)}
+            </button>
+          ))}
+        </div>
+        {tab === 'stats' && (
+          <SidebarSettings
+            hidden={hidden}
+            order={order}
+            onToggle={toggleHidden}
+            onReorder={reorder}
+            onReset={resetPrefs}
+            dirty={dirty}
+          />
+        )}
       </div>
 
       {tab === 'playbook' ? (
@@ -280,159 +538,19 @@ export default function TradeStatsPanel({
             </div>
 
             {/* Rating */}
-            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
-              <span className="text-xs text-muted-foreground">{t('trades.detail.stats.rating')}</span>
-              <div className="flex items-center gap-2">
-                <StarRating value={rating} onChange={saveRating} />
+            {show('row.rating') && (
+              <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3">
+                <span className="text-xs text-muted-foreground">{t('trades.detail.stats.rating')}</span>
+                <div className="flex items-center gap-2">
+                  <StarRating value={rating} onChange={saveRating} />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {(candlesLoading || showRunning) && (
-            <div className="rounded-xl border border-border bg-card px-5 py-4">
-              <div className="mb-2 flex items-center justify-between">
-                <SectionTitle
-                  icon={<span className="text-muted-foreground">~</span>}
-                  label={t('trades.detail.risk.runningPnl')}
-                />
-                {showRunning && (
-                  <span
-                    className={cn(
-                      'text-sm font-semibold tabular',
-                      runningPnl[runningPnl.length - 1] >= 0 ? 'text-profit' : 'text-loss',
-                    )}
-                  >
-                    {formatCurrency(runningPnl[runningPnl.length - 1])}
-                  </span>
-                )}
-              </div>
-              {candlesLoading ? (
-                <div className="h-[76px] w-full animate-pulse rounded-md bg-muted/30" />
-              ) : (
-                <RunningPnlChart
-                  points={runningPnl}
-                  target={targetUsd > 0 ? targetUsd : null}
-                  risk={riskUsd > 0 ? -riskUsd : null}
-                />
-              )}
-            </div>
+          {order.sections.map((key) =>
+            show(key) && sectionNodes[key] ? <Fragment key={key}>{sectionNodes[key]}</Fragment> : null,
           )}
-
-          {/* ── Details ── */}
-          <div className="rounded-xl border border-border bg-card px-5 py-3">
-            <dl>
-              <Row
-                label={t('trades.detail.stats.side')}
-                value={
-                  <span className={cn('uppercase', trade.direction === 'long' ? 'text-profit' : 'text-loss')}>
-                    {trade.direction}
-                  </span>
-                }
-              />
-              {accountName && (
-                <Row
-                  label={t('trades.detail.stats.account')}
-                  value={<span className="text-right text-sm font-medium">{accountName}</span>}
-                />
-              )}
-              <Row label={t('trades.detail.stats.contracts')} value={contractsTraded || null} />
-              <Row
-                label={t('trades.detail.stats.points')}
-                value={points !== null ? points.toFixed(2).replace(/\.?0+$/, '') : null}
-              />
-              {priceLow !== null && priceHigh !== null && (
-                <Row
-                  label={t('trades.detail.risk.priceMaeMfe')}
-                  value={
-                    <span className="text-xs">
-                      <span className="text-loss">{formatCurrency(priceLow)}</span>
-                      <span className="mx-0.5 text-muted-foreground">/</span>
-                      <span className="text-profit">{formatCurrency(priceHigh)}</span>
-                    </span>
-                  }
-                />
-              )}
-              <Row label={t('trades.detail.stats.multiplier')} value={mult !== 1 ? mult : null} />
-              <Row label={t('trades.detail.stats.commissions')} value={formatCurrency(fees)} />
-              <Row label={t('trades.detail.stats.netRoi')} value={netRoi !== null ? formatPercent(netRoi, 2) : null} />
-              <Row label={t('trades.detail.grossPnl')} value={grossPnl !== null ? formatCurrency(grossPnl) : null} />
-            </dl>
-          </div>
-
-          <div className="rounded-xl border border-border bg-card px-5 py-4 space-y-4">
-            <div className="flex items-center justify-between">
-              <SectionTitle
-                icon={<Target className="h-3.5 w-3.5 text-profit" />}
-                label={t('trades.detail.takeProfit')}
-              />
-            </div>
-            <LegEditor
-              legs={profitTargets}
-              mode={targetMode}
-              onModeChange={setTargetMode}
-              entryPrice={entryPrice}
-              tickSize={ts}
-              tickValue={tickValue}
-              priceSign={dirSign}
-              totalQty={defaultQty}
-              kind="tp"
-              onChange={setProfitTargets}
-            />
-
-            <div className="flex items-center justify-between border-t border-border pt-4">
-              <SectionTitle icon={<Shield className="h-3.5 w-3.5 text-loss" />} label={t('trades.detail.stopLoss')} />
-            </div>
-            <LegEditor
-              legs={stopLosses}
-              mode={stopMode}
-              onModeChange={setStopMode}
-              entryPrice={entryPrice}
-              tickSize={ts}
-              tickValue={tickValue}
-              priceSign={-dirSign}
-              totalQty={defaultQty}
-              kind="sl"
-              onChange={setStopLosses}
-            />
-
-            <div className="h-3 text-right text-[11px] text-muted-foreground">
-              {saveState === 'saving' && t('trades.detail.savingNote')}
-              {saveState === 'saved' && t('trades.detail.savedNote')}
-            </div>
-
-            <dl className="border-t border-border pt-3">
-              <Row
-                label={t('trades.detail.risk.initialTarget')}
-                value={<span className="text-profit">{formatCurrency(targetUsd)}</span>}
-              />
-              <Row
-                label={t('trades.detail.risk.tradeRisk')}
-                value={<span className="text-loss">-{formatCurrency(riskUsd)}</span>}
-              />
-              <Row
-                label={t('trades.detail.risk.plannedR')}
-                value={plannedR !== null ? `${plannedR.toFixed(2)}R` : null}
-              />
-              <Row
-                label={t('trades.detail.risk.realizedR')}
-                value={
-                  realizedR !== null ? (
-                    <span className={cn(realizedR >= 0 ? 'text-profit' : 'text-loss')}>{realizedR.toFixed(2)}R</span>
-                  ) : null
-                }
-              />
-              <Row label={t('trades.detail.stats.avgEntry')} value={formatCurrency(entryPrice)} />
-              <Row
-                label={t('trades.detail.stats.avgExit')}
-                value={exitPrice !== null ? formatCurrency(exitPrice) : null}
-              />
-              <Row label={t('trades.detail.stats.entryTime')} value={formatDateTimeTz(trade.entryDatetime, timezone)} />
-              <Row
-                label={t('trades.detail.stats.exitTime')}
-                value={trade.exitDatetime ? formatDateTimeTz(trade.exitDatetime, timezone) : null}
-              />
-            </dl>
-          </div>
         </>
       )}
     </div>

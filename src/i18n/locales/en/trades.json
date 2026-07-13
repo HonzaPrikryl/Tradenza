@@ -187,6 +187,22 @@
       "executions": "Executions",
       "playbook": "Playbook"
     },
+    "sidebar": {
+      "customize": "Customize sidebar",
+      "reset": "Reset",
+      "dragToReorder": "Drag to reorder",
+      "groups": {
+        "blocks": "Sections",
+        "details": "Details",
+        "risk": "Risk & targets"
+      },
+      "blocks": {
+        "details": "Details card",
+        "risk": "Risk & targets card",
+        "tags": "Tags",
+        "strategy": "Strategy"
+      }
+    },
     "playbook": {
       "checklistTitle": "Setup checklist",
       "progress": "{done}/{total}"
