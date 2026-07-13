@@ -4,22 +4,27 @@ import { db, trades, marketCandles } from '@/lib/db'
 import { and, eq } from 'drizzle-orm'
 import { uuid } from '@/lib/validation'
 import { authedAction } from '@/lib/safe-action'
+import { resolveFeed, intervalToPolygon, intervalToBinance, type Candle, type DatabentoSpec } from '@/lib/market-data'
 
-// Historical API: https://databento.com/docs/api-reference-historical
+// Historical sources:
+//   futures / stocks → Databento  https://databento.com/docs/api-reference-historical
+//   forex            → Polygon.io https://polygon.io/docs/rest/forex/aggregates
+//   crypto           → Binance    https://developers.binance.com/docs/binance-spot-api-docs
 
-export interface Candle {
-  /** Unix seconds (UTC). */
-  t: number
-  o: number
-  h: number
-  l: number
-  c: number
-  v: number
-}
+export type { Candle }
 
 export type CandlesResult =
   | { status: 'ok'; intervalSec: number; candles: Candle[] }
-  | { status: 'noKey' | 'unsupported' | 'noData' | 'error' }
+  | { status: 'noKey' | 'unsupported' | 'noData' | 'error' | 'rateLimited' }
+
+// A soft failure a fetcher can raise to distinguish a transient rate-limit
+// (HTTP 429) from a generic error, so the UI can show a fitting message.
+type SoftError = 'error' | 'rateLimited'
+class FetchError extends Error {
+  constructor(public readonly soft: SoftError) {
+    super(soft)
+  }
+}
 
 const PADDING_BY_INTERVAL: Record<number, number> = {
   60: 2 * 3600,
@@ -27,8 +32,6 @@ const PADDING_BY_INTERVAL: Record<number, number> = {
   3600: 24 * 3600,
 }
 const AVAILABILITY_LAG = 20 * 60
-
-const MONTH_CODE = /[FGHJKMNQUVXZ]\d{1,2}$/
 
 function aggregate(candles: Candle[], fromSec: number, toSec: number): Candle[] {
   if (toSec === fromSec) return candles
@@ -60,16 +63,6 @@ function mergeCandles(a: Candle[], b: Candle[]): Candle[] {
   return Array.from(byT.values()).sort((x, y) => x.t - y.t)
 }
 
-interface DbnRow {
-  hd?: { ts_event?: string | number }
-  ts_event?: string | number
-  open?: string | number
-  high?: string | number
-  low?: string | number
-  close?: string | number
-  volume?: string | number
-}
-
 const num = (v: string | number | undefined): number => {
   const n = typeof v === 'string' ? parseFloat(v) : (v ?? NaN)
   return Number.isFinite(n) ? n : NaN
@@ -87,45 +80,29 @@ function tsToSec(v: string | number | undefined): number {
   }
 }
 
-// A resolved Databento feed for one instrument: which dataset to query, the
-// symbols string, and how to interpret it. `cacheKey` namespaces the shared
-// candle cache so a futures root can never collide with an equity ticker.
-interface DatabentoFeed {
-  dataset: string
-  symbols: string
-  stypeIn: 'continuous' | 'raw_symbol'
-  cacheKey: string
-}
+// ─── Databento (futures + stocks) ──────────────────────────────────────────────
 
-// Map a trade to its Databento feed, or null when we have no data source for the
-// asset class. Futures use CME Globex continuous contracts; equities use a US
-// equities dataset (configurable — default Nasdaq ITCH; set
-// DATABENTO_EQUITIES_DATASET to a consolidated feed like EQUS.MINI or DBEQ.BASIC
-// for full NYSE + Nasdaq coverage) queried by raw ticker.
-function feedFor(assetClass: string, symbol: string): DatabentoFeed | null {
-  const sym = symbol.toUpperCase().trim()
-  if (assetClass === 'futures') {
-    const root = sym.replace(MONTH_CODE, '')
-    return { dataset: 'GLBX.MDP3', symbols: `${root}.v.0`, stypeIn: 'continuous', cacheKey: root }
-  }
-  if (assetClass === 'stocks') {
-    const dataset = process.env.DATABENTO_EQUITIES_DATASET || 'XNAS.ITCH'
-    return { dataset, symbols: sym, stypeIn: 'raw_symbol', cacheKey: `${dataset}:${sym}` }
-  }
-  return null
+interface DbnRow {
+  hd?: { ts_event?: string | number }
+  ts_event?: string | number
+  open?: string | number
+  high?: string | number
+  low?: string | number
+  close?: string | number
+  volume?: string | number
 }
 
 async function fetchDatabento(
   apiKey: string,
-  feed: DatabentoFeed,
+  spec: DatabentoSpec,
   startSec: number,
   endSec: number,
   schema: 'ohlcv-1m' | 'ohlcv-1h',
-): Promise<Candle[] | null> {
+): Promise<Candle[]> {
   const params = new URLSearchParams({
-    dataset: feed.dataset,
-    symbols: feed.symbols,
-    stype_in: feed.stypeIn,
+    dataset: spec.dataset,
+    symbols: spec.symbols,
+    stype_in: spec.stypeIn,
     schema,
     start: new Date(startSec * 1000).toISOString(),
     end: new Date(endSec * 1000).toISOString(),
@@ -136,14 +113,13 @@ async function fetchDatabento(
   })
 
   const res = await fetch(`https://hist.databento.com/v0/timeseries.get_range?${params}`, {
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}`,
-    },
+    headers: { Authorization: `Basic ${Buffer.from(`${apiKey}:`).toString('base64')}` },
     cache: 'no-store',
   })
+  if (res.status === 429) throw new FetchError('rateLimited')
   if (!res.ok) {
     console.error('[candles] Databento error', res.status, await res.text().catch(() => ''))
-    return null
+    throw new FetchError('error')
   }
 
   const text = await res.text()
@@ -170,6 +146,85 @@ async function fetchDatabento(
   return candles
 }
 
+// ─── Polygon.io (forex) ─────────────────────────────────────────────────────────
+
+interface PolyBar {
+  t: number // ms
+  o: number
+  h: number
+  l: number
+  c: number
+  v?: number
+}
+
+async function fetchPolygon(
+  apiKey: string,
+  ticker: string,
+  startSec: number,
+  endSec: number,
+  intervalSec: number,
+): Promise<Candle[]> {
+  const { multiplier, timespan } = intervalToPolygon(intervalSec)
+  const url =
+    `https://api.polygon.io/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/${multiplier}/${timespan}/` +
+    `${startSec * 1000}/${endSec * 1000}?adjusted=true&sort=asc&limit=50000&apiKey=${apiKey}`
+
+  const res = await fetch(url, { cache: 'no-store' })
+  if (res.status === 429) throw new FetchError('rateLimited')
+  if (!res.ok) {
+    console.error('[candles] Polygon error', res.status, await res.text().catch(() => ''))
+    throw new FetchError('error')
+  }
+  const data = (await res.json()) as { results?: PolyBar[] }
+  const rows = Array.isArray(data.results) ? data.results : []
+  return rows
+    .map((r) => ({ t: Math.floor(r.t / 1000), o: r.o, h: r.h, l: r.l, c: r.c, v: Number.isFinite(r.v) ? r.v! : 0 }))
+    .filter((c) => Number.isFinite(c.t) && [c.o, c.h, c.l, c.c].every(Number.isFinite))
+}
+
+// ─── Binance (crypto) ────────────────────────────────────────────────────────────
+
+// Public market-data host — no API key, and dedicated to historical data so it
+// doesn't consume the trading API's rate-limit quota. Configurable for regions
+// where the primary host is blocked.
+const BINANCE_BASE = process.env.BINANCE_API_BASE || 'https://data-api.binance.vision'
+
+async function fetchBinance(symbol: string, startSec: number, endSec: number, intervalSec: number): Promise<Candle[]> {
+  const interval = intervalToBinance(intervalSec)
+  const endMs = endSec * 1000
+  const out: Candle[] = []
+  let cursor = startSec * 1000
+
+  // Binance caps klines at 1000 rows/request; page forward until the window is
+  // covered (bounded to keep a single trade's fetch cheap).
+  for (let page = 0; page < 25 && cursor < endMs; page++) {
+    const url = `${BINANCE_BASE}/api/v3/klines?symbol=${symbol}&interval=${interval}&startTime=${cursor}&endTime=${endMs}&limit=1000`
+    const res = await fetch(url, { cache: 'no-store' })
+    if (res.status === 429 || res.status === 418) throw new FetchError('rateLimited')
+    if (!res.ok) {
+      console.error('[candles] Binance error', res.status, await res.text().catch(() => ''))
+      throw new FetchError('error')
+    }
+    const rows = (await res.json()) as unknown[]
+    if (!Array.isArray(rows) || rows.length === 0) break
+    for (const r of rows as (string | number)[][]) {
+      out.push({
+        t: Math.floor(Number(r[0]) / 1000),
+        o: Number(r[1]),
+        h: Number(r[2]),
+        l: Number(r[3]),
+        c: Number(r[4]),
+        v: Number(r[5]),
+      })
+    }
+    if (rows.length < 1000) break
+    cursor = Number((rows[rows.length - 1] as (string | number)[])[0]) + 1
+  }
+  return out.filter((c) => Number.isFinite(c.t) && [c.o, c.h, c.l, c.c].every(Number.isFinite))
+}
+
+// ─── Orchestration ───────────────────────────────────────────────────────────────
+
 export const getTradeCandles = authedAction(
   [uuid],
   async ({ userId }, tradeId): Promise<CandlesResult> => {
@@ -178,11 +233,17 @@ export const getTradeCandles = authedAction(
     })
     if (!trade) return { status: 'error' }
 
-    const feed = feedFor(trade.assetClass, trade.symbol)
+    const feed = resolveFeed(trade.assetClass, trade.symbol)
     if (!feed) return { status: 'unsupported' }
 
-    const apiKey = process.env.DATABENTO_API_KEY
-    if (!apiKey) return { status: 'noKey' }
+    // Per-provider credentials. Binance needs none; Databento/Polygon do.
+    const apiKey =
+      feed.provider === 'databento'
+        ? process.env.DATABENTO_API_KEY
+        : feed.provider === 'polygon'
+          ? process.env.POLYGON_API_KEY
+          : undefined
+    if (feed.provider !== 'binance' && !apiKey) return { status: 'noKey' }
 
     const entrySec = Math.floor(new Date(trade.entryDatetime).getTime() / 1000)
     const exitSec = trade.exitDatetime ? Math.floor(new Date(trade.exitDatetime).getTime() / 1000) : null
@@ -204,19 +265,25 @@ export const getTradeCandles = authedAction(
     if (end <= start) return { status: 'noData' }
 
     const symbolRoot = feed.cacheKey
+    let softError: SoftError = 'error'
 
-    // Fetch one time span from Databento and aggregate it to `intervalSec` if needed.
+    // Fetch one time span from the right provider, normalised to `intervalSec`.
     const fetchSpan = async (spanStart: number, spanEnd: number): Promise<Candle[] | null> => {
       if (spanEnd <= spanStart) return []
-      let span: Candle[] | null
       try {
-        span = await fetchDatabento(apiKey, feed, spanStart, spanEnd, schema)
+        if (feed.provider === 'databento') {
+          const span = await fetchDatabento(apiKey!, feed.databento!, spanStart, spanEnd, schema)
+          return intervalSec === 1800 ? aggregate(span, 60, 1800) : span
+        }
+        if (feed.provider === 'polygon') {
+          return await fetchPolygon(apiKey!, feed.polygonTicker!, spanStart, spanEnd, intervalSec)
+        }
+        return await fetchBinance(feed.binanceSymbol!, spanStart, spanEnd, intervalSec)
       } catch (e) {
-        console.error('[candles] fetch failed', e)
+        if (e instanceof FetchError) softError = e.soft
+        else console.error('[candles] fetch failed', e)
         return null
       }
-      if (span === null) return null
-      return intervalSec === 1800 ? aggregate(span, 60, 1800) : span
     }
 
     // Slice the merged superset down to the window this trade actually wants.
@@ -236,7 +303,7 @@ export const getTradeCandles = authedAction(
 
     if (!cached) {
       const fetched = await fetchSpan(start, end)
-      if (fetched === null) return { status: 'error' }
+      if (fetched === null) return { status: softError }
       await db
         .insert(marketCandles)
         .values({ symbolRoot, intervalSec, fromSec: start, toSec: end, candles: fetched })
@@ -255,12 +322,12 @@ export const getTradeCandles = authedAction(
 
     if (newFrom < cached.fromSec) {
       const left = await fetchSpan(newFrom, cached.fromSec)
-      if (left === null) return { status: 'error' }
+      if (left === null) return { status: softError }
       merged = mergeCandles(left, merged)
     }
     if (newTo > cached.toSec) {
       const right = await fetchSpan(cached.toSec, newTo)
-      if (right === null) return { status: 'error' }
+      if (right === null) return { status: softError }
       merged = mergeCandles(merged, right)
     }
 

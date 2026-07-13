@@ -90,6 +90,11 @@ export function isForexPair(symbol: string): boolean {
   return splitPair(symbol) !== null
 }
 
+// Public [base, quote] split, or null. `EUR/USD` → ['EUR', 'USD'].
+export function forexPairParts(symbol: string): [string, string] | null {
+  return splitPair(symbol)
+}
+
 // Pip (smallest conventional increment) for a pair: 0.01 for JPY-quoted pairs,
 // otherwise 0.0001. Defaults to 0.0001 for unrecognised symbols.
 export function forexPipSize(symbol: string): number {

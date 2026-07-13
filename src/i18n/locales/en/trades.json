@@ -176,9 +176,10 @@
       "loading": "Loading market data…",
       "buy": "Buy",
       "sell": "Sell",
-      "noKey": "Market data not configured. Add DATABENTO_API_KEY to .env.local to see real candles for this trade.",
-      "unsupported": "Price charts are available for futures and stocks. Charting for options, forex, crypto and CFDs isn't available yet.",
-      "noData": "No market data available for this trade's time range.",
+      "noKey": "Market data isn't configured for this market.",
+      "unsupported": "Price charts aren't available for this market yet (options and CFDs are not supported).",
+      "noData": "No market data available for this trade.",
+      "rateLimited": "Waiting for market data. Please try again in a minute.",
       "error": "Failed to load market data. Try again later."
     },
     "tabs": {
