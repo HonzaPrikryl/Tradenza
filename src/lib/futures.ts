@@ -1,3 +1,5 @@
+import { forexPipSize } from './forex'
+
 export const FUTURES_MULTIPLIERS: Record<string, number> = {
   // ── Equity index (CME) ──────────────────────────────────────────────
   ES: 50,
@@ -213,4 +215,26 @@ export function tickValue(symbol: string, mult?: number): number {
   const ts = tickSize(symbol)
   if (m <= 0 || ts <= 0) return 0
   return m * ts
+}
+
+/**
+ * A sensible price increment for any instrument, so the risk planner's price /
+ * money modes work beyond futures:
+ *  - futures → the contract's real tick (0 when unknown, to prompt the user)
+ *  - forex → the pair's pip (0.0001, or 0.01 for JPY pairs)
+ *  - stocks / options / crypto / cfd / other → 0.01 (a penny), a fine-enough
+ *    granularity for entering price levels.
+ */
+export function instrumentTickSize(assetClass: string, symbol: string): number {
+  const futuresTs = tickSize(symbol)
+  if (futuresTs > 0) return futuresTs
+  if (assetClass === 'forex') return forexPipSize(symbol)
+  if (assetClass === 'futures') return 0
+  return 0.01
+}
+
+/** Money value of one `instrumentTickSize` step given the value multiplier. */
+export function instrumentTickValue(assetClass: string, symbol: string, mult: number): number {
+  const ts = instrumentTickSize(assetClass, symbol)
+  return ts > 0 && mult > 0 ? ts * mult : 0
 }

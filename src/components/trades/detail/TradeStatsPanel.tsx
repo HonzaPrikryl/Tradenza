@@ -7,7 +7,7 @@ import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { cn, formatCurrency, formatDateTimeTz, formatPercent } from '@/lib/utils'
 import { t } from '@/i18n'
-import { assetMultiplier, tickValue as tickValueFor, tickSize as tickSizeFor } from '@/lib/futures'
+import { assetMultiplier, instrumentTickSize, instrumentTickValue } from '@/lib/futures'
 import { updateTradeJournal, updateTradeRiskPlan } from '@/lib/actions/trades'
 import { type CandlesResult } from '@/lib/actions/candles'
 import ExecutionsEditor from './ExecutionsEditor'
@@ -147,8 +147,8 @@ export default function TradeStatsPanel({
       ? Math.max(...execPrices)
       : null
 
-  const symbolTickValue = tickValueFor(trade.symbol, mult)
-  const ts = tickSizeFor(trade.symbol)
+  const symbolTickValue = instrumentTickValue(trade.assetClass, trade.symbol, mult)
+  const ts = instrumentTickSize(trade.assetClass, trade.symbol)
   const stored = useMemo(() => storedRiskPlan(trade), [trade])
   const defaultQty = Math.max(1, Math.round(contractsTraded || entryQty || 1))
 
@@ -156,8 +156,9 @@ export default function TradeStatsPanel({
 
   const [profitTargets, setProfitTargets] = useState<RiskPlanLeg[]>(() => initLegs(stored?.profitTargets, defaultQty))
   const [stopLosses, setStopLosses] = useState<RiskPlanLeg[]>(() => initLegs(stored?.stopLosses, defaultQty))
-  const [targetMode, setTargetMode] = useState<LegMode>('ticks')
-  const [stopMode, setStopMode] = useState<LegMode>('ticks')
+  const defaultLegMode: LegMode = trade.assetClass === 'futures' ? 'ticks' : 'price'
+  const [targetMode, setTargetMode] = useState<LegMode>(defaultLegMode)
+  const [stopMode, setStopMode] = useState<LegMode>(defaultLegMode)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
 
   const targetUsd = profitTargets.reduce((s, l) => s + l.ticks * l.qty * tickValue, 0)

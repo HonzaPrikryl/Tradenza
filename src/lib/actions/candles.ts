@@ -87,17 +87,45 @@ function tsToSec(v: string | number | undefined): number {
   }
 }
 
+// A resolved Databento feed for one instrument: which dataset to query, the
+// symbols string, and how to interpret it. `cacheKey` namespaces the shared
+// candle cache so a futures root can never collide with an equity ticker.
+interface DatabentoFeed {
+  dataset: string
+  symbols: string
+  stypeIn: 'continuous' | 'raw_symbol'
+  cacheKey: string
+}
+
+// Map a trade to its Databento feed, or null when we have no data source for the
+// asset class. Futures use CME Globex continuous contracts; equities use a US
+// equities dataset (configurable — default Nasdaq ITCH; set
+// DATABENTO_EQUITIES_DATASET to a consolidated feed like EQUS.MINI or DBEQ.BASIC
+// for full NYSE + Nasdaq coverage) queried by raw ticker.
+function feedFor(assetClass: string, symbol: string): DatabentoFeed | null {
+  const sym = symbol.toUpperCase().trim()
+  if (assetClass === 'futures') {
+    const root = sym.replace(MONTH_CODE, '')
+    return { dataset: 'GLBX.MDP3', symbols: `${root}.v.0`, stypeIn: 'continuous', cacheKey: root }
+  }
+  if (assetClass === 'stocks') {
+    const dataset = process.env.DATABENTO_EQUITIES_DATASET || 'XNAS.ITCH'
+    return { dataset, symbols: sym, stypeIn: 'raw_symbol', cacheKey: `${dataset}:${sym}` }
+  }
+  return null
+}
+
 async function fetchDatabento(
   apiKey: string,
-  symbolRoot: string,
+  feed: DatabentoFeed,
   startSec: number,
   endSec: number,
   schema: 'ohlcv-1m' | 'ohlcv-1h',
 ): Promise<Candle[] | null> {
   const params = new URLSearchParams({
-    dataset: 'GLBX.MDP3',
-    symbols: `${symbolRoot}.v.0`,
-    stype_in: 'continuous',
+    dataset: feed.dataset,
+    symbols: feed.symbols,
+    stype_in: feed.stypeIn,
     schema,
     start: new Date(startSec * 1000).toISOString(),
     end: new Date(endSec * 1000).toISOString(),
@@ -149,7 +177,9 @@ export const getTradeCandles = authedAction(
       where: and(eq(trades.id, tradeId), eq(trades.userId, userId)),
     })
     if (!trade) return { status: 'error' }
-    if (trade.assetClass !== 'futures') return { status: 'unsupported' }
+
+    const feed = feedFor(trade.assetClass, trade.symbol)
+    if (!feed) return { status: 'unsupported' }
 
     const apiKey = process.env.DATABENTO_API_KEY
     if (!apiKey) return { status: 'noKey' }
@@ -173,14 +203,14 @@ export const getTradeCandles = authedAction(
     const end = Math.min((exitSec ?? entrySec) + padding, nowSec)
     if (end <= start) return { status: 'noData' }
 
-    const symbolRoot = trade.symbol.toUpperCase().replace(MONTH_CODE, '')
+    const symbolRoot = feed.cacheKey
 
     // Fetch one time span from Databento and aggregate it to `intervalSec` if needed.
     const fetchSpan = async (spanStart: number, spanEnd: number): Promise<Candle[] | null> => {
       if (spanEnd <= spanStart) return []
       let span: Candle[] | null
       try {
-        span = await fetchDatabento(apiKey, symbolRoot, spanStart, spanEnd, schema)
+        span = await fetchDatabento(apiKey, feed, spanStart, spanEnd, schema)
       } catch (e) {
         console.error('[candles] fetch failed', e)
         return null
@@ -192,7 +222,7 @@ export const getTradeCandles = authedAction(
     // Slice the merged superset down to the window this trade actually wants.
     const slice = (all: Candle[]): Candle[] => all.filter((c) => c.t >= start && c.t <= end)
 
-    // Global cache shared across all users: candles for a continuous root + interval
+    // Global cache shared across all users: candles for a given feed + interval
     // are identical for everyone, so a span fetched once serves every user's trade.
     const cached = await db.query.marketCandles.findFirst({
       where: and(eq(marketCandles.symbolRoot, symbolRoot), eq(marketCandles.intervalSec, intervalSec)),

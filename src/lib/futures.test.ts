@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { contractMultiplier, tickSize, tickValue, assetMultiplier, editorDefaultMultiplier } from './futures'
+import {
+  contractMultiplier,
+  tickSize,
+  tickValue,
+  assetMultiplier,
+  editorDefaultMultiplier,
+  instrumentTickSize,
+  instrumentTickValue,
+} from './futures'
 
 describe('contractMultiplier', () => {
   it('looks up a known root symbol', () => {
@@ -48,6 +56,37 @@ describe('editorDefaultMultiplier', () => {
   it('is 1 for stocks / forex / crypto', () => {
     expect(editorDefaultMultiplier('stocks', 'AAPL')).toBe(1)
     expect(editorDefaultMultiplier('forex', 'EURUSD')).toBe(1)
+  })
+})
+
+describe('instrumentTickSize', () => {
+  it('uses the futures tick for a known futures symbol', () => {
+    expect(instrumentTickSize('futures', 'ES')).toBe(0.25)
+  })
+  it('is 0 for an unknown futures symbol (prompts the user)', () => {
+    expect(instrumentTickSize('futures', 'ZZZ')).toBe(0)
+  })
+  it('uses the pip for forex (0.0001, or 0.01 for JPY)', () => {
+    expect(instrumentTickSize('forex', 'EURUSD')).toBe(0.0001)
+    expect(instrumentTickSize('forex', 'USDJPY')).toBe(0.01)
+  })
+  it('is a penny for stocks / options / crypto / cfd', () => {
+    expect(instrumentTickSize('stocks', 'AAPL')).toBe(0.01)
+    expect(instrumentTickSize('options', 'AAPL')).toBe(0.01)
+    expect(instrumentTickSize('crypto', 'BTCUSD')).toBe(0.01)
+    expect(instrumentTickSize('cfd', 'US30')).toBe(0.01)
+  })
+})
+
+describe('instrumentTickValue', () => {
+  it('is tick size × multiplier', () => {
+    expect(instrumentTickValue('futures', 'ES', 50)).toBeCloseTo(12.5)
+    expect(instrumentTickValue('options', 'AAPL', 100)).toBeCloseTo(1)
+    expect(instrumentTickValue('stocks', 'AAPL', 1)).toBeCloseTo(0.01)
+  })
+  it('is 0 when tick size or multiplier is unavailable', () => {
+    expect(instrumentTickValue('futures', 'ZZZ', 1)).toBe(0)
+    expect(instrumentTickValue('stocks', 'AAPL', 0)).toBe(0)
   })
 })
 

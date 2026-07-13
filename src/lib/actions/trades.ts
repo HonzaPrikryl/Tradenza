@@ -7,6 +7,7 @@ import { tradeFormSchema, type TradeFilters } from '@/types'
 import { calculatePnl, calculateRR } from '@/lib/utils'
 import { derivePnl, roundMoney } from '@/lib/trade-pnl'
 import { assetMultiplier } from '@/lib/futures'
+import { forexContractSize } from '@/lib/forex'
 import { readGlobalFilters } from '@/lib/global-filters'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { generalConditions } from './filter-sql'
@@ -26,11 +27,13 @@ type TradeFormInput = z.infer<typeof tradeFormSchema>
 // including the derived gross/net P&L and planned R-multiple. Centralised so the
 // two write paths cannot drift: how a trade is persisted lives in one place.
 function buildTradeColumns(v: TradeFormInput, prevExtra?: Record<string, unknown> | null) {
-  // Value multiplier per asset class (futures contract size, options ×100, else
-  // 1) so manually entered P&L matches the execution-based paths. assetClass is
-  // the user's explicit signal — avoids misclassifying a stock whose ticker
-  // collides with a futures root.
-  const multiplier = assetMultiplier(v.assetClass, v.symbol)
+  // Value multiplier per asset class (futures contract size, options ×100, forex
+  // standard-lot contract size, else 1) so manually entered P&L matches the
+  // execution-based paths. assetClass is the user's explicit signal — avoids
+  // misclassifying a stock whose ticker collides with a futures root. Forex is
+  // lot-based here (like the manual wizard), unlike CSV import which keeps ×1
+  // because exported quantities may already be in units.
+  const multiplier = v.assetClass === 'forex' ? forexContractSize(v.symbol) : assetMultiplier(v.assetClass, v.symbol)
 
   let grossPnl: string | null = null
   let netPnl: string | null = null
