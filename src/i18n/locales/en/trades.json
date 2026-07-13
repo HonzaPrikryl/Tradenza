@@ -179,6 +179,7 @@
       "noKey": "Market data isn't configured for this market.",
       "unsupported": "Price charts aren't available for this market yet (options and CFDs are not supported).",
       "noData": "No market data available for this trade.",
+      "today": "This chart only shows historical days. Market data for today's trades becomes available the next day.",
       "rateLimited": "Waiting for market data. Please try again in a minute.",
       "error": "Failed to load market data. Try again later."
     },

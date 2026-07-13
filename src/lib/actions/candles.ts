@@ -15,7 +15,7 @@ export type { Candle }
 
 export type CandlesResult =
   | { status: 'ok'; intervalSec: number; candles: Candle[] }
-  | { status: 'noKey' | 'unsupported' | 'noData' | 'error' | 'rateLimited' }
+  | { status: 'noKey' | 'unsupported' | 'noData' | 'error' | 'rateLimited' | 'today' }
 
 // A soft failure a fetcher can raise to distinguish a transient rate-limit
 // (HTTP 429) from a generic error, so the UI can show a fitting message.
@@ -248,6 +248,12 @@ export const getTradeCandles = authedAction(
     const entrySec = Math.floor(new Date(trade.entryDatetime).getTime() / 1000)
     const exitSec = trade.exitDatetime ? Math.floor(new Date(trade.exitDatetime).getTime() / 1000) : null
     const nowSec = Math.floor(Date.now() / 1000) - AVAILABILITY_LAG
+
+    // Historical data providers only cover past days — a trade opened today has
+    // no historical candles yet, so surface a dedicated message instead of an
+    // empty "no data" chart.
+    const startOfTodaySec = Math.floor(new Date().setUTCHours(0, 0, 0, 0) / 1000)
+    if (entrySec >= startOfTodaySec) return { status: 'today' }
 
     const duration = (exitSec ?? entrySec) - entrySec
     let schema: 'ohlcv-1m' | 'ohlcv-1h' = 'ohlcv-1m'

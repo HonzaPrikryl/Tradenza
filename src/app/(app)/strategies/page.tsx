@@ -12,7 +12,7 @@ export default function StrategiesPage() {
     <div className="p-4 sm:p-6 w-full animate-in">
       <div className="mb-6">
         <h1 className="text-xl font-semibold tracking-tight">{t('strategies.title')}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5 max-w-2xl">{t('strategies.subtitle')}</p>
+        <p className="text-sm text-muted-foreground mt-0.5">{t('strategies.subtitle')}</p>
       </div>
       <Suspense fallback={<StrategiesListSkeleton />}>
         <StrategiesContent />
