@@ -102,39 +102,63 @@ export default function TradeStatsPanel({
     let pos = 0
     let avgCost = 0
     let realized = 0
-    const series: number[] = []
+
+    const applyExec = (e: NormalizedExecution) => {
+      const q = e.side === 'buy' ? e.quantity : -e.quantity
+      if (pos === 0 || Math.sign(pos) === Math.sign(q)) {
+        const tot = Math.abs(pos) + Math.abs(q)
+        avgCost = tot > 0 ? (avgCost * Math.abs(pos) + e.price * Math.abs(q)) / tot : e.price
+        pos += q
+      } else {
+        const closeQty = Math.min(Math.abs(pos), Math.abs(q))
+        realized += closeQty * (e.price - avgCost) * Math.sign(pos)
+        const np = pos + q
+        if (Math.sign(np) !== Math.sign(pos) && np !== 0) avgCost = e.price
+        if (np === 0) avgCost = 0
+        pos = np
+      }
+    }
+
+    // Path in raw price points (realized + unrealized), before any money scaling.
+    const pts: number[] = []
     let lowPrice = Infinity
     let highPrice = -Infinity
     let any = false
     for (const c of candles) {
       if (c.t < entrySec) continue
       if (c.t > upTo) break
-      while (ei < evs.length && evs[ei].time <= c.t) {
-        const e = evs[ei]
-        ei++
-        const q = e.side === 'buy' ? e.quantity : -e.quantity
-        if (pos === 0 || Math.sign(pos) === Math.sign(q)) {
-          const tot = Math.abs(pos) + Math.abs(q)
-          avgCost = tot > 0 ? (avgCost * Math.abs(pos) + e.price * Math.abs(q)) / tot : e.price
-          pos += q
-        } else {
-          const closeQty = Math.min(Math.abs(pos), Math.abs(q))
-          realized += closeQty * (e.price - avgCost) * Math.sign(pos)
-          const np = pos + q
-          if (Math.sign(np) !== Math.sign(pos) && np !== 0) avgCost = e.price
-          if (np === 0) avgCost = 0
-          pos = np
-        }
-      }
+      while (ei < evs.length && evs[ei].time <= c.t) applyExec(evs[ei++])
       any = true
       lowPrice = Math.min(lowPrice, c.l)
       highPrice = Math.max(highPrice, c.h)
       const unreal = pos !== 0 ? pos * (c.c - avgCost) : 0
-      series.push((realized + unreal) * mult)
+      pts.push(realized + unreal)
     }
     if (!any) return null
-    return { series, lowPrice, highPrice }
-  }, [candles, executions, entrySec, exitSec, mult])
+
+    // The exit fill's timestamp usually sits a few seconds past the last candle,
+    // so it wasn't applied above. Drain the remaining fills at their real prices
+    // to get the true realized terminal (in points).
+    while (ei < evs.length) applyExec(evs[ei++])
+    const closed = pos === 0
+    const terminalPts = realized + (closed ? 0 : pos * (candles[candles.length - 1].c - avgCost))
+    pts.push(terminalPts)
+
+    // Convert points → money. For a closed trade, anchor to the trade's stored
+    // result: derive the money-per-point factor from the actual gross P&L (so an
+    // imperfect reconstructed multiplier or averaged fills can't skew the scale),
+    // and pin the final point exactly to Net P&L. Open trades stay marked-to-
+    // market at the instrument multiplier.
+    const hasStored = grossPnl !== null || netPnl !== null
+    if (closed && hasStored) {
+      const actualGross = grossPnl !== null ? grossPnl : netPnl! + fees
+      const factor = Math.abs(terminalPts) > 1e-9 ? actualGross / terminalPts : mult
+      const series = pts.map((p) => p * factor)
+      series[series.length - 1] = netPnl !== null ? netPnl : actualGross - fees
+      return { series, lowPrice, highPrice }
+    }
+    return { series: pts.map((p) => p * mult), lowPrice, highPrice }
+  }, [candles, executions, entrySec, exitSec, mult, fees, grossPnl, netPnl])
 
   const runningPnl = runningFromCandles?.series ?? []
   const showRunning = runningPnl.length >= 2

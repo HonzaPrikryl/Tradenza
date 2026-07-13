@@ -8,6 +8,7 @@ import {
   CandlestickSeries,
   HistogramSeries,
   ColorType,
+  LineStyle,
   type IChartApi,
   type UTCTimestamp,
   type SeriesMarker,
@@ -66,6 +67,9 @@ export default function TradeChart({
       borderDownColor: '#ef5350',
       wickUpColor: '#26a69a',
       wickDownColor: '#ef5350',
+      // No dotted last-price level line across the chart.
+      priceLineVisible: false,
+      lastValueVisible: false,
     })
 
     const volumeSeries = chart.addSeries(HistogramSeries, {
@@ -120,6 +124,21 @@ export default function TradeChart({
     })
     markers.sort((a, b) => Number(a.time) - Number(b.time))
     createSeriesMarkers(candleSeries, markers)
+
+    const seenPrices = new Set<number>()
+    for (const e of executions) {
+      const key = Math.round(e.price * 1e6)
+      if (seenPrices.has(key)) continue
+      seenPrices.add(key)
+      candleSeries.createPriceLine({
+        price: e.price,
+        color: e.side === 'buy' ? '#26a69a' : '#ef5350',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: e.side === 'buy' ? t('trades.detail.chart.buy') : t('trades.detail.chart.sell'),
+      })
+    }
 
     chart.timeScale().fitContent()
 

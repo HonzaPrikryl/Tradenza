@@ -198,10 +198,6 @@ export function searchBrokers(query: string): Broker[] {
   return BROKERS.filter((b) => b.name.toLowerCase().includes(q))
 }
 
-export function supportsFutures(b: Broker | undefined): boolean {
-  return !!b?.assets.includes('futures')
-}
-
 // The asset class an import defaults to for a broker: its first (primary)
 // supported type. Falls back to 'futures' for brokers with no declared assets
 // (e.g. the generic template), matching the app's historical default.
