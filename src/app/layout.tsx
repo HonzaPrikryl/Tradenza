@@ -10,6 +10,7 @@ import MuiProvider from '@/components/providers/MuiProvider'
 import ThemeProvider, { ThemeScript } from '@/components/providers/ThemeProvider'
 import ConfirmProvider from '@/components/providers/ConfirmProvider'
 import PostHogProvider from '@/components/providers/PostHogProvider'
+import DomNodeGuard from '@/components/providers/DomNodeGuard'
 import './globals.css'
 
 const SITE_URL = process.env.NEXT_PUBLIC_MARKETING_URL || 'https://tradenza.dev'
@@ -109,6 +110,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           style={{ fontFamily: 'var(--font-body, "DM Sans", system-ui, sans-serif)' }}
           suppressHydrationWarning
         >
+          <DomNodeGuard />
           <PostHogProvider>
             <ThemeProvider>
               <MuiProvider>

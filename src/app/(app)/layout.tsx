@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <div translate="no" className="flex h-screen overflow-hidden bg-background">
         <Sidebar isAdmin={admin} />
         <main className="flex-1 overflow-y-auto min-w-0">
           <AppHeader
