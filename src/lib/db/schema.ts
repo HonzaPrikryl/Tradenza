@@ -18,7 +18,7 @@ import { relations, sql } from 'drizzle-orm'
 
 export const directionEnum = pgEnum('direction', ['long', 'short'])
 export const statusEnum = pgEnum('status', ['open', 'closed', 'cancelled'])
-export const assetClassEnum = pgEnum('asset_class', ['stocks', 'futures', 'forex', 'crypto', 'options', 'other'])
+export const assetClassEnum = pgEnum('asset_class', ['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other'])
 export const feedbackKindEnum = pgEnum('feedback_kind', ['bug', 'idea', 'other'])
 
 // ─── Users ────────────────────────────────────────────────────────────────────

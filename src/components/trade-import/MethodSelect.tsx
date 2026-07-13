@@ -13,18 +13,18 @@ type Method = 'autoSync' | 'fileUpload' | 'manual'
 export default function MethodSelect({
   brokerId,
   accountId,
-  futures,
+  canUpload,
   assets,
   known,
 }: {
   brokerId: string
   accountId: string
-  futures: boolean
+  canUpload: boolean
   assets: AssetType[]
   known: boolean
 }) {
   const router = useRouter()
-  const [method, setMethod] = useState<Method>(futures ? 'fileUpload' : 'manual')
+  const [method, setMethod] = useState<Method>(canUpload ? 'fileUpload' : 'manual')
 
   const goNext = () => {
     const dest = method === 'fileUpload' ? 'upload' : 'manual'
@@ -49,8 +49,8 @@ export default function MethodSelect({
       desc: t('addTrades.method.fileUpload.desc'),
       badge: t('addTrades.method.fileUpload.badge'),
       badgeTone: 'recommended',
-      disabled: !futures,
-      note: futures ? undefined : t('addTrades.method.fileUpload.notFutures'),
+      disabled: !canUpload,
+      note: canUpload ? undefined : t('addTrades.method.fileUpload.notSupported'),
     },
     {
       key: 'manual',
@@ -105,7 +105,7 @@ export default function MethodSelect({
       </div>
 
       {/* Supported asset types — for file upload */}
-      {futures && known && (
+      {canUpload && known && (
         <div className="mt-6 flex flex-col items-center gap-3">
           <p className="text-sm font-semibold">{t('addTrades.method.supportedAssets')}</p>
           <AssetTypeList assets={assets} />

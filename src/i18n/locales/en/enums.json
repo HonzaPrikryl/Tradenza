@@ -14,6 +14,7 @@
     "forex": "Forex",
     "crypto": "Crypto",
     "options": "Options",
+    "cfd": "CFD",
     "other": "Other"
   }
 }

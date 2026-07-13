@@ -4,7 +4,7 @@
 // percentage of the position's notional value. Kept pure (no 'use server') so it
 // can be shared by every classification site and unit-tested.
 
-import { contractMultiplier } from '@/lib/futures'
+import { assetMultiplier, contractMultiplier } from '@/lib/futures'
 
 export type Outcome = 'win' | 'loss' | 'breakeven'
 export type BreakevenMode = 'dollar' | 'percent'
@@ -29,12 +29,15 @@ export function tradeNotional(entryPrice: number, quantity: number, multiplier =
 }
 
 /**
- * Resolve a trade's contract multiplier from its stored `extra.contractMultiplier`,
- * falling back to the symbol's futures multiplier, then 1.
+ * Resolve a trade's value multiplier from its stored `extra.contractMultiplier`,
+ * falling back to the asset class's canonical multiplier (futures contract size,
+ * options ×100, else 1). When `assetClass` is omitted, only a known futures
+ * symbol raises it above 1 — preserving the legacy futures-only behaviour.
  */
-export function multiplierFor(extra: unknown, symbol: string): number {
+export function multiplierFor(extra: unknown, symbol: string, assetClass?: string): number {
   const stored = toNum((extra as { contractMultiplier?: unknown } | null)?.contractMultiplier)
   if (stored > 0) return stored
+  if (assetClass) return assetMultiplier(assetClass, symbol)
   const bySymbol = contractMultiplier(symbol)
   return bySymbol > 0 ? bySymbol : 1
 }

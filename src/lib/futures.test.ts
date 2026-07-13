@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { contractMultiplier, tickSize, tickValue } from './futures'
+import { contractMultiplier, tickSize, tickValue, assetMultiplier, editorDefaultMultiplier } from './futures'
 
 describe('contractMultiplier', () => {
   it('looks up a known root symbol', () => {
@@ -13,6 +13,41 @@ describe('contractMultiplier', () => {
   it('returns 0 for unknown or empty symbols', () => {
     expect(contractMultiplier('ZZZ')).toBe(0)
     expect(contractMultiplier('')).toBe(0)
+  })
+})
+
+describe('assetMultiplier', () => {
+  it('uses the contract size for futures', () => {
+    expect(assetMultiplier('futures', 'ES')).toBe(50)
+    expect(assetMultiplier('futures', 'MNQ')).toBe(2)
+  })
+  it('falls back to 1 for an unknown futures symbol', () => {
+    expect(assetMultiplier('futures', 'ZZZ')).toBe(1)
+  })
+  it('is 100 for options (one contract = 100 shares)', () => {
+    expect(assetMultiplier('options', 'AAPL')).toBe(100)
+  })
+  it('is 1 for stocks, crypto, forex and other', () => {
+    expect(assetMultiplier('stocks', 'AAPL')).toBe(1)
+    expect(assetMultiplier('crypto', 'BTC')).toBe(1)
+    expect(assetMultiplier('forex', 'EURUSD')).toBe(1)
+    expect(assetMultiplier('other', 'XYZ')).toBe(1)
+  })
+})
+
+describe('editorDefaultMultiplier', () => {
+  it('uses the contract size for a known futures symbol', () => {
+    expect(editorDefaultMultiplier('futures', 'ES')).toBe(50)
+  })
+  it('returns 0 for an unknown futures symbol (prompts the user)', () => {
+    expect(editorDefaultMultiplier('futures', 'ZZZ')).toBe(0)
+  })
+  it('is 100 for options', () => {
+    expect(editorDefaultMultiplier('options', 'AAPL')).toBe(100)
+  })
+  it('is 1 for stocks / forex / crypto', () => {
+    expect(editorDefaultMultiplier('stocks', 'AAPL')).toBe(1)
+    expect(editorDefaultMultiplier('forex', 'EURUSD')).toBe(1)
   })
 })
 

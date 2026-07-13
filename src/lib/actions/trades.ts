@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { tradeFormSchema, type TradeFilters } from '@/types'
 import { calculatePnl, calculateRR } from '@/lib/utils'
 import { derivePnl, roundMoney } from '@/lib/trade-pnl'
-import { contractMultiplier } from '@/lib/futures'
+import { assetMultiplier } from '@/lib/futures'
 import { readGlobalFilters } from '@/lib/global-filters'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { generalConditions } from './filter-sql'
@@ -25,14 +25,16 @@ type TradeFormInput = z.infer<typeof tradeFormSchema>
 // Maps validated form input to the trade columns shared by create and update,
 // including the derived gross/net P&L and planned R-multiple. Centralised so the
 // two write paths cannot drift: how a trade is persisted lives in one place.
-function buildTradeColumns(v: TradeFormInput) {
+function buildTradeColumns(v: TradeFormInput, prevExtra?: Record<string, unknown> | null) {
+  // Value multiplier per asset class (futures contract size, options ×100, else
+  // 1) so manually entered P&L matches the execution-based paths. assetClass is
+  // the user's explicit signal — avoids misclassifying a stock whose ticker
+  // collides with a futures root.
+  const multiplier = assetMultiplier(v.assetClass, v.symbol)
+
   let grossPnl: string | null = null
   let netPnl: string | null = null
   if (v.exitPrice && v.exitQuantity) {
-    // Apply the contract multiplier for futures so manually entered P&L matches
-    // the execution-based paths. assetClass is the user's explicit signal here,
-    // which avoids misclassifying a stock whose ticker collides with a futures root.
-    const multiplier = v.assetClass === 'futures' ? contractMultiplier(v.symbol) || 1 : 1
     const pnl = derivePnl({
       direction: v.direction,
       entryPrice: v.entryPrice,
@@ -50,6 +52,18 @@ function buildTradeColumns(v: TradeFormInput) {
     riskRewardRatio =
       calculateRR(v.direction, v.entryPrice, Number(v.stopLoss), Number(v.takeProfit))?.toString() ?? null
   }
+
+  // Persist the multiplier (only when it differs from 1, i.e. futures/options) so
+  // every downstream consumer — the sidebar, notional-based P&L%, R-multiple and
+  // the SQL breakeven filter, which all read `extra.contractMultiplier` — values
+  // the trade exactly as the P&L above was computed. Merged with any existing
+  // extra so riskPlan / executions survive an edit; a class change back to a ×1
+  // market drops the stale key.
+  const mergedExtra: Record<string, unknown> = {
+    ...(prevExtra ?? {}),
+    contractMultiplier: multiplier !== 1 ? multiplier : undefined,
+  }
+  const extra = Object.values(mergedExtra).some((x) => x !== undefined) ? mergedExtra : null
 
   return {
     symbol: v.symbol,
@@ -75,6 +89,7 @@ function buildTradeColumns(v: TradeFormInput) {
     emotionAfter: v.emotionAfter || null,
     mistakes: v.mistakes || null,
     lessons: v.lessons || null,
+    extra,
   }
 }
 
@@ -129,7 +144,7 @@ export const updateTrade = mutationAction(
       .set({
         // accountId is only touched when the caller passes it explicitly.
         ...(accountId !== undefined ? { accountId: accountId || null } : {}),
-        ...buildTradeColumns(validated),
+        ...buildTradeColumns(validated, existing.extra as Record<string, unknown> | null),
         updatedAt: new Date(),
       })
       .where(and(eq(trades.id, id), eq(trades.userId, userId)))

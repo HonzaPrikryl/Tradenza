@@ -2,7 +2,7 @@ import Link from 'next/link'
 import WizardChrome from '@/components/trade-import/WizardChrome'
 import MethodSelect from '@/components/trade-import/MethodSelect'
 import { BrokerIcon } from '@/components/trade-import/shared'
-import { getBroker, supportsFutures, type Broker } from '@/lib/brokers'
+import { getBroker, supportsUpload, type Broker } from '@/lib/brokers'
 import { t } from '@/i18n'
 import type { Metadata } from 'next'
 
@@ -25,7 +25,7 @@ export default async function MethodPage({
   const broker = getBroker(brokerId)
   const known = !!broker
   const display = broker ?? GENERIC
-  const futures = supportsFutures(broker) || brokerId === 'generic'
+  const canUpload = supportsUpload(broker) || brokerId === 'generic'
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -56,7 +56,7 @@ export default async function MethodPage({
           <MethodSelect
             brokerId={brokerId}
             accountId={accountId}
-            futures={futures}
+            canUpload={canUpload}
             assets={display.assets}
             known={known}
           />

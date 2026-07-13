@@ -11,7 +11,7 @@ import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import { useSelection } from '@/hooks/useSelection'
 import { updateTradeExecutions } from '@/lib/actions/trades'
-import { contractMultiplier } from '@/lib/futures'
+import { editorDefaultMultiplier } from '@/lib/futures'
 import DateTimeField from '@/components/ui/DateTimeField'
 import { storedMultiplier, type NormalizedExecution } from './executions'
 import type { Trade } from '@/lib/db'
@@ -58,7 +58,7 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
       fee: String(e.fee),
     })),
   )
-  const initMult = storedMultiplier(trade) ?? (contractMultiplier(trade.symbol) || 0)
+  const initMult = storedMultiplier(trade) ?? editorDefaultMultiplier(trade.assetClass, trade.symbol)
   const [multiplier, setMultiplier] = useState<string>(initMult ? String(initMult) : '')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Row | null>(null)

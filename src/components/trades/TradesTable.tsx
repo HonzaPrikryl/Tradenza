@@ -448,7 +448,7 @@ export default function TradesTable({
                   tradeNotional(
                     Number(trade.entryPrice ?? 0),
                     Number(trade.entryQuantity ?? 0),
-                    multiplierFor(trade.extra, trade.symbol),
+                    multiplierFor(trade.extra, trade.symbol, trade.assetClass),
                   ),
                 )
                 const isSel = sel.has(trade.id)

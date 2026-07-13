@@ -42,7 +42,8 @@
       "badge": "Recommended",
       "title": "File upload",
       "desc": "Upload broker-provided file with your trading history",
-      "notFutures": "Available for futures brokers only"
+      "notFutures": "Available for futures brokers only",
+      "notSupported": "File upload isn't available for this broker yet — add trades manually instead"
     },
     "manual": {
       "title": "Add manually",
@@ -73,6 +74,8 @@
     "importAnother": "Import another file",
     "viewTrades": "View trades",
     "supportedAssets": "Supported Asset Types:",
+    "assetType": "Asset type",
+    "assetTypeHint": "Which asset type is this file? We use it to value each trade correctly.",
     "howTo": "How to import trades from {broker}",
     "integrationGuide": "Integration Guide",
     "expand": "Expand whole instructions",
@@ -146,9 +149,12 @@
     "col": {
       "dateTime": "Date & Time",
       "expDate": "Exp Date",
-      "multiplier": "Contract Multiplier",
+      "multiplier": "Multiplier",
       "contracts": "Number of contracts",
-      "qty": "Qty",
+      "shares": "Number of shares",
+      "lots": "Lots",
+      "units": "Units",
+      "qty": "Quantity",
       "side": "Side",
       "price": "Price, $",
       "comm": "Comm, $",
@@ -161,7 +167,7 @@
     "options": "Options",
     "forex": "Forex",
     "crypto": "Crypto",
-    "cfd": "Cfd",
+    "cfd": "CFD",
     "other": "Other"
   },
   "tradeTypes": {

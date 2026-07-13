@@ -11,11 +11,33 @@ import { t } from '@/i18n'
 import { saveManualTrade } from '@/lib/actions/wizard'
 import { track } from '@/lib/analytics'
 import { contractMultiplier } from '@/lib/futures'
+import { forexContractSize } from '@/lib/forex'
+import { getBroker } from '@/lib/brokers'
 import DateTimeField from '@/components/ui/DateTimeField'
 import DateField from '@/components/ui/DateField'
 
-const ASSET_CLASSES = ['stocks', 'futures', 'options', 'forex', 'crypto', 'other'] as const
+const ASSET_CLASSES = ['stocks', 'futures', 'options', 'forex', 'crypto', 'cfd', 'other'] as const
 type AssetClass = (typeof ASSET_CLASSES)[number]
+
+// Which asset classes the picker offers for a broker. A recognised broker is
+// constrained to the types it actually supports (plus "other" as an escape
+// hatch), mirroring the file-upload flow; unknown / generic brokers keep the
+// full freedom of every class. The first entry is the default selection.
+const assetChoicesFor = (brokerId: string): readonly AssetClass[] => {
+  const broker = getBroker(brokerId)
+  if (!broker || broker.assets.length === 0) return ASSET_CLASSES
+  return [...broker.assets, 'other']
+}
+
+// The quantity column means different things per market — contracts, shares, or
+// units — so its header adapts to the selected asset class.
+const qtyHeaderKey = (assetClass: AssetClass): string => {
+  if (assetClass === 'futures' || assetClass === 'options') return 'contracts'
+  if (assetClass === 'stocks') return 'shares'
+  if (assetClass === 'forex') return 'lots'
+  if (assetClass === 'crypto' || assetClass === 'cfd') return 'units'
+  return 'qty'
+}
 
 interface Execution {
   id: string
@@ -48,6 +70,19 @@ const num = (s: string) => {
   return isNaN(n) ? 0 : n
 }
 
+// Default per-execution multiplier for a market: futures pull the contract size
+// from the table (0 when unknown, so the user is prompted to fill it), options are
+// ×100 (one contract = 100 shares), everything else is 1. Stays editable per row.
+const rowMultiplier = (assetClass: AssetClass, symbol: string): string => {
+  if (assetClass === 'options') return '100'
+  if (assetClass === 'futures') {
+    const m = contractMultiplier(symbol)
+    return m ? String(m) : '0'
+  }
+  if (assetClass === 'forex') return String(forexContractSize(symbol))
+  return '1'
+}
+
 export default function ManualEntry({
   brokerId,
   accountId,
@@ -58,7 +93,8 @@ export default function ManualEntry({
   cancelHref?: string
 }) {
   const router = useRouter()
-  const assetClass: AssetClass = 'futures'
+  const assetChoices = useMemo(() => assetChoicesFor(brokerId), [brokerId])
+  const [assetClass, setAssetClass] = useState<AssetClass>(assetChoices[0])
   const [symbol, setSymbol] = useState('')
   const [execs, setExecs] = useState<Execution[]>([emptyExec()])
   const [saving, setSaving] = useState(false)
@@ -68,19 +104,25 @@ export default function ManualEntry({
   const update = (id: string, patch: Partial<Execution>) =>
     setExecs((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)))
 
+  // Switching market resets each row's multiplier to that market's default.
+  const selectAssetClass = (ac: AssetClass) => {
+    setAssetClass(ac)
+    const mult = rowMultiplier(ac, symbol)
+    setExecs((rows) => rows.map((r) => ({ ...r, multiplier: mult })))
+  }
+
   const handleSymbolChange = (raw: string) => {
     const next = raw.toUpperCase()
     setSymbol(next)
-    const mult = contractMultiplier(next)
-    setExecs((rows) => rows.map((r) => ({ ...r, multiplier: mult ? String(mult) : '0' })))
+    const mult = rowMultiplier(assetClass, next)
+    setExecs((rows) => rows.map((r) => ({ ...r, multiplier: mult })))
   }
 
   const addRow = () =>
     setExecs((rows) => {
       const side = rows.length > 0 && rows[0].side === 'buy' ? 'sell' : 'buy'
-      const mult = contractMultiplier(symbol)
       const last = rows[rows.length - 1]
-      const row = emptyExec(side, mult ? String(mult) : '0')
+      const row = emptyExec(side, rowMultiplier(assetClass, symbol))
       if (last) {
         row.expDate = last.expDate
         row.qty = last.qty
@@ -167,19 +209,16 @@ export default function ManualEntry({
       <div className="mt-6">
         <p className="mb-2 text-xs font-medium text-primary">{t('addTrades.manual.type')}</p>
         <div className="inline-flex flex-wrap gap-1 rounded-lg bg-muted/50 p-1">
-          {ASSET_CLASSES.map((ac) => {
+          {assetChoices.map((ac) => {
             const active = ac === assetClass
-            const disabled = ac !== 'futures'
             return (
               <button
                 key={ac}
                 type="button"
-                disabled={disabled}
-                aria-disabled={disabled}
+                onClick={() => selectAssetClass(ac)}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm transition-colors',
-                  active && 'bg-primary text-primary-foreground',
-                  disabled && 'cursor-not-allowed text-muted-foreground/40',
+                  active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {t(`addTrades.assets.${ac}`)}
@@ -213,7 +252,9 @@ export default function ManualEntry({
                   <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.dateTime')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.expDate')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.multiplier')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.contracts')}</th>
+                  <th className="px-3 py-2.5 text-left font-medium">
+                    {t(`addTrades.manual.col.${qtyHeaderKey(assetClass)}`)}
+                  </th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.side')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.price')}</th>
                   <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.comm')}</th>

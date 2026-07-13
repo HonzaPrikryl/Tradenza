@@ -17,7 +17,7 @@ export const BROKERS: Broker[] = [
     name: 'Alpaca',
     short: 'A',
     className: 'bg-amber-400/20 text-amber-300',
-    assets: ['stocks', 'crypto'],
+    assets: ['stocks', 'options', 'crypto'],
   },
   {
     id: 'alpha-futures',
@@ -89,7 +89,7 @@ export const BROKERS: Broker[] = [
     className: 'bg-sky-500/20 text-sky-300',
     assets: ['futures'],
   },
-  { id: 'atas', name: 'ATAS', short: 'A', className: 'bg-blue-500/20 text-blue-300', assets: ['futures'] },
+  { id: 'atas', name: 'ATAS', short: 'A', className: 'bg-blue-500/20 text-blue-300', assets: ['futures', 'crypto'] },
   {
     id: 'deepcharts',
     name: 'DeepCharts',
@@ -104,7 +104,7 @@ export const BROKERS: Broker[] = [
     name: 'ByBit - MetaTrader 5',
     short: 'B',
     className: 'bg-amber-500/20 text-amber-300',
-    assets: ['crypto', 'forex'],
+    assets: ['crypto', 'forex', 'cfd'],
   },
   {
     id: 'rithmic',
@@ -113,7 +113,13 @@ export const BROKERS: Broker[] = [
     className: 'bg-emerald-500/20 text-emerald-300',
     assets: ['futures'],
   },
-  { id: 'ftmo', name: 'FTMO', short: 'F', className: 'bg-zinc-200/20 text-zinc-100', assets: ['futures', 'forex'] },
+  {
+    id: 'ftmo',
+    name: 'FTMO',
+    short: 'F',
+    className: 'bg-zinc-200/20 text-zinc-100',
+    assets: ['forex', 'cfd', 'crypto'],
+  },
   {
     id: 'topstepx',
     name: 'TopstepX',
@@ -143,7 +149,7 @@ export const BROKERS: Broker[] = [
     name: 'TradeLocker',
     short: 'T',
     className: 'bg-zinc-200/15 text-zinc-100',
-    assets: ['forex', 'cfd'],
+    assets: ['forex', 'cfd', 'crypto'],
     popular: true,
   },
   {
@@ -151,7 +157,7 @@ export const BROKERS: Broker[] = [
     name: 'Interactive Brokers',
     short: 'IB',
     className: 'bg-red-500/20 text-red-300',
-    assets: ['stocks', 'options', 'futures', 'forex'],
+    assets: ['stocks', 'options', 'futures', 'forex', 'crypto', 'cfd'],
     popular: true,
   },
   {
@@ -175,8 +181,7 @@ export const BROKERS: Broker[] = [
     name: 'Thinkorswim',
     short: 'tos',
     className: 'bg-green-500/20 text-green-300',
-    assets: ['stocks', 'options', 'futures'],
-    popular: true,
+    assets: ['stocks', 'options', 'futures', 'forex'],
   },
 ]
 
@@ -195,4 +200,17 @@ export function searchBrokers(query: string): Broker[] {
 
 export function supportsFutures(b: Broker | undefined): boolean {
   return !!b?.assets.includes('futures')
+}
+
+// The asset class an import defaults to for a broker: its first (primary)
+// supported type. Falls back to 'futures' for brokers with no declared assets
+// (e.g. the generic template), matching the app's historical default.
+export function defaultAssetClass(b: Broker | undefined): AssetType {
+  return b?.assets[0] ?? 'futures'
+}
+
+// File upload is offered for any broker we recognise that declares at least one
+// supported asset type. Unknown / out-of-list brokers fall back to manual entry.
+export function supportsUpload(b: Broker | undefined): boolean {
+  return !!b && b.assets.length > 0
 }

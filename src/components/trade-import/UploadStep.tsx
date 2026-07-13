@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import Select from '@/components/ui/Select'
 import { AssetTypeList, BrokerIcon } from './shared'
-import type { Broker } from '@/lib/brokers'
+import { defaultAssetClass, type AssetType, type Broker } from '@/lib/brokers'
 import {
   buildImportMapping,
   buildFillMapping,
@@ -76,6 +76,11 @@ export default function UploadStep({
   const [colMap, setColMap] = useState<Record<string, string>>({})
   const [mode, setMode] = useState<ImportMode>('trades')
   const [modeTouched, setModeTouched] = useState(false)
+  // Asset class for this import, constrained to what the broker actually
+  // supports. Single-asset brokers (most futures prop firms) resolve to their
+  // one type automatically and never render a picker.
+  const assetChoices = broker.assets
+  const [assetClass, setAssetClass] = useState<AssetType>(defaultAssetClass(broker))
 
   const headers = useMemo(() => (rows.length > 0 ? Object.keys(rows[0]) : []), [rows])
 
@@ -144,12 +149,12 @@ export default function UploadStep({
     try {
       const res =
         mode === 'fills'
-          ? await importFillsCsv({ accountId, filename: file.name, timezone: tz, mapping: colMap, rows })
+          ? await importFillsCsv({ accountId, filename: file.name, timezone: tz, assetClass, mapping: colMap, rows })
           : await importTradesCsv({
               accountId,
               filename: file.name,
               timezone: tz,
-              assetClass: broker.assets.includes('futures') ? 'futures' : 'stocks',
+              assetClass,
               mapping: colMap,
               rows,
             })
@@ -271,6 +276,32 @@ export default function UploadStep({
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">{t('addTrades.upload.timeZoneHint')}</p>
           </div>
+
+          {/* Asset type — only when the broker supports more than one */}
+          {assetChoices.length > 1 && (
+            <div className="mt-5">
+              <label className="text-sm font-medium">{t('addTrades.upload.assetType')}</label>
+              <div className="mt-1.5 inline-flex flex-wrap gap-1 rounded-lg bg-muted/50 p-1">
+                {assetChoices.map((a) => {
+                  const active = a === assetClass
+                  return (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => setAssetClass(a)}
+                      className={cn(
+                        'rounded-md px-3 py-1.5 text-sm transition-colors',
+                        active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                      )}
+                    >
+                      {t(`addTrades.assets.${a}`)}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">{t('addTrades.upload.assetTypeHint')}</p>
+            </div>
+          )}
 
           {/* Dropzone */}
           <div

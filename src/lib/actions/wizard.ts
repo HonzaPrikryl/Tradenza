@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { calculatePnl } from '@/lib/utils'
 import { roundMoney } from '@/lib/trade-pnl'
-import { contractMultiplier } from '@/lib/futures'
+import { contractMultiplier, assetMultiplier } from '@/lib/futures'
 import { IMPORT_REQUIRED, FILL_REQUIRED } from '@/lib/csv-columns'
 import { t } from '@/i18n'
 import {
@@ -50,7 +50,7 @@ const executionSchema = z.object({
 
 const manualTradeSchema = z.object({
   accountId: z.string().uuid(),
-  assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'other']),
+  assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other']),
   symbol: z.string().trim().min(1).max(20),
   contractMultiplier: z.coerce.number().min(0).optional(),
   // Contract expiration date ("YYYY-MM-DD"), informational only.
@@ -141,7 +141,7 @@ const csvImportSchema = z.object({
   accountId: z.string().uuid(),
   filename: z.string().min(1).max(255),
   timezone: z.string().min(1).max(60),
-  assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'other']).default('futures'),
+  assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other']).default('futures'),
   mapping: z.record(z.string()),
   rows: z.array(z.record(z.string())).min(1).max(10000),
 })
@@ -261,28 +261,35 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
       continue
     }
 
-    // Futures detection → asset class + contract multiplier (chart, R-multiple)
-    const mult = contractMultiplier(trade.symbol)
-    const isFutures = mult > 0
+    // Resolve asset class: a symbol matching a known futures contract is always
+    // futures (overrides the picker); otherwise honour the asset class chosen for
+    // this import, constrained to what the broker supports.
+    const resolvedAssetClass = contractMultiplier(trade.symbol) > 0 ? 'futures' : v.assetClass
+    // Per-point value multiplier: futures → contract size, options → 100, else 1.
+    const mult = assetMultiplier(resolvedAssetClass, trade.symbol)
 
     // Prefer the broker-provided P&L (summed across partials); only compute from
-    // prices when none was supplied.
+    // prices when none was supplied — applying the instrument multiplier so
+    // futures/options round-trips without a P&L column are still valued correctly.
     let grossPnl = trade.grossPnl !== null ? roundMoney(trade.grossPnl).toString() : null
     let netPnl = trade.netPnl !== null ? roundMoney(trade.netPnl).toString() : null
     if (netPnl === null && trade.exitPrice !== null) {
       const matched = Math.min(trade.entryQuantity, trade.exitQuantity)
-      const pnl = calculatePnl(trade.direction, trade.entryPrice, trade.exitPrice, matched, trade.fees)
-      grossPnl = roundMoney(pnl.grossPnl).toString()
-      netPnl = roundMoney(pnl.netPnl).toString()
+      const pnl = calculatePnl(trade.direction, trade.entryPrice, trade.exitPrice, matched, 0)
+      const gross = pnl.grossPnl * mult
+      grossPnl = roundMoney(gross).toString()
+      netPnl = roundMoney(gross - trade.fees).toString()
     }
 
     // Persist the individual fills only when a position was actually scaled
-    // (more than one leg), so single round-trip trades keep a minimal `extra`.
+    // (more than one leg); persist the multiplier only for derivatives (≠ 1) so
+    // single round-trip stock/forex trades keep a minimal `extra`.
     const hasPartials = trade.legCount > 1
+    const hasMult = mult !== 1
     const extra =
-      isFutures || hasPartials
+      hasMult || hasPartials
         ? {
-            ...(isFutures ? { contractMultiplier: mult } : {}),
+            ...(hasMult ? { contractMultiplier: mult } : {}),
             ...(hasPartials ? { executions: trade.executions } : {}),
           }
         : undefined
@@ -293,7 +300,7 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
       symbol: trade.symbol,
       direction: trade.direction,
       status: trade.exitPrice !== null || netPnl !== null ? 'closed' : 'open',
-      assetClass: isFutures ? 'futures' : v.assetClass,
+      assetClass: resolvedAssetClass,
       entryPrice: trade.entryPrice.toString(),
       entryQuantity: trade.entryQuantity.toString(),
       entryDatetime: trade.entryDatetime,
@@ -417,6 +424,7 @@ const fillImportSchema = z.object({
   accountId: z.string().uuid(),
   filename: z.string().min(1).max(255),
   timezone: z.string().min(1).max(60),
+  assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other']).default('stocks'),
   mapping: z.record(z.string()),
   rows: z.array(z.record(z.string())).min(1).max(20000),
 })
@@ -492,9 +500,9 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
     const entryDatetime = group[0].time
     const exitDatetime = exits.length > 0 ? group[group.length - 1].time : null
 
-    const mult = contractMultiplier(symbol)
-    const isFutures = mult > 0
-    const m1 = isFutures ? mult : 1
+    // Known futures symbols override the picker; otherwise use the chosen class.
+    const resolvedAssetClass = contractMultiplier(symbol) > 0 ? 'futures' : v.assetClass
+    const m1 = assetMultiplier(resolvedAssetClass, symbol)
     let grossPnl: string | null = null
     let netPnl: string | null = null
     const matched = Math.min(entryQty, exitQty)
@@ -515,7 +523,7 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
       symbol,
       direction,
       status,
-      assetClass: isFutures ? 'futures' : 'stocks',
+      assetClass: resolvedAssetClass,
       entryPrice: entryPrice.toString(),
       entryQuantity: entryQty.toString(),
       entryDatetime,
@@ -536,7 +544,7 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
           commission: f.commission,
           fee: 0,
         })),
-        contractMultiplier: isFutures ? mult : null,
+        contractMultiplier: m1 !== 1 ? m1 : null,
       },
     })
   }

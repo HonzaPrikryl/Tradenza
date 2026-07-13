@@ -7,7 +7,7 @@ import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { cn, formatCurrency, formatDateTimeTz, formatPercent } from '@/lib/utils'
 import { t } from '@/i18n'
-import { contractMultiplier, tickValue as tickValueFor, tickSize as tickSizeFor } from '@/lib/futures'
+import { assetMultiplier, tickValue as tickValueFor, tickSize as tickSizeFor } from '@/lib/futures'
 import { updateTradeJournal, updateTradeRiskPlan } from '@/lib/actions/trades'
 import { type CandlesResult } from '@/lib/actions/candles'
 import ExecutionsEditor from './ExecutionsEditor'
@@ -76,7 +76,7 @@ export default function TradeStatsPanel({
   const grossPnl = trade.grossPnl !== null ? Number(trade.grossPnl) : null
   const fees = Number(trade.fees ?? 0)
 
-  const mult = storedMultiplier(trade) ?? (contractMultiplier(trade.symbol) || 1)
+  const mult = storedMultiplier(trade) ?? assetMultiplier(trade.assetClass, trade.symbol)
   const entryPrice = Number(trade.entryPrice)
   const entryQty = Number(trade.entryQuantity)
   const exitPrice = trade.exitPrice !== null ? Number(trade.exitPrice) : null

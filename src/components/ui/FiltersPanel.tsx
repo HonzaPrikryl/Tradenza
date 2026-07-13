@@ -228,6 +228,7 @@ export default function FiltersPanel({ tagGroups, filters, symbols, strategies, 
             { value: 'forex', label: t('enums.asset.forex') },
             { value: 'crypto', label: t('enums.asset.crypto') },
             { value: 'options', label: t('enums.asset.options') },
+            { value: 'cfd', label: t('enums.asset.cfd') },
             { value: 'other', label: t('enums.asset.other') },
           ]}
         />

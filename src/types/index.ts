@@ -4,7 +4,7 @@ import { t } from '@/i18n'
 export const tradeFormSchema = z.object({
   symbol: z.string().min(1, t('validation.symbolRequired')).max(20).toUpperCase(),
   direction: z.enum(['long', 'short']),
-  assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'other']).default('stocks'),
+  assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other']).default('stocks'),
   status: z.enum(['open', 'closed', 'cancelled']).default('closed'),
 
   entryPrice: z.coerce.number().positive(t('validation.entryPricePositive')),
