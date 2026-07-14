@@ -27,6 +27,7 @@
     "dismiss": "Dismiss",
     "steps": {
       "trade": { "label": "Add your first trade", "cta": "Add trade" },
+      "strategy": { "label": "Create your first strategy", "cta": "Add strategy" },
       "tags": { "label": "Set up tags to categorize your trades", "cta": "Add tags" },
       "discipline": { "label": "Define your first discipline rule", "cta": "Add rule" }
     }

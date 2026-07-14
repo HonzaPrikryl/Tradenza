@@ -8,6 +8,7 @@ import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { cn, formatCurrency, formatDateTimeTz, formatPercent } from '@/lib/utils'
 import { t } from '@/i18n'
 import { assetMultiplier, instrumentTickSize, instrumentTickValue } from '@/lib/futures'
+import { computeExcursion } from '@/lib/mae-mfe'
 import { updateTradeJournal, updateTradeRiskPlan } from '@/lib/actions/trades'
 import { type CandlesResult } from '@/lib/actions/candles'
 import ExecutionsEditor from './ExecutionsEditor'
@@ -261,6 +262,27 @@ export default function TradeStatsPanel({
   const plannedR = riskUsd > 0 ? targetUsd / riskUsd : null
   const realizedR = riskUsd > 0 && netPnl !== null ? netPnl / riskUsd : null
 
+  // Maximum Adverse / Favourable Excursion from the price extremes reached while
+  // the position was open. Direction-aware: the adverse side is the low for a
+  // long and the high for a short. `pointValue` is the $ value of a 1.00 price
+  // move for the whole position, so money/R excursions come out correctly.
+  const excursion =
+    priceLow !== null && priceHigh !== null
+      ? computeExcursion({
+          direction: trade.direction,
+          entryPrice,
+          lowPrice: priceLow,
+          highPrice: priceHigh,
+          pointValue: mult * (contractsTraded || entryQty || 0),
+          riskAmount: riskUsd > 0 ? riskUsd : Number(trade.riskAmount ?? 0) || null,
+        })
+      : null
+  const excursionTitle = excursion
+    ? `MAE −${formatCurrency(excursion.maeMoney ?? excursion.maePoints)} · MFE +${formatCurrency(
+        excursion.mfeMoney ?? excursion.mfePoints,
+      )}`
+    : undefined
+
   const firstRun = useRef(true)
   useEffect(() => {
     if (firstRun.current) {
@@ -318,19 +340,18 @@ export default function TradeStatsPanel({
         value={points !== null ? points.toFixed(2).replace(/\.?0+$/, '') : null}
       />
     ),
-    'row.priceMaeMfe':
-      priceLow !== null && priceHigh !== null ? (
-        <Row
-          label={t('trades.detail.risk.priceMaeMfe')}
-          value={
-            <span className="text-xs">
-              <span className="text-loss">{formatCurrency(priceLow)}</span>
-              <span className="mx-0.5 text-muted-foreground">/</span>
-              <span className="text-profit">{formatCurrency(priceHigh)}</span>
-            </span>
-          }
-        />
-      ) : null,
+    'row.priceMaeMfe': excursion ? (
+      <Row
+        label={t('trades.detail.risk.priceMaeMfe')}
+        value={
+          <span className="text-xs" title={excursionTitle}>
+            <span className="text-loss">{formatCurrency(excursion.maePrice)}</span>
+            <span className="mx-0.5 text-muted-foreground">/</span>
+            <span className="text-profit">{formatCurrency(excursion.mfePrice)}</span>
+          </span>
+        }
+      />
+    ) : null,
     'row.multiplier': <Row label={t('trades.detail.stats.multiplier')} value={mult !== 1 ? mult : null} />,
     'row.commissions': <Row label={t('trades.detail.stats.commissions')} value={formatCurrency(fees)} />,
     'row.netRoi': (

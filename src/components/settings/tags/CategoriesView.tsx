@@ -4,12 +4,12 @@ import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit, handleRateLimitBatch } from '@/components/ui/rate-limit-toast'
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, X } from 'lucide-react'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import { useSelection } from '@/hooks/useSelection'
 import Select from '@/components/ui/Select'
-import { createTagGroup, updateTagGroup, deleteTagGroup } from '@/lib/actions/tags'
+import { createTagGroup, createTag, updateTagGroup, deleteTagGroup } from '@/lib/actions/tags'
 import ActionMenu from '@/components/ui/ActionMenu'
 import { ColorPicker, Modal, PALETTE, inputClass, labelClass, type Category } from './shared'
 
@@ -22,6 +22,16 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
   const [name, setName] = useState('')
   const [color, setColor] = useState(PALETTE[0])
   const [saving, setSaving] = useState(false)
+  const [tagList, setTagList] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState('')
+
+  const addTagChip = (raw: string) => {
+    const v = raw.trim()
+    if (!v) return
+    setTagList((prev) => (prev.some((x) => x.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]))
+    setTagInput('')
+  }
+  const removeTagChip = (v: string) => setTagList((prev) => prev.filter((x) => x !== v))
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -37,11 +47,15 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
   const openNew = () => {
     setName('')
     setColor(PALETTE[categories.length % PALETTE.length])
+    setTagList([])
+    setTagInput('')
     setDialog({ mode: 'new' })
   }
   const openEdit = (cat: Category) => {
     setName(cat.name)
     setColor(cat.color)
+    setTagList([])
+    setTagInput('')
     setDialog({ mode: 'edit', cat })
   }
 
@@ -52,16 +66,37 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
     }
     setSaving(true)
     try {
-      const res =
-        dialog?.mode === 'edit' && dialog.cat
-          ? await updateTagGroup(dialog.cat.id, { name: name.trim(), color })
-          : await createTagGroup({ name: name.trim(), color })
+      if (dialog?.mode === 'edit' && dialog.cat) {
+        const res = await updateTagGroup(dialog.cat.id, { name: name.trim(), color })
+        if (handleRateLimit(res)) return
+        toast.success(t('settings.tagsManagement.toast.updated'))
+        setDialog(null)
+        onChanged()
+        return
+      }
+
+      const res = await createTagGroup({ name: name.trim(), color })
       if (handleRateLimit(res)) return
-      toast.success(
-        dialog?.mode === 'edit'
-          ? t('settings.tagsManagement.toast.updated')
-          : t('settings.tagsManagement.toast.created'),
-      )
+      const groupId = res.group.id
+
+      const pending = tagInput.trim()
+      const seen = new Set<string>()
+      const finalTags = [...tagList, ...(pending ? [pending] : [])].filter((tg) => {
+        const key = tg.toLowerCase()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+
+      if (finalTags.length > 0) {
+        const results = await Promise.all(finalTags.map((tg) => createTag({ name: tg, color, groupId })))
+        if (handleRateLimitBatch(results)) {
+          onChanged()
+          return
+        }
+      }
+
+      toast.success(t('settings.tagsManagement.toast.created'))
       setDialog(null)
       onChanged()
     } catch (err) {
@@ -238,6 +273,59 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
             <label className={labelClass}>{t('settings.tagsManagement.colorLabel')}</label>
             <ColorPicker value={color} onChange={setColor} />
           </div>
+          {dialog.mode === 'new' && (
+            <div>
+              <label className={labelClass}>{t('settings.tagsManagement.tagsInlineLabel')}</label>
+              <div className="flex items-center gap-2">
+                <input
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ',') {
+                      e.preventDefault()
+                      addTagChip(tagInput)
+                    } else if (e.key === 'Backspace' && !tagInput && tagList.length > 0) {
+                      removeTagChip(tagList[tagList.length - 1])
+                    }
+                  }}
+                  maxLength={40}
+                  placeholder={t('settings.tagsManagement.tagsInlinePlaceholder')}
+                  className={inputClass}
+                />
+                <button
+                  type="button"
+                  onClick={() => addTagChip(tagInput)}
+                  disabled={!tagInput.trim()}
+                  className="flex shrink-0 items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm font-medium text-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-transparent"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('settings.tagsManagement.tagsInlineAdd')}</span>
+                </button>
+              </div>
+              {tagList.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {tagList.map((tg) => (
+                    <span
+                      key={tg}
+                      className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium"
+                      style={{ borderColor: color, color, backgroundColor: `${color}1a` }}
+                    >
+                      {tg}
+                      <button
+                        type="button"
+                        onClick={() => removeTagChip(tg)}
+                        aria-label={t('settings.tagsManagement.tagsInlineRemove', { name: tg })}
+                        className="opacity-70 transition-opacity hover:opacity-100"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="mt-1.5 text-xs text-muted-foreground">{t('settings.tagsManagement.tagsInlineHint')}</p>
+            </div>
+          )}
         </Modal>
       )}
     </div>

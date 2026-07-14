@@ -2,6 +2,7 @@ import { getDashboardWidgetData, getActiveLayout, getCalendarData, listTemplates
 import { hasAnyTrades } from '@/lib/actions/trades'
 import { getTagGroups } from '@/lib/actions/tags'
 import { getRules } from '@/lib/actions/progress'
+import { getStrategies } from '@/lib/actions/strategies'
 import { isOnboardingDismissed } from '@/lib/onboarding'
 import { readGlobalFilters } from '@/lib/global-filters'
 import DashboardClient from '@/components/dashboard/DashboardClient'
@@ -15,7 +16,7 @@ export const metadata: Metadata = { title: t('meta.dashboard') }
 
 export default async function DashboardPage() {
   const now = new Date()
-  const [data, active, templates, filters, hasTrades, tagGroups, rules, dismissed] = await Promise.all([
+  const [data, active, templates, filters, hasTrades, tagGroups, rules, strategies, dismissed] = await Promise.all([
     getDashboardWidgetData(),
     getActiveLayout(),
     listTemplates(),
@@ -23,12 +24,14 @@ export default async function DashboardPage() {
     hasAnyTrades(),
     getTagGroups(),
     getRules(),
+    getStrategies(),
     isOnboardingDismissed(),
   ])
   const calendarInitial = await getCalendarData(now.getFullYear(), now.getMonth() + 1)
 
   const steps: OnboardingStep[] = [
     { key: 'trade', done: hasTrades },
+    { key: 'strategy', done: strategies.length > 0 },
     { key: 'tags', done: tagGroups.some((g) => g.values.length > 0) },
     { key: 'discipline', done: rules.length > 0 },
   ]

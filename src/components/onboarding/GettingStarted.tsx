@@ -7,7 +7,7 @@ import { Check, ArrowRight, X, Sparkles } from 'lucide-react'
 import { dismissOnboarding } from '@/lib/onboarding'
 import { t } from '@/i18n'
 
-export type StepKey = 'trade' | 'tags' | 'discipline'
+export type StepKey = 'trade' | 'strategy' | 'tags' | 'discipline'
 
 export interface OnboardingStep {
   key: StepKey
@@ -16,6 +16,7 @@ export interface OnboardingStep {
 
 const HREFS: Record<StepKey, string> = {
   trade: '/add-trade',
+  strategy: '/strategies',
   tags: '/settings/tags',
   discipline: '/progress?tab=rules',
 }
