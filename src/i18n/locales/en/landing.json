@@ -34,11 +34,7 @@
     "subheading": "Beyond the dashboard, journal and discipline tracker — playbooks, analytics and the tooling that makes daily logging fast and keeps your data yours.",
     "strategies": {
       "title": "Strategies & playbooks",
-      "desc": "Define each setup you trade as a reusable strategy with entry and exit checklists, reference screenshots and a color. Assign it to trades, tick off what you actually followed, and review per-strategy stats and how closely you stuck to the plan."
-    },
-    "stats": {
-      "title": "Deep statistics",
-      "desc": "Win rate by direction, profit factor, expectancy, planned vs. realized R, hold-time analysis and win/loss streaks."
+      "desc": "Define each setup you trade as a reusable strategy with entry and exit checklists and a reference screenshots. Assign it to trades, tick off what you actually followed, and review per-strategy stats and how closely you stuck to the plan."
     },
     "import": {
       "title": "Flexible import",

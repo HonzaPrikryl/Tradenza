@@ -1,11 +1,10 @@
-import { BarChart3, ClipboardCheck, Download, MonitorSmartphone, SlidersHorizontal, Tags, Wallet } from 'lucide-react'
+import { ClipboardCheck, Download, MonitorSmartphone, SlidersHorizontal, Tags, Wallet } from 'lucide-react'
 import { t } from '@/i18n'
 import Blob from './Blob'
 import Reveal from './Reveal'
 
 const features = [
   { icon: ClipboardCheck, key: 'strategies' },
-  { icon: BarChart3, key: 'stats' },
   { icon: Download, key: 'import' },
   { icon: Wallet, key: 'accounts' },
   { icon: Tags, key: 'tags' },
