@@ -31,10 +31,14 @@
   "features": {
     "kicker": "And more",
     "heading": "Everything else you'd expect",
-    "subheading": "Beyond the dashboard, journal and discipline tracker — the tooling that makes daily logging fast and keeps your data yours.",
+    "subheading": "Beyond the dashboard, journal and discipline tracker — playbooks, analytics and the tooling that makes daily logging fast and keeps your data yours.",
+    "strategies": {
+      "title": "Strategies & playbooks",
+      "desc": "Define each setup you trade as a reusable strategy with entry and exit checklists, reference screenshots and a color. Assign it to trades, tick off what you actually followed, and review per-strategy stats and how closely you stuck to the plan."
+    },
     "stats": {
       "title": "Deep statistics",
-      "desc": "Win rate by direction, profit factor, expectancy, MAE / MFE, planned vs. realized R, hold-time analysis and win/loss streaks."
+      "desc": "Win rate by direction, profit factor, expectancy, planned vs. realized R, hold-time analysis and win/loss streaks."
     },
     "import": {
       "title": "Flexible import",
@@ -42,7 +46,7 @@
     },
     "accounts": {
       "title": "Trading accounts",
-      "desc": "Built for the prop-firm workflow: track firms, phases, account sizes and currencies, and filter everything by account."
+      "desc": "Built for the prop-firm workflow: track firms, phases, account sizes and starting balances, and filter everything by account."
     },
     "tags": {
       "title": "Tags & categories",
@@ -137,7 +141,7 @@
       },
       {
         "q": "Which brokers and instruments are supported?",
-        "a": "Import works from Tradezella and a broad catalog of broker CSV exports, with automatic de-duplication. Stocks, futures, forex, crypto and options are supported, and futures P&L uses built-in contract multipliers so the numbers are correct per instrument."
+        "a": "Import works from a broad catalog of broker and platform CSV exports — Interactive Brokers, MetaTrader 4/5, Tradovate, Thinkorswim, cTrader, DeepCharts and many more — with automatic de-duplication. Stocks, futures, forex, crypto and options are supported, and futures P&L uses built-in contract multipliers so the numbers are correct per instrument."
       },
       {
         "q": "Can I contribute or request features?",
