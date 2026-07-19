@@ -8,7 +8,7 @@ import { useConfirm } from '@/components/providers/ConfirmProvider'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import StrategyFormModal, { type StrategyFormValue } from '@/components/strategies/StrategyFormModal'
 import { deleteStrategy } from '@/lib/actions/strategies'
-import { t } from '@/i18n'
+import { t, tRich } from '@/i18n'
 
 export default function StrategyDetailActions({ strategy }: { strategy: StrategyFormValue }) {
   const router = useRouter()
@@ -18,8 +18,8 @@ export default function StrategyDetailActions({ strategy }: { strategy: Strategy
   async function remove() {
     const ok = await confirm({
       title: t('strategies.delete.title'),
-      message: t('strategies.delete.body', { name: strategy.name }),
-      confirmLabel: t('strategies.delete.confirm'),
+      message: tRich('strategies.delete.body', { name: strategy.name }),
+      variant: 'delete',
     })
     if (!ok) return
     const res = await deleteStrategy(strategy.id)

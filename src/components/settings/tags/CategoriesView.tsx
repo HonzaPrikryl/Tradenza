@@ -110,8 +110,7 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
     const ok = await confirm({
       title: t('settings.tagsManagement.rowMenu.delete'),
       message: tRich('settings.tagsManagement.confirmDeleteCategory', { name: cat.name }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     try {
@@ -127,8 +126,7 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
     const ok = await confirm({
       title: t('settings.tagsManagement.rowMenu.delete'),
       message: tRich('settings.tagsManagement.confirmBulkCategories', { count: sel.size }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     try {

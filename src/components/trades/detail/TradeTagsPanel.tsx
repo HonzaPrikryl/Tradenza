@@ -90,8 +90,7 @@ function GroupSelect({
     const ok = await confirm({
       title: t('common.delete'),
       message: tRich('trades.detail.tags.confirmDeleteTag', { name: v.name }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     setBusy(true)
@@ -291,8 +290,7 @@ function CategoryHeader({
     const ok = await confirm({
       title: t('common.delete'),
       message: tRich('trades.detail.tags.confirmDeleteCategory', { name: group.name }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     try {

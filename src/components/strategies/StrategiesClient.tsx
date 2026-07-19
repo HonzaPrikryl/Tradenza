@@ -13,7 +13,7 @@ import { useTableSort } from '@/hooks/useTableSort'
 import { deleteStrategy, type StrategyDTO, type StrategyOverviewRow } from '@/lib/actions/strategies'
 import { formatCurrency, cn } from '@/lib/utils'
 import { AreaSparkline } from '@/components/stats/StatVisuals'
-import { t } from '@/i18n'
+import { t, tRich } from '@/i18n'
 
 type View = 'cards' | 'list'
 type SortKey = 'name' | 'tradeCount' | 'netPnl' | 'winRate' | 'adherence'
@@ -71,8 +71,8 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
   async function remove(s: StrategyDTO) {
     const ok = await confirm({
       title: t('strategies.delete.title'),
-      message: t('strategies.delete.body', { name: s.name }),
-      confirmLabel: t('strategies.delete.confirm'),
+      message: tRich('strategies.delete.body', { name: s.name }),
+      variant: 'delete',
     })
     if (!ok) return
     const res = await deleteStrategy(s.id)

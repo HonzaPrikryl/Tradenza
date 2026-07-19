@@ -109,8 +109,7 @@ export default function TagsView({
     const ok = await confirm({
       title: t('settings.tagsManagement.rowMenu.delete'),
       message: tRich('settings.tagsManagement.confirmDeleteTag', { name: tg.name }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     try {
@@ -126,8 +125,7 @@ export default function TagsView({
     const ok = await confirm({
       title: t('settings.tagsManagement.rowMenu.delete'),
       message: tRich('settings.tagsManagement.confirmBulkTags', { count: sel.size }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     try {

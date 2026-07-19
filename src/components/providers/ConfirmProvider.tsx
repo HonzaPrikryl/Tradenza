@@ -12,6 +12,13 @@ export interface ConfirmOptions {
   confirmLabel?: string
   cancelLabel?: string
   danger?: boolean
+  /**
+   * Preset for the most common case. `'delete'` styles the dialog as destructive
+   * (red confirm button) and defaults the confirm label to "Delete" — so a delete
+   * confirmation is just `confirm({ variant: 'delete', title, message })`. Any
+   * explicit `danger`/`confirmLabel` still override the preset.
+   */
+  variant?: 'delete'
 }
 
 type ConfirmFn = (opts?: ConfirmOptions) => Promise<boolean>
@@ -41,6 +48,11 @@ export default function ConfirmProvider({ children }: { children: React.ReactNod
     setOpts(null)
   }, [])
 
+  // Resolve the preset once: `variant: 'delete'` → destructive styling + "Delete"
+  // label, unless the caller overrides danger/confirmLabel explicitly.
+  const danger = opts ? (opts.danger ?? opts.variant === 'delete') : false
+  const confirmLabel = opts?.confirmLabel ?? (opts?.variant === 'delete' ? t('common.delete') : t('common.confirm'))
+
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
@@ -51,7 +63,7 @@ export default function ConfirmProvider({ children }: { children: React.ReactNod
               <span
                 className={cn(
                   'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
-                  opts.danger ? 'bg-loss/15 text-loss' : 'bg-primary/15 text-primary',
+                  danger ? 'bg-loss/15 text-loss' : 'bg-primary/15 text-primary',
                 )}
               >
                 <AlertTriangle className="h-4.5 w-4.5" />
@@ -81,10 +93,10 @@ export default function ConfirmProvider({ children }: { children: React.ReactNod
               onClick={() => finish(true)}
               className={cn(
                 'rounded-md px-5 py-2 text-sm font-medium text-white transition-colors',
-                opts.danger ? 'bg-loss hover:bg-loss/90' : 'bg-primary text-primary-foreground hover:bg-primary/90',
+                danger ? 'bg-loss hover:bg-loss/90' : 'bg-primary text-primary-foreground hover:bg-primary/90',
               )}
             >
-              {opts.confirmLabel ?? t('common.confirm')}
+              {confirmLabel}
             </button>
           </div>
         </Dialog>

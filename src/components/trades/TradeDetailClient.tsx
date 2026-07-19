@@ -81,8 +81,7 @@ export default function TradeDetailClient({
         symbol: trade.symbol,
         date: formatDateTz(trade.entryDatetime, timezone),
       }),
-      confirmLabel: t('trades.detail.deleteConfirm'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     try {

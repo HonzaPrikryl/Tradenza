@@ -125,8 +125,7 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
     const ok = await confirm({
       title: t('trades.detail.exec.delete'),
       message: tRich('trades.detail.exec.confirmDelete'),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     if (await persist(rows.filter((x) => x.id !== r.id))) {
@@ -144,8 +143,7 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
     const ok = await confirm({
       title: t('trades.detail.exec.delete'),
       message: tRich('trades.detail.exec.confirmDeleteSelected', { count: sel.size }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     if (await persist(rows.filter((r) => !sel.has(r.id)))) sel.clear()

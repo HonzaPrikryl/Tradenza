@@ -29,8 +29,7 @@ export default function DeleteImportButton({ id, filename, trades }: DeleteImpor
         trades > 0
           ? tRich('settings.importHistory.deleteConfirm.message', { filename, count: trades })
           : tRich('settings.importHistory.deleteConfirm.messageNoTrades', { filename }),
-      confirmLabel: t('settings.importHistory.deleteConfirm.confirmLabel'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
 

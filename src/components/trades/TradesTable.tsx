@@ -118,8 +118,7 @@ export default function TradesTable({
     const ok = await confirm({
       title: t('common.delete'),
       message: tRich('trades.confirmDelete', { symbol }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     try {
@@ -136,8 +135,7 @@ export default function TradesTable({
     const ok = await confirm({
       title: t('trades.bulk.confirmDeleteTitle'),
       message: tRich('trades.bulk.confirmDelete', { count }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      variant: 'delete',
     })
     if (!ok) return
     setBusy(true)
