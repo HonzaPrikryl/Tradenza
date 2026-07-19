@@ -1,6 +1,5 @@
 {
   "title": "Settings",
-  "sectionUser": "User",
   "sectionGeneral": "General",
   "danger": {
     "title": "Delete account",
@@ -15,24 +14,14 @@
     }
   },
   "nav": {
-    "profile": "Profile",
-    "security": "Security",
-    "subscription": "Subscription",
     "accounts": "Accounts",
-    "ptSl": "PT / SL settings",
-    "commissions": "Commissions & fees",
     "tradeSettings": "Trade settings",
     "globalSettings": "Global settings",
-    "editor": "Editor",
     "tags": "Tags management",
-    "importHistory": "Import history",
-    "logHistory": "Log history",
-    "reportSubscriptions": "Report subscriptions",
-    "supportAccess": "Support access"
+    "importHistory": "Import history"
   },
   "accounts": {
     "title": "Accounts",
-    "learnMore": "Learn more",
     "subtitle": "You can have unlimited active accounts"
   },
   "trade": {
@@ -44,7 +33,6 @@
     "subtitle": "Display preferences applied across the app.",
     "timezone": "Time zone",
     "timezoneHint": "Used to display trade dates and times.",
-    "currency": "Display currency",
     "saved": "Settings saved",
     "breakeven": "Breakeven offset",
     "breakevenHint": "Set the range of values for a trade to be considered breakeven.",
@@ -76,8 +64,7 @@
     "deleteConfirm": {
       "title": "Delete this import?",
       "message": "This permanently removes the import {filename} and all {count} trades created by it. This action cannot be undone.",
-      "messageNoTrades": "This permanently removes the import {filename}. No trades from it remain to delete. This action cannot be undone.",
-      "confirmLabel": "Delete import"
+      "messageNoTrades": "This permanently removes the import {filename}. No trades from it remain to delete. This action cannot be undone."
     },
     "toast": {
       "deleted": "Import deleted ({count} trades removed)",
@@ -85,7 +72,6 @@
     }
   },
   "tagsManagement": {
-    "learnMore": "Learn more",
     "categoriesTab": "Categories",
     "tagsTab": "Tags",
     "categoriesTitle": "Categories management",
@@ -107,8 +93,7 @@
       "color": "Color",
       "tagName": "Tag name",
       "category": "Category",
-      "used": "Used",
-      "actions": "Actions"
+      "used": "Used"
     },
     "rowMenu": {
       "edit": "Edit",

@@ -1,13 +1,10 @@
 {
-  "title": "Filters",
   "categories": {
     "general": "General",
     "tags": "Tags",
     "dayTime": "Day & Time",
-    "strategy": "Strategy",
-    "insights": "Zella Insights"
+    "strategy": "Strategy"
   },
-  "comingSoon": "Coming soon",
   "general": {
     "side": "Side",
     "status": "Status",
@@ -36,10 +33,7 @@
     "exitTime": "Exit time",
     "min": "Min",
     "max": "Max",
-    "from": "From",
-    "to": "To",
-    "addAnother": "Add another",
-    "days": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    "addAnother": "Add another"
   },
   "strategy": {
     "label": "Strategies",
@@ -48,11 +42,7 @@
     "none": "No strategies yet."
   },
   "tags": {
-    "include": "Include tags",
-    "exclude": "Exclude tags",
     "matchAll": "Only show those that match all",
-    "searchPlaceholder": "Search tags…",
-    "noResults": "No tags found",
     "noTags": "No tag categories yet. Create them when adding a trade.",
     "selectAll": "Select all",
     "selected": "{count} selected",

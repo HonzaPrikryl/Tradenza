@@ -17,8 +17,7 @@
     "searchPlaceholder": "Start typing the broker, prop firm or trading platform",
     "popular": "Popular Brokers",
     "noResults": "Can't find your broker",
-    "noResultsHint": "Use generic template or add trades manually",
-    "useGeneric": "Use generic template"
+    "noResultsHint": "Use generic template or add trades manually"
   },
   "account": {
     "title": "Create Trading Account",
@@ -32,17 +31,10 @@
     "brokerOutOfList": "Broker out of the list",
     "changeBroker": "Change broker",
     "supportedAssets": "Supported Asset Types:",
-    "autoSync": {
-      "badge": "Not available",
-      "title": "Auto-sync",
-      "desc": "Not available yet - request it!",
-      "cta": "Request a broker"
-    },
     "fileUpload": {
       "badge": "Recommended",
       "title": "File upload",
       "desc": "Upload broker-provided file with your trading history",
-      "notFutures": "Available for futures brokers only",
       "notSupported": "File upload isn't available for this broker yet — add trades manually instead"
     },
     "manual": {
@@ -61,7 +53,6 @@
     "emptyFile": "The file is empty or has no readable rows.",
     "parseError": "The file could not be parsed. Make sure it's a valid CSV.",
     "rowsDetected": "{count} rows detected",
-    "columnsOk": "{count} columns recognized — ready to import",
     "missingColumns": "Required columns not found: {cols}. Check your export settings.",
     "importButton": "Import {count} rows",
     "importing": "Importing…",
@@ -77,7 +68,6 @@
     "assetType": "Asset type",
     "assetTypeHint": "Which asset type is this file? We use it to value each trade correctly.",
     "howTo": "How to import trades from {broker}",
-    "integrationGuide": "Integration Guide",
     "expand": "Expand whole instructions",
     "steps": {
       "1": "Export your trading history from your broker or platform as a CSV file.",
@@ -169,14 +159,5 @@
     "crypto": "Crypto",
     "cfd": "CFD",
     "other": "Other"
-  },
-  "tradeTypes": {
-    "stock": "Stock",
-    "option": "Option",
-    "future": "Future",
-    "futureOption": "Future Option",
-    "forex": "Forex",
-    "crypto": "Crypto",
-    "cfd": "CFD"
   }
 }

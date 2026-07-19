@@ -2,7 +2,6 @@
   "title": "Statistics",
   "subtitle": "Detailed analysis of your trading performance",
   "empty": "No data. Add trades or import a CSV.",
-  "noData": "No data",
   "tabs": {
     "performance": "Performance",
     "overview": "Overview"
@@ -33,7 +32,7 @@
     "avgDailyPnl": "Avg daily {pl} P&L",
     "avgPlannedR": "Avg. planned r-multiple",
     "avgRealizedR": "Avg. realized r-multiple",
-    "avgDailyVolume": "Avg daily volume",
+    "avgDailyVolume": "Avg daily qty",
     "loggedDays": "Logged days",
     "maxDailyDrawdown": "Max daily {pl} drawdown",
     "avgDailyDrawdown": "Avg daily {pl} drawdown",
@@ -51,7 +50,7 @@
     "lowestMonth": "Lowest month",
     "average": "Average",
     "totalPnl": "Total P&L",
-    "avgDailyVolume": "Average daily volume",
+    "avgDailyVolume": "Average daily qty",
     "avgWinningTrade": "Average winning trade",
     "avgLosingTrade": "Average losing trade",
     "totalTrades": "Total number of trades",

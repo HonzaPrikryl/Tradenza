@@ -72,20 +72,21 @@
     },
     "trade": {
       "title": "Review every trade like a pro",
-      "desc": "Open any trade on a full price chart with your executions marked, watch the running P&L build, rate your execution and journal the setup, emotions, mistakes and lessons.",
+      "desc": "Open any trade on a full price chart with your executions marked, watch the running P&L build, rate your execution and journal the setup, emotions, mistakes and lessons — then arrange the sidebar panels and stats exactly how you like.",
       "points": [
         "Chart with entries, exits and running P&L",
         "Multi-execution and multi-leg support",
-        "Structured notes, tags, screenshots, star rating and more"
+        "Structured notes, tags, screenshots, star rating and more",
+        "Customizable sidebar — show, hide and reorder every panel and stat"
       ]
     },
     "discipline": {
       "title": "Process over P&L",
-      "desc": "Define your trading rules, check them off each day and build streaks. A year-long heatmap and consistency stats keep you honest about how you actually traded — not just what you made.",
+      "desc": "Hold yourself to your own rules, separate from P&L. Split non-negotiable limits from quality habits, check them off each day, and see every day graded green, amber or red on a year-long heatmap. Streaks and consistency stats keep you honest — and a payoff view shows whether discipline actually pays.",
       "points": [
-        "Daily rule check-ins and perfect-day streaks",
-        "Year heatmap and discipline trend",
-        "Rule consistency by rule and by weekday"
+        "Hard rules vs. soft habits, each on its own daily schedule",
+        "Year heatmap, clean-day streaks and a 30-day discipline trend",
+        "See if discipline pays: daily P&L and R-multiple by day type"
       ]
     }
   },

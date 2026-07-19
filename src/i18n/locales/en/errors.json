@@ -20,7 +20,7 @@
   },
   "rule": {
     "notFound": "Rule not found.",
-    "notToday": "Rules can only be tracked for the current day.",
+    "future": "You can't log a day that hasn't happened yet.",
     "notScheduled": "This rule is not scheduled for that day."
   },
   "strategy": {

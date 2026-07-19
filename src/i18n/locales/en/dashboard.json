@@ -1,31 +1,7 @@
 {
   "title": "Dashboard",
   "subtitle": "Overview of your trading performance",
-  "cards": {
-    "totalPnl": "Total P&L",
-    "totalPnlSub": "{count} closed trades",
-    "winrate": "Win rate",
-    "winrateSub": "{wins}W / {losses}L",
-    "profitFactor": "Profit factor",
-    "profitFactorSub": "gross profit / gross loss",
-    "avgRr": "Avg RR",
-    "avgRrSub": "average risk/reward",
-    "maxDrawdown": "Max drawdown",
-    "maxDrawdownSub": "maximum drawdown",
-    "streak": "Streak",
-    "streakWin": "winning streak",
-    "streakLoss": "losing streak"
-  },
-  "cumulativePnl": "Cumulative P&L",
-  "noDataAddFirst": "No data — add your first trade",
-  "topSymbols": "Top symbols",
   "noData": "No data",
-  "tradesCount": "{count} trades",
-  "recentTrades": "Recent trades",
-  "viewAll": "View all →",
-  "noTradesYet": "No trades.",
-  "addFirstTrade": "Add your first trade →",
-  "tooltipCumulative": "Cumulative P&L",
   "seriesCumulative": "Cumulative",
   "seriesNetPnl": "Net P&L",
   "viewMyDay": "View my day",
@@ -69,7 +45,7 @@
     "templateRenamed": "Template renamed",
     "templateDeleted": "Template deleted",
     "deleteTitle": "Delete template",
-    "deleteMessage": "\"{name}\" will be permanently removed. This cannot be undone.",
+    "deleteMessage": "{name} will be permanently removed. This cannot be undone.",
     "createTitle": "Create a template",
     "createDescription": "You can switch between templates to have a dashboard that suits your needs at the moment."
   },
@@ -89,7 +65,7 @@
     "winnersLosers": "Winners / Losers",
     "commissions": "Commissions",
     "winRate": "Win Rate",
-    "volume": "Volume",
+    "volume": "Qty",
     "profitFactor": "Profit Factor",
     "intradayCumulative": "Intraday cumulative net P&L",
     "tradesHeading": "Trades ({count})",
@@ -143,22 +119,73 @@
     }
   },
   "widgets": {
-    "net-pnl": { "label": "Net P&L", "description": "Celkový čistý zisk/ztráta" },
-    "trade-win-rate": { "label": "Trade win %", "description": "Podíl výherních tradů" },
-    "profit-factor": { "label": "Profit factor", "description": "Hrubý zisk / hrubá ztráta" },
-    "day-win-rate": { "label": "Day win %", "description": "Podíl výherních dní" },
-    "avg-win-loss": { "label": "Avg win/loss", "description": "Poměr průměrné výhry a ztráty" },
-    "total-trades": { "label": "Total trades", "description": "Počet tradů" },
-    "avg-rr": { "label": "Avg RR", "description": "Průměrný risk/reward" },
-    "max-drawdown": { "label": "Max drawdown", "description": "Maximální propad" },
-    "expectancy": { "label": "Expectancy", "description": "Průměrný P&L na trade" },
-    "current-streak": { "label": "Streak", "description": "Aktuální série" },
-    "zella-score": { "label": "Trade score", "description": "Trade score – pavučinový graf" },
-    "cumulative-pnl": { "label": "Daily net cumulative P&L", "description": "Kumulativní křivka P&L" },
-    "net-daily-pnl": { "label": "Net daily P&L", "description": "Denní čistý P&L (sloupce)" },
-    "time-performance": { "label": "Trade time performance", "description": "Výkon dle času vstupu" },
-    "duration-performance": { "label": "Trade duration performance", "description": "Výkon dle délky tradu" },
-    "calendar": { "label": "Calendar", "description": "Robustní kalendář obchodních dní" },
-    "top-symbols": { "label": "Top symbols", "description": "Nejlepší symboly" }
+    "net-pnl": {
+      "label": "Net P&L",
+      "description": "Celkový čistý zisk/ztráta"
+    },
+    "trade-win-rate": {
+      "label": "Trade win %",
+      "description": "Podíl výherních tradů"
+    },
+    "profit-factor": {
+      "label": "Profit factor",
+      "description": "Hrubý zisk / hrubá ztráta"
+    },
+    "day-win-rate": {
+      "label": "Day win %",
+      "description": "Podíl výherních dní"
+    },
+    "avg-win-loss": {
+      "label": "Avg win/loss",
+      "description": "Poměr průměrné výhry a ztráty"
+    },
+    "total-trades": {
+      "label": "Total trades",
+      "description": "Počet tradů"
+    },
+    "avg-rr": {
+      "label": "Avg RR",
+      "description": "Průměrný risk/reward"
+    },
+    "max-drawdown": {
+      "label": "Max drawdown",
+      "description": "Maximální propad"
+    },
+    "expectancy": {
+      "label": "Expectancy",
+      "description": "Průměrný P&L na trade"
+    },
+    "current-streak": {
+      "label": "Streak",
+      "description": "Aktuální série"
+    },
+    "zella-score": {
+      "label": "Trade score",
+      "description": "Trade score – pavučinový graf"
+    },
+    "cumulative-pnl": {
+      "label": "Daily net cumulative P&L",
+      "description": "Kumulativní křivka P&L"
+    },
+    "net-daily-pnl": {
+      "label": "Net daily P&L",
+      "description": "Denní čistý P&L (sloupce)"
+    },
+    "time-performance": {
+      "label": "Trade time performance",
+      "description": "Výkon dle času vstupu"
+    },
+    "duration-performance": {
+      "label": "Trade duration performance",
+      "description": "Výkon dle délky tradu"
+    },
+    "calendar": {
+      "label": "Calendar",
+      "description": "Robustní kalendář obchodních dní"
+    },
+    "top-symbols": {
+      "label": "Top symbols",
+      "description": "Nejlepší symboly"
+    }
   }
 }

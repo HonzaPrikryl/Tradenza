@@ -1,14 +1,11 @@
 {
-  "appName": "Tradenza",
   "addTrade": "Add trade",
   "dashboard": "Dashboard",
   "trades": "Trades",
   "stats": "Statistics",
   "strategies": "Strategies",
   "progress": "Discipline",
-  "accounts": "Accounts",
   "settings": "Settings",
-  "import": "Import / Export",
   "profile": "Profile",
   "admin": "Admin"
 }

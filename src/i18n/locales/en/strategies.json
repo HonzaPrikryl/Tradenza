@@ -1,5 +1,4 @@
 {
-  "nav": "Strategies",
   "title": "Strategies",
   "subtitle": "Your trading playbooks — define a setup once, then assign it to trades and see which ones actually work.",
   "search": "Search strategies…",
@@ -27,9 +26,7 @@
     "addCriterion": "Add criterion",
     "criterionPlaceholder": "e.g. Price above VWAP",
     "removeCriterion": "Remove criterion",
-    "image": "Reference screenshot",
     "images": "Reference screenshots",
-    "attachImage": "Upload image",
     "attachImages": "Upload images",
     "uploading": "Uploading…",
     "removeImage": "Remove image",
@@ -40,14 +37,13 @@
     "dragToReorder": "Drag to reorder",
     "limitReached": "You can attach up to {max} images.",
     "imageUnavailable": "Image upload isn't available (storage not configured).",
-    "color": "Color",
     "save": "Save",
     "saving": "Saving…",
     "cancel": "Cancel"
   },
   "delete": {
     "title": "Delete strategy?",
-    "body": "\"{name}\" will be removed from your list. Trades already assigned to it keep their history.",
+    "body": "{name} will be removed from your list. Trades already assigned to it keep their history.",
     "confirm": "Delete"
   },
   "toast": {
@@ -59,7 +55,6 @@
     "title": "Strategy",
     "none": "No strategy"
   },
-  "column": "Strategy",
   "stats": {
     "trades": "Trades",
     "netPnl": "Net P&L",
