@@ -9,6 +9,7 @@ import { getUiLocale } from '@/i18n/config'
 import Select from '@/components/ui/Select'
 import type { ProgressYearData, ProgressCalendarCell } from '@/lib/actions/progress'
 import { prettyDate } from '@/components/progress/DaySummaryPanel'
+import WidgetInfo from './WidgetInfo'
 
 const MONTHS = tList('datepicker.monthsShort')
 const WD_SHORT = tList('datepicker.weekdaysShort')
@@ -64,17 +65,30 @@ function buildYearGrid(year: number): DayCell[][] {
   return weeks
 }
 
-function heatClass(d: ProgressCalendarCell | undefined): string | false {
-  if (!d || d.ratio <= 0) return false
-  if (d.perfect) return 'heat-perfect'
-  if (d.ratio > 0.75) return 'heat-l4'
-  if (d.ratio > 0.5) return 'heat-l3'
-  if (d.ratio > 0.25) return 'heat-l2'
-  return 'heat-l1'
+function greenShadeClass(ratio: number): string {
+  if (ratio === 1) return 'heat-perfect'
+  if (ratio >= 0.7) return 'heat-l3'
+  if (ratio >= 0.5) return 'heat-l1'
+  return 'border-muted-foreground/30 bg-muted/50'
+}
+
+function statusClass(d: Pick<ProgressCalendarCell, 'status' | 'ratio' | 'cleanNoTrade'> | undefined): string | false {
+  switch (d?.status) {
+    case 'green':
+      // No-trade check-in days get ONE flat shade, never the soft-ratio ramp — the
+      // handful of habits you happened to tick must not change the colour.
+      return d.cleanNoTrade ? 'heat-notrade' : greenShadeClass(d.ratio)
+    case 'yellow':
+      return 'day-yellow'
+    case 'red':
+      return 'day-red'
+    default:
+      return false
+  }
 }
 
 function cellStyle(d: ProgressCalendarCell | undefined): React.CSSProperties {
-  if (d?.perfect) return { boxShadow: '0 0 7px hsl(var(--primary) / 0.6)' }
+  if (d?.ratio === 1 && !d.cleanNoTrade) return { boxShadow: '0 0 7px hsl(var(--primary) / 0.6)' }
   return {}
 }
 
@@ -132,7 +146,7 @@ export default function ProgressYearHeatmap({
         </div>
         <div className="flex items-center gap-2 text-xs">
           <span className="rounded-md bg-primary/10 px-2 py-0.5 font-semibold text-primary">
-            {data.perfectDays} {t('progress.calendar.perfect')}
+            {data.perfectDays} {t('progress.calendar.green')}
           </span>
           <span className="rounded-md bg-muted px-2 py-0.5 text-muted-foreground">
             {data.loggedDays} {t('progress.calendar.logged')}
@@ -140,6 +154,7 @@ export default function ProgressYearHeatmap({
           <span className="rounded-md bg-muted px-2 py-0.5 text-muted-foreground">
             {Math.round(data.avgRatio * 100)}% {t('progress.calendar.avg')}
           </span>
+          <WidgetInfo text={t('progress.calendar.info')} />
         </div>
       </div>
 
@@ -186,8 +201,8 @@ export default function ProgressYearHeatmap({
                         onMouseLeave={hideTip}
                         className={cn(
                           'h-3 w-3 rounded-[3px] border transition-transform hover:scale-125',
-                          (!d || d.ratio <= 0) && 'border-muted-foreground/30 bg-muted/50',
-                          heatClass(d),
+                          (!d || d.status === 'none') && 'border-muted-foreground/30 bg-muted/50',
+                          statusClass(d),
                           isFuture && 'opacity-30',
                           isToday && 'ring-1 ring-foreground/50',
                           isSelected && 'ring-2 ring-primary ring-offset-1 ring-offset-card',
@@ -203,21 +218,32 @@ export default function ProgressYearHeatmap({
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="mt-3 flex items-center justify-end gap-1.5 px-1 text-[10px] text-muted-foreground">
-        <span>{t('progress.calendar.legendLess')}</span>
-        {[0, 0.25, 0.5, 0.75, 1].map((r) => (
-          <span
-            key={r}
-            className={cn(
-              'h-3 w-3 rounded-[3px] border',
-              r <= 0 && 'border-muted-foreground/30 bg-muted/50',
-              heatClass({ date: '', completed: 0, total: 0, ratio: r, perfect: r >= 1, hasNote: false }),
-            )}
-            style={cellStyle({ date: '', completed: 0, total: 0, ratio: r, perfect: r >= 1, hasNote: false })}
-          />
-        ))}
-        <span>{t('progress.calendar.legendMore')}</span>
+      {/* Legend — mixes the status colours with the green intensity ramp */}
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5 px-1 text-[10px] text-muted-foreground">
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded-[3px] border border-muted-foreground/30 bg-muted/50" />
+          {t('progress.calendar.legendNone')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded-[3px] border day-red" />
+          {t('progress.calendar.legendRed')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded-[3px] border day-yellow" />
+          {t('progress.calendar.legendYellow')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded-[3px] border heat-notrade" />
+          {t('progress.calendar.legendNoTrade')}
+        </span>
+        <span className="flex items-center gap-1">
+          <span>{t('progress.calendar.legendLess')}</span>
+          <span className="h-3 w-3 rounded-[3px] border heat-l1" />
+          <span className="h-3 w-3 rounded-[3px] border heat-l3" />
+          <span className="h-3 w-3 rounded-[3px] border heat-perfect" />
+          <span>{t('progress.calendar.legendMore')}</span>
+        </span>
+        <span className="font-medium text-primary/80">{t('progress.calendar.legendGreen')}</span>
       </div>
 
       {tip &&
@@ -228,13 +254,38 @@ export default function ProgressYearHeatmap({
             style={{ left: tip.x, top: tip.y - 8 }}
           >
             <div className="font-medium text-foreground">{prettyShortDate(tip.date)}</div>
-            <div className="mt-0.5 text-muted-foreground">
-              {tip.d && tip.d.total > 0
-                ? tip.d.perfect
-                  ? t('progress.calendar.tipPerfect', { total: tip.d.total })
-                  : t('progress.calendar.tipRules', { completed: tip.d.completed, total: tip.d.total })
-                : t('progress.calendar.tipNoRecord')}
-            </div>
+            {tip.d && tip.d.status !== 'none' ? (
+              <div className="mt-0.5 space-y-0.5">
+                <div
+                  className={cn(
+                    'font-medium',
+                    tip.d.status === 'green' && 'text-primary',
+                    tip.d.status === 'yellow' && 'text-amber-500',
+                    tip.d.status === 'red' && 'text-loss',
+                  )}
+                >
+                  {t(`progress.calendar.status.${tip.d.status}`)}
+                </div>
+                {tip.d.hardViolations > 0 && (
+                  <div className="text-muted-foreground">
+                    {tip.d.hardViolations === 1
+                      ? t('progress.hardBroken.one')
+                      : t('progress.hardBroken.other', { count: tip.d.hardViolations })}
+                  </div>
+                )}
+                {tip.d.cleanNoTrade ? (
+                  <div className="text-muted-foreground">{t('progress.calendar.tipNoTrade')}</div>
+                ) : (
+                  tip.d.softTotal > 0 && (
+                    <div className="text-muted-foreground">
+                      {t('progress.calendar.tipSoft', { completed: tip.d.softDone, total: tip.d.softTotal })}
+                    </div>
+                  )
+                )}
+              </div>
+            ) : (
+              <div className="mt-0.5 text-muted-foreground">{t('progress.calendar.tipNoRecord')}</div>
+            )}
           </div>,
           document.body,
         )}

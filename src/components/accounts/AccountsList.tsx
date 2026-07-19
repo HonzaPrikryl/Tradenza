@@ -199,8 +199,7 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
               {isLastActive(a) && <> {t('tradingAccounts.lastAccountNote')}</>}
             </>
           ),
-          confirmLabel: t('common.delete'),
-          danger: true,
+          variant: 'delete',
         })
         if (ok) act(() => deleteAccount(a.id), t('accounts.toast.deleted'))
         break

@@ -21,6 +21,13 @@ export const directionEnum = pgEnum('direction', ['long', 'short'])
 export const statusEnum = pgEnum('status', ['open', 'closed', 'cancelled'])
 export const assetClassEnum = pgEnum('asset_class', ['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other'])
 export const feedbackKindEnum = pgEnum('feedback_kind', ['bug', 'idea', 'other'])
+// Two tiers of discipline rules:
+//  - 'hard': non-negotiable anti-self-destruction rules. A single violation on a
+//    traded day makes the day red, regardless of everything else. Stored as
+//    violations (a completion row = the rule was BROKEN that day; no row = respected).
+//  - 'soft': quality habits. Each contributes to the day's score proportionally.
+//    Stored as completions (a row = the habit was DONE that day).
+export const ruleTypeEnum = pgEnum('rule_type', ['hard', 'soft'])
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 // Lightweight registry of the app's users. Auth stays owned by Clerk (the source
@@ -262,6 +269,8 @@ export const progressRules = pgTable(
 
     name: text('name').notNull(), // "No revenge trading"
     description: text('description'),
+    // Rule tier — see ruleTypeEnum. Existing rules migrate to 'soft'.
+    ruleType: ruleTypeEnum('rule_type').notNull().default('soft'),
     sortOrder: integer('sort_order').notNull().default(0),
     active: boolean('active').notNull().default(true), // paused (false) vs running (true)
     // ISO weekdays (1=Mon … 7=Sun) on which the rule applies. Default: every day.
@@ -283,6 +292,9 @@ export const progressRules = pgTable(
   }),
 )
 
+// A logged event for a rule on a day. Its meaning depends on the rule's tier:
+//   soft rule → the habit was DONE (positive)
+//   hard rule → the rule was VIOLATED (negative); absence of a row = respected
 export const ruleCompletions = pgTable(
   'rule_completions',
   {
@@ -308,6 +320,10 @@ export const dailyCheckins = pgTable(
     userId: text('user_id').notNull(),
     date: text('date').notNull(), // 'yyyy-MM-dd'
     note: text('note'),
+    // Explicit "I reviewed this day" marker. Lets a no-trade day still be scored
+    // (e.g. you did your prep and rightly took no trade) — without it, a day is
+    // only in scope when it has trades or logged rules.
+    checkedIn: boolean('checked_in').notNull().default(false),
 
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

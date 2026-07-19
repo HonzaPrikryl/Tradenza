@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { ArrowLeft, ChevronRight, Sparkles, ListChecks, Lock } from 'lucide-react'
+import { ArrowLeft, ChevronRight, ListChecks, Lock, CheckCircle2, Circle } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
@@ -13,11 +13,13 @@ import { t } from '@/i18n'
 import { getUiLocale } from '@/i18n/config'
 import type { DayDetail } from '@/lib/dashboard/types'
 import type { DayRule } from '@/lib/actions/progress'
-import { toggleRuleCompletion } from '@/lib/actions/progress'
+import { toggleRuleCompletion, setDayCheckedIn, markAllSoftDone } from '@/lib/actions/progress'
+import { computeDayStatus, dayInScope, isCleanNoTrade } from '@/lib/progress-compute'
 import { useChartColors, makeTooltipStyle } from '@/components/dashboard/widgets/shared'
 import ProgressRing from './ProgressRing'
 import DailyNoteEditor from './DailyNoteEditor'
-import RuleRow from './RuleRow'
+import DayRulesSections from './DayRulesSections'
+import DayStatusBadge from './DayStatusBadge'
 
 function formatDateHeader(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString(getUiLocale(), {
@@ -45,6 +47,8 @@ export default function DayReviewClient({
   detail,
   rules: initialRules,
   anyRules = true,
+  hasTrades = false,
+  initialCheckedIn = false,
   note,
   currency,
 }: {
@@ -53,24 +57,38 @@ export default function DayReviewClient({
   detail: DayDetail
   rules: DayRule[]
   anyRules?: boolean
+  hasTrades?: boolean
+  initialCheckedIn?: boolean
   note: string
   currency: string
 }) {
   const router = useRouter()
   const c = useChartColors()
   const [rules, setRules] = useState(initialRules)
-  const [, startTransition] = useTransition()
+  const [checkedIn, setCheckedIn] = useState(initialCheckedIn)
+  const [pending, startTransition] = useTransition()
 
   const s = detail.stats
   const color = (s?.netPnl ?? 0) >= 0 ? c.profit : c.loss
 
-  const completedCount = rules.filter((r) => r.completed).length
-  const totalCount = rules.length
-  const ratio = totalCount > 0 ? completedCount / totalCount : 0
-  const perfect = totalCount > 0 && completedCount >= totalCount
+  const hardRules = rules.filter((r) => r.type === 'hard')
+  const softRules = rules.filter((r) => r.type === 'soft')
+  const softDone = softRules.filter((r) => r.completed).length
+  const softTotal = softRules.length
+  const hardTotal = hardRules.length
+  const hardViolations = hardRules.filter((r) => !r.completed).length
+  const ratio = softTotal > 0 ? softDone / softTotal : 0
+  const inScope = dayInScope({
+    hasTrades,
+    checkedIn,
+    hasLoggedRules: rules.some((r) => (r.type === 'hard' ? !r.completed : r.completed)),
+  })
+  const cleanNoTrade = isCleanNoTrade(checkedIn, hasTrades)
+  const status = computeDayStatus({ inScope, cleanNoTrade, hardTotal, hardViolations, softTotal, softDone })
 
   const toggle = (ruleId: string, next: boolean) => {
     if (!editable) return
+    const isHardViolation = rules.find((r) => r.id === ruleId)?.type === 'hard' && next === false
     setRules((arr) => arr.map((r) => (r.id === ruleId ? { ...r, completed: next } : r)))
     startTransition(async () => {
       try {
@@ -79,8 +97,49 @@ export default function DayReviewClient({
           return
         }
         router.refresh()
+        if (isHardViolation) {
+          toast(t('progress.day.hardViolationLogged'), {
+            action: { label: t('progress.day.undo'), onClick: () => toggle(ruleId, true) },
+          })
+        }
       } catch (err) {
         setRules((arr) => arr.map((r) => (r.id === ruleId ? { ...r, completed: !next } : r)))
+        toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
+      }
+    })
+  }
+
+  const markAllSoft = () => {
+    if (!editable) return
+    const prev = rules
+    setRules((arr) => arr.map((r) => (r.type === 'soft' ? { ...r, completed: true } : r)))
+    startTransition(async () => {
+      try {
+        if (handleRateLimit(await markAllSoftDone(date))) {
+          setRules(prev)
+          return
+        }
+        router.refresh()
+      } catch (err) {
+        setRules(prev)
+        toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
+      }
+    })
+  }
+
+  const toggleCheckIn = () => {
+    if (!editable) return
+    const next = !checkedIn
+    setCheckedIn(next)
+    startTransition(async () => {
+      try {
+        if (handleRateLimit(await setDayCheckedIn(date, next))) {
+          setCheckedIn(!next)
+          return
+        }
+        router.refresh()
+      } catch (err) {
+        setCheckedIn(!next)
         toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
       }
     })
@@ -233,8 +292,8 @@ export default function DayReviewClient({
               size={60}
               label={
                 <span className="text-sm">
-                  {completedCount}
-                  <span className="text-muted-foreground">/{totalCount}</span>
+                  {softDone}
+                  <span className="text-muted-foreground">/{softTotal}</span>
                 </span>
               }
             />
@@ -243,15 +302,20 @@ export default function DayReviewClient({
                 <ListChecks className="h-4 w-4 text-muted-foreground" />
                 {t('progress.dayReview.rulesTitle')}
               </h3>
-              {perfect ? (
-                <span className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-                  <Sparkles className="h-4 w-4" /> {t('progress.day.allDone')}
-                </span>
-              ) : (
-                <span className="mt-1 block text-xs text-muted-foreground">
-                  {t('progress.day.completedOf', { completed: completedCount, total: totalCount })}
-                </span>
-              )}
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                {rules.length > 0 && <DayStatusBadge status={status} className="text-xs" />}
+                {hardTotal > 0 && (
+                  <span
+                    className={cn('text-xs font-medium', hardViolations > 0 ? 'text-loss' : 'text-muted-foreground')}
+                  >
+                    {hardViolations > 0
+                      ? hardViolations === 1
+                        ? t('progress.hardBroken.one')
+                        : t('progress.hardBroken.other', { count: hardViolations })
+                      : t('progress.day.hardClean', { total: hardTotal })}
+                  </span>
+                )}
+              </div>
             </div>
             <Link
               href="/progress"
@@ -268,16 +332,38 @@ export default function DayReviewClient({
             </div>
           )}
 
-          {totalCount === 0 ? (
+          {editable && !hasTrades && (
+            <div className="mb-3">
+              <button
+                type="button"
+                onClick={toggleCheckIn}
+                aria-pressed={checkedIn}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
+                  checkedIn
+                    ? 'border-primary/40 bg-primary/10 text-primary'
+                    : 'border-border text-muted-foreground hover:bg-accent/50',
+                )}
+              >
+                {checkedIn ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+                {t('progress.day.checkInNoTrade')}
+              </button>
+              <p className="mt-1 px-1 text-[11px] text-muted-foreground/80">{t('progress.day.checkInNoTradeHint')}</p>
+            </div>
+          )}
+
+          {rules.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
               {anyRules ? t('progress.day.noScheduledRules') : t('progress.day.noActiveRules')}
             </p>
           ) : (
-            <div className="space-y-1.5">
-              {rules.map((r) => (
-                <RuleRow key={r.id} rule={r} editable={editable} onToggle={toggle} />
-              ))}
-            </div>
+            <DayRulesSections
+              rules={rules}
+              editable={editable}
+              busy={pending}
+              onToggleRule={toggle}
+              onMarkAllSoft={markAllSoft}
+            />
           )}
         </div>
       </div>

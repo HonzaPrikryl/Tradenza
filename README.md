@@ -29,10 +29,10 @@ It is designed for traders who want to improve through data rather than feelings
 ## Highlights
 
 - **Customizable dashboard** — drag-and-drop widget grid (powered by dnd-kit) with savable layout templates. KPI tiles (net P&L, win rate, profit factor, expectancy, average R:R, max drawdown, current streak…) plus larger widgets: a Zella-style score, cumulative P&L curve, net daily P&L, a P&L calendar, top symbols, and a performance breakdown.
-- **Rich trade journal** — per-trade detail with an interactive price chart, multi-execution / multi-leg editor, running P&L, star rating, and structured notes (setup, emotions before/after, mistakes, lessons).
+- **Rich trade journal** — per-trade detail with an interactive price chart, multi-execution / multi-leg editor, running P&L, star rating, and structured notes (setup, emotions before/after, mistakes, lessons). The detail sidebar is fully customizable — show, hide and drag-to-reorder every panel and stat row to build your own review layout, saved to your account.
 - **Strategies & playbooks** — define each setup you trade as a reusable strategy with its own entry and exit checklists, reference screenshots, and color. Assign a strategy to a trade, tick off the checklist you actually followed, and review per-strategy statistics alongside how closely your executions matched the plan. Retired setups can be archived without losing their trade history.
 - **Deep statistics** — win rate (overall, longs, shorts), profit factor, expectancy, planned vs. realized R-multiples, hold-time analysis, consecutive win/loss streaks, day-level stats, fees/commissions breakdown, and more.
-- **Discipline tracking** — define your trading rules, check them off each day, write daily reviews, and watch your streaks on a year-long heatmap. Rules can be paused or archived without losing history.
+- **Discipline tracking** — hold yourself to your own rules, separate from P&L. Split them into _hard_ rules (non-negotiable risk limits — one breach turns the day red) and _soft_ habits (scored by how many you keep), each on its own weekday schedule. Every day is graded green / amber / red on a year-long heatmap, with clean-day streaks, a 30-day discipline trend, per-rule and per-weekday consistency, daily reviews, and a "does discipline pay off?" breakdown of average daily P&L and R-multiple by day type. Rules can be paused or archived without losing history.
 - **Trading accounts** — built around the prop-firm workflow (firm, phase, account size, starting balance, currency). Assign trades to accounts and filter everything by account.
 - **Flexible import** — guided import wizard for CSV exports (large catalog of broker formats), with automatic de-duplication and a full import history.
 - **Tags & categories** — color-coded tags grouped into categories (e.g. _Setup type_, _Mistake_), assignable to trades and usable as filters.
@@ -200,7 +200,7 @@ src/
 │   ├── actions/                # Server Actions (trades, stats, import, accounts, tags, progress, dashboard, candles, strategies, wizard, admin, feedback)
 │   ├── dashboard/              # Widget compute + default templates
 │   ├── stats-compute.ts        # Pure statistics engine (unit-tested)
-│   ├── progress-compute.ts     # Streak / discipline math
+│   ├── progress-compute.ts     # Discipline scoring, streaks & payoff math
 │   ├── futures.ts              # Futures contract multipliers
 │   ├── trade-pnl.ts            # P&L calculations
 │   └── ...                     # csv-columns, brokers, global-filters, date-tz, utils…

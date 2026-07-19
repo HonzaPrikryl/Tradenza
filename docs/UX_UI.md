@@ -130,6 +130,7 @@ The trade detail screen is the journaling heart of the app:
 - **Star rating** — a quick subjective grade of execution quality.
 - **Tags panel** — assign color-coded tags/categories.
 - **Strategy & playbook** — link the trade to one of your strategies, then tick off its **entry** and **exit** checklist items as you review. The trade records how faithfully you followed the plan, which rolls up into per-strategy adherence stats.
+- **Customizable sidebar** — a gear-menu (`SidebarSettings`, dnd-kit) lets the trader show, hide and drag-to-reorder every sidebar panel (running P&L, strategy, details, risk, tags) and individual stat row (R, ROI, MAE/MFE, entry/exit times, star rating…), with a one-click reset. Preferences are saved to the user's account (`SidebarPrefs`), so a review layout persists across trades and sessions rather than living in one browser.
 
 The structure nudges the trader past "did I win?" toward "did I execute well, and what do I repeat or avoid?".
 
@@ -141,9 +142,10 @@ Discipline (Progress) → Day [date]
 
 Separate from P&L, the **Discipline** area tracks _process_:
 
-- Define **rules** ("No revenge trading", "Wait for confirmation"). Rules can be reordered, paused, or archived — archived rules stop applying going forward but keep counting toward the days they were active, preserving history.
-- Each day, check off the rules you followed and write a **daily note / review**.
-- A **year heatmap**, **progress rings**, and **streaks** visualize consistency over time, turning discipline into a game you can see yourself winning.
+- Define **rules** in two tiers: **hard** rules — non-negotiable risk limits ("No revenge trading") where a single breach turns the whole day red — and **soft** habits ("Wait for confirmation") scored by how many you keep. Each rule runs on its own weekday schedule, and rules can be reordered, paused, or archived — archived rules stop applying going forward but keep counting toward the days they were active, preserving history.
+- Each day, check off the habits you kept (or flag a hard-rule breach), mark a disciplined no-trade day, and write a **daily note / review**. Every day is graded **green / amber / red** from the rules that actually applied that day — never punishing you for a rule that wasn't in effect yet.
+- A **year heatmap**, **clean-day streaks** (with a flame that grows as the run gets longer), and a **30-day discipline trend** visualize consistency over time, while **per-rule** and **per-weekday** breakdowns show where it slips.
+- A **"does discipline pay off?"** view buckets your trading days by how disciplined they were and compares the **average daily P&L and R-multiple** — turning "process over P&L" from a slogan into a number.
 
 ### 4.5 Analyzing performance
 

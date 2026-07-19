@@ -1,142 +1,17 @@
 'use client'
 
-import { useLayoutEffect, useRef, useState } from 'react'
-import { Check, X, Sparkles, CalendarDays, Loader2, ArrowRight } from 'lucide-react'
-import * as Tooltip from '@radix-ui/react-tooltip'
+import { CalendarDays, Loader2, ArrowRight, CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { getUiLocale } from '@/i18n/config'
-import { useMediaQuery } from '@/hooks/useMediaQuery'
-import type { DayProgress, DayRule } from '@/lib/actions/progress'
+import type { DayProgress } from '@/lib/actions/progress'
 import ProgressRing from './ProgressRing'
-import RuleRow from './RuleRow'
+import DayRulesSections from './DayRulesSections'
+import DayStatusBadge from './DayStatusBadge'
 
 export function prettyDate(key: string): string {
   const [y, m, d] = key.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString(getUiLocale(), { weekday: 'long', month: 'long', day: 'numeric' })
-}
-
-interface RowControls {
-  editable?: boolean
-  busy?: boolean
-  onToggle?: (ruleId: string, next: boolean) => void
-}
-
-const GAP = 6
-const FOOTER = 36
-
-function ClampedRuleList({ rules, controls }: { rules: DayRule[]; controls?: RowControls }) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const measureRefs = useRef<(HTMLDivElement | null)[]>([])
-  const [visible, setVisible] = useState(rules.length)
-
-  useLayoutEffect(() => {
-    const compute = () => {
-      const c = containerRef.current
-      if (!c) return
-      const avail = c.clientHeight
-      const heights = measureRefs.current.map((el) => el?.offsetHeight ?? 0)
-
-      let totalAll = 0
-      heights.forEach((h, i) => {
-        totalAll += h + (i > 0 ? GAP : 0)
-      })
-      if (totalAll <= avail) {
-        setVisible(rules.length)
-        return
-      }
-
-      const target = avail - FOOTER - GAP
-      let cum = 0
-      let count = 0
-      for (let i = 0; i < heights.length; i++) {
-        const add = heights[i] + (i > 0 ? GAP : 0)
-        if (cum + add > target) break
-        cum += add
-        count++
-      }
-      setVisible(Math.max(1, count))
-    }
-
-    compute()
-    const ro = new ResizeObserver(compute)
-    if (containerRef.current) ro.observe(containerRef.current)
-    window.addEventListener('resize', compute)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('resize', compute)
-    }
-  }, [rules])
-
-  const hidden = Math.max(0, rules.length - visible)
-  const shown = hidden > 0 ? rules.slice(0, visible) : rules
-
-  return (
-    <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden">
-      <div className="invisible absolute inset-x-0 top-0 space-y-1.5" aria-hidden>
-        {rules.map((r, i) => (
-          <div
-            key={r.id}
-            ref={(el) => {
-              measureRefs.current[i] = el
-            }}
-          >
-            <RuleRow rule={r} />
-          </div>
-        ))}
-      </div>
-
-      <div className="absolute inset-0 space-y-1.5">
-        {shown.map((r) => (
-          <RuleRow key={r.id} rule={r} {...controls} />
-        ))}
-
-        {hidden > 0 && (
-          <Tooltip.Provider delayDuration={80}>
-            <Tooltip.Root>
-              <Tooltip.Trigger asChild>
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-background/40 px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
-                >
-                  {t('progress.day.moreRules', { count: hidden })}
-                </button>
-              </Tooltip.Trigger>
-              <Tooltip.Portal>
-                <Tooltip.Content
-                  side="top"
-                  align="end"
-                  sideOffset={6}
-                  className="z-[60] max-h-72 w-64 overflow-auto rounded-lg border border-border bg-popover p-2 shadow-2xl animate-fade-in"
-                >
-                  <div className="space-y-1">
-                    {rules.slice(visible).map((r) => (
-                      <div key={r.id} className="flex items-center gap-2 text-xs">
-                        <span
-                          className={cn(
-                            'flex h-4 w-4 shrink-0 items-center justify-center rounded',
-                            r.completed ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-                          )}
-                        >
-                          {r.completed ? (
-                            <Check className="h-3 w-3" strokeWidth={3} />
-                          ) : (
-                            <X className="h-3 w-3" strokeWidth={3} />
-                          )}
-                        </span>
-                        <span className="truncate text-foreground/90">{r.name}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <Tooltip.Arrow className="fill-[hsl(var(--popover))]" />
-                </Tooltip.Content>
-              </Tooltip.Portal>
-            </Tooltip.Root>
-          </Tooltip.Provider>
-        )}
-      </div>
-    </div>
-  )
 }
 
 export default function DaySummaryPanel({
@@ -146,6 +21,8 @@ export default function DaySummaryPanel({
   editable = false,
   busy = false,
   onToggleRule,
+  onToggleCheckIn,
+  onMarkAllSoft,
 }: {
   day: DayProgress
   loading?: boolean
@@ -154,35 +31,58 @@ export default function DaySummaryPanel({
   editable?: boolean
   busy?: boolean
   onToggleRule?: (ruleId: string, next: boolean) => void
+  /** Toggle the no-trade check-in (only meaningful when editable + no trades). */
+  onToggleCheckIn?: () => void
+  /** Mark every soft habit done in one tap (editable days with unfinished habits). */
+  onMarkAllSoft?: () => void
 }) {
-  const controls: RowControls = { editable, busy, onToggle: onToggleRule }
-  const { completedCount, totalCount } = day
-  const ratio = totalCount > 0 ? completedCount / totalCount : 0
-  const perfect = totalCount > 0 && completedCount >= totalCount
-  const clamp = useMediaQuery('(min-width: 1280px)')
+  const { softDone, softTotal, hardTotal, hardViolations, status } = day
+  const ratio = softTotal > 0 ? softDone / softTotal : 0
+  const totalRules = day.rules.length
+
+  // On an explicit no-trade CHECK-IN day soft habits don't apply, so the ring reflects
+  // only hard-rule cleanliness (full & green when respected, empty when a hard rule
+  // broke) rather than a misleading "0/10 soft" reading. A no-trade day that was NOT
+  // checked in still scores by its soft ratio, like any other day.
+  const cleanNoTrade = status !== 'none' && day.checkedIn && !day.hasTrades
+  const ringRatio = cleanNoTrade ? (hardViolations > 0 ? 0 : 1) : ratio
 
   const emptyMessage = day.anyRules ? t('progress.day.noScheduledRules') : t('progress.day.noActiveRules')
   const message =
-    totalCount === 0
+    totalRules === 0
       ? emptyMessage
-      : perfect
-        ? t('progress.process.perfect')
-        : completedCount > 0
-          ? t('progress.process.partial', { completed: completedCount, total: totalCount })
-          : t('progress.process.none')
+      : status === 'none'
+        ? t('progress.process.noScope')
+        : hardViolations > 0
+          ? t('progress.process.hardBroken', { count: hardViolations })
+          : cleanNoTrade
+            ? t('progress.process.noTrade')
+            : status === 'green'
+              ? t('progress.process.green')
+              : status === 'yellow'
+                ? t('progress.process.yellow', { completed: softDone, total: softTotal })
+                : t('progress.process.redSoft', { completed: softDone, total: softTotal })
 
   return (
     <div className="flex h-full flex-col gap-4 rounded-xl border border-border bg-card p-4 sm:p-5">
       {/* Header */}
       <div className="flex items-center gap-4">
         <ProgressRing
-          ratio={ratio}
+          ratio={ringRatio}
           size={64}
           label={
-            <span className="text-base">
-              {completedCount}
-              <span className="text-muted-foreground">/{totalCount}</span>
-            </span>
+            cleanNoTrade ? (
+              hardViolations > 0 ? (
+                <span className="text-base text-loss">✕</span>
+              ) : (
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+              )
+            ) : (
+              <span className="text-base">
+                {softDone}
+                <span className="text-muted-foreground">/{softTotal}</span>
+              </span>
+            )
           }
         />
         <div className="min-w-0 flex-1">
@@ -191,14 +91,15 @@ export default function DaySummaryPanel({
             {prettyDate(day.date)}
             {loading && <Loader2 className="h-3 w-3 animate-spin" />}
           </div>
-          <div className="mt-1">
-            {perfect ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/15 px-2 py-1 text-sm font-semibold text-primary">
-                <Sparkles className="h-4 w-4" /> {t('progress.day.allDone')}
-              </span>
-            ) : (
-              <span className="text-sm font-semibold text-foreground">
-                {t('progress.day.completedOf', { completed: completedCount, total: totalCount })}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {totalRules > 0 && <DayStatusBadge status={status} />}
+            {hardTotal > 0 && (
+              <span className={cn('text-xs font-medium', hardViolations > 0 ? 'text-loss' : 'text-muted-foreground')}>
+                {hardViolations > 0
+                  ? hardViolations === 1
+                    ? t('progress.hardBroken.one')
+                    : t('progress.hardBroken.other', { count: hardViolations })
+                  : t('progress.day.hardClean', { total: hardTotal })}
               </span>
             )}
           </div>
@@ -209,29 +110,57 @@ export default function DaySummaryPanel({
       <div
         className={cn(
           'rounded-lg border px-3 py-2.5 text-sm',
-          perfect
+          status === 'green'
             ? 'border-primary/30 bg-primary/10 text-foreground'
-            : 'border-border bg-muted/40 text-muted-foreground',
+            : status === 'red'
+              ? 'border-loss/30 bg-loss/10 text-foreground'
+              : status === 'yellow'
+                ? 'border-amber-500/30 bg-amber-500/10 text-foreground'
+                : 'border-border bg-muted/40 text-muted-foreground',
         )}
       >
-        <span className="font-medium text-foreground">{t('progress.process.headline')}.</span> {message}
+        {message}
       </div>
 
-      <div className={cn('flex flex-col', clamp && 'min-h-0 flex-1')}>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          {t('progress.day.rulesTitle')}
-        </h3>
-        {totalCount === 0 ? (
+      {/* No-trade check-in: puts today into scope so it scores by the rules below,
+          instead of the user having to open the day detail to find this control. */}
+      {editable && !day.hasTrades && (
+        <button
+          type="button"
+          onClick={onToggleCheckIn}
+          disabled={busy}
+          aria-pressed={day.checkedIn}
+          title={t('progress.day.checkInNoTradeHint')}
+          className={cn(
+            'flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-60',
+            day.checkedIn
+              ? 'border-primary/40 bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:bg-accent/50',
+          )}
+        >
+          {day.checkedIn ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+          {t('progress.day.checkInNoTrade')}
+        </button>
+      )}
+
+      {/* Rules — one bounded, scrollable block. On xl the panel is height-matched
+          to the calendar column (see ProgressClient), so this list caps at the
+          trend card's bottom edge and only scrolls when the rules don't fit; it
+          never grows the row. Below xl it just caps at a fixed max height. */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {totalRules === 0 ? (
           <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
             {emptyMessage}
           </p>
-        ) : clamp ? (
-          <ClampedRuleList key={day.date} rules={day.rules} controls={controls} />
         ) : (
-          <div className="space-y-1.5">
-            {day.rules.map((r) => (
-              <RuleRow key={r.id} rule={r} {...controls} />
-            ))}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 max-xl:max-h-[26rem]">
+            <DayRulesSections
+              rules={day.rules}
+              editable={editable}
+              busy={busy}
+              onToggleRule={onToggleRule}
+              onMarkAllSoft={onMarkAllSoft}
+            />
           </div>
         )}
       </div>

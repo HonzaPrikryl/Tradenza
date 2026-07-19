@@ -40,7 +40,7 @@ import {
 import { saveTemplate, renameTemplate, deleteTemplate } from '@/lib/actions/dashboard'
 import { track } from '@/lib/analytics'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
-import { t } from '@/i18n'
+import { t, tRich } from '@/i18n'
 import { getWidgetDef, MAIN_WIDGETS } from './widget-registry'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import SortableWidgetCard from './SortableWidgetCard'
@@ -176,9 +176,8 @@ export default function DashboardEditor({ kind, template, initialLayout, onClose
     if (!canDelete || !template?.id) return
     const ok = await confirm({
       title: t('dashboard.editor.deleteTitle'),
-      message: t('dashboard.editor.deleteMessage', { name: template.name }),
-      confirmLabel: t('common.delete'),
-      danger: true,
+      message: tRich('dashboard.editor.deleteMessage', { name: template.name }),
+      variant: 'delete',
     })
     if (!ok) return
     startTransition(async () => {

@@ -26,10 +26,12 @@ export default async function DayReviewPage({ params }: { params: Promise<{ date
   return (
     <DayReviewClient
       date={date}
-      editable={date === today}
+      editable={date <= today}
       detail={detail}
       rules={dayProgress.rules}
       anyRules={dayProgress.anyRules}
+      hasTrades={dayProgress.hasTrades}
+      initialCheckedIn={dayProgress.checkedIn}
       note={note}
       currency="USD"
     />

@@ -105,11 +105,30 @@
     background-color: hsl(158 74% 72%);
     border-color: hsl(158 80% 82%);
   }
+  .heat-notrade {
+    background-image: linear-gradient(
+      135deg,
+      transparent 20%,
+      hsl(158 46% 34%) 20%,
+      hsl(158 46% 34%) 32%,
+      transparent 32%,
+      transparent 44%,
+      hsl(158 46% 34%) 44%,
+      hsl(158 46% 34%) 56%,
+      transparent 56%,
+      transparent 68%,
+      hsl(158 46% 34%) 68%,
+      hsl(158 46% 34%) 80%,
+      transparent 80%
+    );
+    background-origin: border-box;
+    border-color: hsl(158 48% 40%);
+  }
 
   /* Light mode: pale → deep, perfect darkest. */
   .light .heat-l1 {
-    background-color: hsl(158 52% 86%);
-    border-color: hsl(158 48% 76%);
+    background-color: hsl(158 55% 76%);
+    border-color: hsl(158 52% 64%);
   }
   .light .heat-l2 {
     background-color: hsl(158 56% 70%);
@@ -126,6 +145,41 @@
   .light .heat-perfect {
     background-color: hsl(158 72% 26%);
     border-color: hsl(158 76% 18%);
+  }
+  .light .heat-notrade {
+    background-image: linear-gradient(
+      135deg,
+      transparent 20%,
+      hsl(158 56% 70%) 20%,
+      hsl(158 56% 70%) 32%,
+      transparent 32%,
+      transparent 44%,
+      hsl(158 56% 70%) 44%,
+      hsl(158 56% 70%) 56%,
+      transparent 56%,
+      transparent 68%,
+      hsl(158 56% 70%) 68%,
+      hsl(158 56% 70%) 80%,
+      transparent 80%
+    );
+    border-color: hsl(158 54% 60%);
+  }
+
+  .day-yellow {
+    background-color: hsl(42 92% 52%);
+    border-color: hsl(42 94% 62%);
+  }
+  .day-red {
+    background-color: hsl(0 72% 55%);
+    border-color: hsl(0 74% 65%);
+  }
+  .light .day-yellow {
+    background-color: hsl(38 95% 45%);
+    border-color: hsl(34 92% 37%);
+  }
+  .light .day-red {
+    background-color: hsl(2 74% 47%);
+    border-color: hsl(2 72% 39%);
   }
 }
 
@@ -368,4 +422,46 @@
 }
 .animate-sheet-up {
   animation: sheet-up 0.25s ease-out;
+}
+
+@keyframes streak-flicker {
+  0%,
+  100% {
+    opacity: 0.85;
+    transform: translateY(0) scaleY(1);
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-1px) scaleY(1.1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: translateY(0) scaleY(0.94);
+  }
+  75% {
+    opacity: 0.95;
+    transform: translateY(-0.5px) scaleY(1.05);
+  }
+}
+@keyframes streak-glow {
+  0%,
+  100% {
+    opacity: var(--streak-glow-min, 0.2);
+  }
+  50% {
+    opacity: var(--streak-glow-max, 0.45);
+  }
+}
+.streak-flame {
+  transform-origin: bottom center;
+  animation: streak-flicker 1.4s ease-in-out infinite;
+}
+.streak-glow {
+  animation: streak-glow 2.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .streak-flame,
+  .streak-glow {
+    animation: none;
+  }
 }
