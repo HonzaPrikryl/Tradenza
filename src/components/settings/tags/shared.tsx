@@ -7,6 +7,7 @@ import UiModal from '@/components/ui/Modal'
 // ─── Shared constants & types ─────────────────────────────────────────────────
 
 export const PALETTE = [
+  '#64748b',
   '#6366f1',
   '#8b5cf6',
   '#ec4899',
@@ -15,9 +16,10 @@ export const PALETTE = [
   '#10b981',
   '#06b6d4',
   '#3b82f6',
-  '#64748b',
   '#84cc16',
 ]
+
+export const DEFAULT_COLOR = PALETTE[0]
 
 export const inputClass =
   'w-full rounded-md border border-border bg-input/40 px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary'

@@ -11,7 +11,7 @@ import { useSelection } from '@/hooks/useSelection'
 import Select from '@/components/ui/Select'
 import { createTagGroup, createTag, updateTagGroup, deleteTagGroup } from '@/lib/actions/tags'
 import ActionMenu from '@/components/ui/ActionMenu'
-import { ColorPicker, Modal, PALETTE, inputClass, labelClass, type Category } from './shared'
+import { ColorPicker, Modal, DEFAULT_COLOR, inputClass, labelClass, type Category } from './shared'
 
 export default function CategoriesView({ categories, onChanged }: { categories: Category[]; onChanged: () => void }) {
   const confirm = useConfirm()
@@ -20,7 +20,7 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
   const sel = useSelection()
   const [dialog, setDialog] = useState<{ mode: 'new' | 'edit'; cat?: Category } | null>(null)
   const [name, setName] = useState('')
-  const [color, setColor] = useState(PALETTE[0])
+  const [color, setColor] = useState(DEFAULT_COLOR)
   const [saving, setSaving] = useState(false)
   const [tagList, setTagList] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
@@ -46,7 +46,7 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
 
   const openNew = () => {
     setName('')
-    setColor(PALETTE[categories.length % PALETTE.length])
+    setColor(DEFAULT_COLOR)
     setTagList([])
     setTagInput('')
     setDialog({ mode: 'new' })
