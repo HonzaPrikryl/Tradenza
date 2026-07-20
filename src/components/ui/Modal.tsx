@@ -1,6 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import Dialog from './Dialog'
 
 /**
@@ -28,15 +29,15 @@ export default function Modal({
   className?: string
 }) {
   return (
-    <Dialog onClose={onClose} className={className}>
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
+    <Dialog onClose={onClose} className={cn('flex flex-col overflow-y-hidden', className)}>
+      <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
         <h2 className="text-base font-semibold">{title}</h2>
         <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
           <X className="h-4 w-4" />
         </button>
       </div>
-      <div className="space-y-4 px-6 py-5">{children}</div>
-      <div className="flex items-center justify-end gap-3 border-t border-border px-6 py-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">{children}</div>
+      <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-4">
         <button onClick={onClose} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground">
           {cancelLabel}
         </button>

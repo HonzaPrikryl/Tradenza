@@ -43,13 +43,20 @@ export default function Dialog({
   if (!open || !mounted) return null
 
   return createPortal(
-    <div className={cn('fixed inset-0 flex items-center justify-center', z)} role="dialog" aria-modal="true">
+    <div
+      className={cn('fixed inset-0 flex items-center justify-center overflow-y-auto overscroll-contain p-4', z)}
+      role="dialog"
+      aria-modal="true"
+    >
       <div
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
         onClick={closeOnBackdrop ? onClose : undefined}
       />
       <div
-        className={cn('relative mx-4 w-full max-w-md rounded-lg border border-border bg-card shadow-2xl', className)}
+        className={cn(
+          'relative my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-card shadow-2xl',
+          className,
+        )}
       >
         {children}
       </div>
