@@ -44,7 +44,22 @@ const updateTagSchema = nameColorSchema.extend({
 // Both the trades table and the tag manager read from the same source of truth.
 function revalidateTags() {
   revalidatePath('/trades')
+  revalidatePath('/trades/[id]', 'page')
   revalidatePath('/settings/tags')
+}
+
+/**
+ * The colour a tag must carry: its category's, or the requested one when the tag
+ * is ungrouped. Keeping this in one place is what stops the denormalised
+ * `tags.color` from drifting away from `tag_groups.color`.
+ */
+async function colorForGroup(userId: string, groupId: string | null | undefined, fallback: string) {
+  if (!groupId) return fallback
+  const group = await db.query.tagGroups.findFirst({
+    where: and(eq(tagGroups.id, groupId), eq(tagGroups.userId, userId)),
+    columns: { color: true },
+  })
+  return group?.color ?? fallback
 }
 
 export const getTagGroups = authedAction([], async ({ userId }): Promise<TagGroupWithValues[]> => {
@@ -113,11 +128,25 @@ export const reorderTagGroups = mutationAction([uuidArray], async ({ userId }, o
 })
 
 export const updateTagGroup = mutationAction([uuid, nameColorSchema], async ({ userId }, id, { name, color }) => {
-  const [group] = await db
-    .update(tagGroups)
-    .set({ name, color })
-    .where(and(eq(tagGroups.id, id), eq(tagGroups.userId, userId)))
-    .returning()
+  const group = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(tagGroups)
+      .set({ name, color })
+      .where(and(eq(tagGroups.id, id), eq(tagGroups.userId, userId)))
+      .returning()
+    if (!updated) return undefined
+
+    // A tag has no colour of its own — it wears its category's. The colour is
+    // denormalised onto the row (every reader joins tags, not groups), so
+    // recolouring a category has to cascade or the copies go stale.
+    await tx
+      .update(tags)
+      .set({ color })
+      .where(and(eq(tags.groupId, id), eq(tags.userId, userId)))
+
+    return updated
+  })
+
   revalidateTags()
   return { success: true, group }
 })
@@ -142,7 +171,7 @@ export const createTag = mutationAction([valueSchema], async ({ userId }, { name
 
   const [tag] = await db
     .insert(tags)
-    .values({ userId, name, color, groupId: groupId ?? null })
+    .values({ userId, name, color: await colorForGroup(userId, groupId, color), groupId: groupId ?? null })
     .returning()
 
   revalidateTags()
@@ -151,7 +180,17 @@ export const createTag = mutationAction([valueSchema], async ({ userId }, { name
 
 export const updateTag = mutationAction([uuid, updateTagSchema], async ({ userId }, id, { name, color, groupId }) => {
   const set: { name: string; color: string; groupId?: string | null } = { name, color }
-  if (groupId !== undefined) set.groupId = groupId || null
+  if (groupId !== undefined) {
+    set.groupId = groupId || null
+    // Moving a tag into a category adopts that category's colour.
+    set.color = await colorForGroup(userId, set.groupId, color)
+  } else {
+    const current = await db.query.tags.findFirst({
+      where: and(eq(tags.id, id), eq(tags.userId, userId)),
+      columns: { groupId: true },
+    })
+    set.color = await colorForGroup(userId, current?.groupId, color)
+  }
   const [tag] = await db
     .update(tags)
     .set(set)
