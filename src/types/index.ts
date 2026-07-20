@@ -92,6 +92,7 @@ export interface TradeFilters {
   maxPnl?: number
   page?: number
   pageSize?: number
-  sortBy?: 'entryDatetime' | 'netPnl' | 'symbol' | 'riskRewardRatio'
+  /** `riskRewardRatio` is the legacy alias for `rMultiple` (old URLs/cookies). */
+  sortBy?: 'entryDatetime' | 'netPnl' | 'symbol' | 'rMultiple' | 'riskRewardRatio'
   sortOrder?: 'asc' | 'desc'
 }

@@ -76,7 +76,9 @@ function generate(now: Date): Trade[] {
       const exitPrice = round2(entryPrice + (grossPnl / qty) * dir)
 
       const riskAmount = round2(80 + rng() * 240)
-      const rr = round2(netPnl / riskAmount)
+      // Planned reward-to-risk, matching the 2R target set below. (The realized
+      // R-multiple is derived from netPnl / riskAmount, it is not stored.)
+      const rr = 2
       const stopLoss = round2(direction === 'long' ? entryPrice - riskAmount / qty : entryPrice + riskAmount / qty)
       const takeProfit = round2(
         direction === 'long' ? entryPrice + (riskAmount * 2) / qty : entryPrice - (riskAmount * 2) / qty,

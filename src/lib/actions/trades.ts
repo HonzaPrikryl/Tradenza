@@ -1,7 +1,7 @@
 'use server'
 
 import { db, trades, tags, tradeTags, accounts, strategies } from '@/lib/db'
-import { eq, and, or, desc, asc, gte, lte, ilike, inArray, count } from 'drizzle-orm'
+import { eq, and, or, desc, asc, gte, lte, ilike, inArray, count, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { tradeFormSchema, type TradeFilters } from '@/types'
 import { calculatePnl, calculateRR } from '@/lib/utils'
@@ -12,6 +12,7 @@ import { readGlobalFilters } from '@/lib/global-filters'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { generalConditions } from './filter-sql'
 import { getDemoTrades } from '@/lib/demo/trades'
+import { realizedR } from '@/lib/r-multiple'
 import { userHasTrades } from '@/lib/demo/detect'
 import { z } from 'zod'
 import { uuid, uuidArray } from '@/lib/validation'
@@ -404,7 +405,9 @@ const tradeFiltersSchema = z
     maxPnl: z.number().optional(),
     page: z.number().int().positive().optional(),
     pageSize: z.number().int().positive().max(500).optional(),
-    sortBy: z.enum(['entryDatetime', 'netPnl', 'symbol', 'riskRewardRatio']).optional(),
+    // `riskRewardRatio` is the legacy key for the R column (it used to sort by the
+    // planned R:R); it is still accepted from old URLs/cookies and treated as `rMultiple`.
+    sortBy: z.enum(['entryDatetime', 'netPnl', 'symbol', 'rMultiple', 'riskRewardRatio']).optional(),
     sortOrder: z.enum(['asc', 'desc']).optional(),
   })
   .default({})
@@ -477,6 +480,15 @@ export const getTrades = authedAction([tradeFiltersSchema], async ({ userId }, f
   if (!(await userHasTrades(userId))) {
     const all = [...getDemoTrades()]
     all.sort((a, b) => {
+      if (sortBy === 'rMultiple' || sortBy === 'riskRewardRatio') {
+        // Mirror the SQL ordering: trades without an R always sit at the bottom.
+        const av = realizedR(a.netPnl, a.riskAmount)
+        const bv = realizedR(b.netPnl, b.riskAmount)
+        if (av === null && bv === null) return 0
+        if (av === null) return 1
+        if (bv === null) return -1
+        return sortOrder === 'asc' ? av - bv : bv - av
+      }
       let cmp: number
       if (sortBy === 'netPnl') cmp = Number(a.netPnl ?? 0) - Number(b.netPnl ?? 0)
       else if (sortBy === 'symbol') cmp = a.symbol.localeCompare(b.symbol)
@@ -497,19 +509,19 @@ export const getTrades = authedAction([tradeFiltersSchema], async ({ userId }, f
   const conditions = await buildTradeConditions(userId, filters)
 
   const orderFn = sortOrder === 'asc' ? asc : desc
-  const orderColumn =
-    sortBy === 'netPnl'
-      ? trades.netPnl
-      : sortBy === 'symbol'
-        ? trades.symbol
-        : sortBy === 'riskRewardRatio'
-          ? trades.riskRewardRatio
-          : trades.entryDatetime
+  const orderBy =
+    sortBy === 'rMultiple' || sortBy === 'riskRewardRatio'
+      ? // Realized R-multiple is derived, not stored — sort on the same expression
+        // the R filter uses so the column and the filter always agree. Trades with
+        // no initial risk have no R, so they are parked at the bottom in both
+        // directions instead of heading the list on the first click.
+        sql`(${trades.netPnl}::numeric / nullif(${trades.riskAmount}::numeric, 0)) ${sql.raw(sortOrder === 'asc' ? 'asc' : 'desc')} nulls last`
+      : orderFn(sortBy === 'netPnl' ? trades.netPnl : sortBy === 'symbol' ? trades.symbol : trades.entryDatetime)
 
   const [rows, totalResult] = await Promise.all([
     db.query.trades.findMany({
       where: and(...conditions),
-      orderBy: [orderFn(orderColumn)],
+      orderBy: [orderBy],
       limit: pageSize,
       offset: (page - 1) * pageSize,
       with: {
