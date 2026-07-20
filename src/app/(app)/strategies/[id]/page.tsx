@@ -8,6 +8,16 @@ import StrategyEquityChart from '@/components/strategies/StrategyEquityChart'
 import StrategyDetailActions from '@/components/strategies/StrategyDetailActions'
 import StrategyImageGallery from '@/components/strategies/StrategyImageGallery'
 import SortableTradesTable from '@/components/trades/SortableTradesTable'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeadRow,
+  TableHeaderCell,
+  TableRow,
+} from '@/components/ui/Table'
 import { formatCurrency, cn } from '@/lib/utils'
 import type { ChecklistAnalytics, ComplianceSplit, CriterionPerformance } from '@/lib/strategy-checklist'
 import { t } from '@/i18n'
@@ -203,19 +213,29 @@ function PlaybookPerformance({ checklist }: { checklist: ChecklistAnalytics }) {
         <ComplianceTile label={t('strategies.detail.playbook.partial')} split={partial} />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-              <th className="py-2 pr-3 text-left font-medium">{t('strategies.detail.playbook.criterion')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('strategies.detail.playbook.followed')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('strategies.detail.playbook.winFollowed')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('strategies.detail.playbook.winMissed')}</th>
-              <th className="px-3 py-2 text-right font-medium">{t('strategies.detail.playbook.pnlFollowed')}</th>
-              <th className="py-2 pl-3 text-right font-medium">{t('strategies.detail.playbook.pnlMissed')}</th>
-            </tr>
-          </thead>
-          <tbody>
+      <TableContainer bordered={false}>
+        <Table>
+          <TableHead>
+            <TableHeadRow className="bg-transparent uppercase tracking-wide">
+              <TableHeaderCell className="py-2 pl-0 pr-3">{t('strategies.detail.playbook.criterion')}</TableHeaderCell>
+              <TableHeaderCell align="right" className="px-3 py-2">
+                {t('strategies.detail.playbook.followed')}
+              </TableHeaderCell>
+              <TableHeaderCell align="right" className="px-3 py-2">
+                {t('strategies.detail.playbook.winFollowed')}
+              </TableHeaderCell>
+              <TableHeaderCell align="right" className="px-3 py-2">
+                {t('strategies.detail.playbook.winMissed')}
+              </TableHeaderCell>
+              <TableHeaderCell align="right" className="px-3 py-2">
+                {t('strategies.detail.playbook.pnlFollowed')}
+              </TableHeaderCell>
+              <TableHeaderCell align="right" className="py-2 pl-3 pr-0">
+                {t('strategies.detail.playbook.pnlMissed')}
+              </TableHeaderCell>
+            </TableHeadRow>
+          </TableHead>
+          <TableBody>
             {groups.map((g) => (
               <Fragment key={g.kind}>
                 <tr>
@@ -233,9 +253,9 @@ function PlaybookPerformance({ checklist }: { checklist: ChecklistAnalytics }) {
                   ))}
               </Fragment>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </TableContainer>
 
       {anyHurts && (
         <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -268,8 +288,8 @@ function CriterionRow({ c }: { c: CriterionPerformance }) {
   const thin = 'text-muted-foreground/40'
 
   return (
-    <tr className="border-b border-border last:border-0">
-      <td className="py-2 pr-3">
+    <TableRow className="border-border">
+      <TableCell className="py-2 pl-0 pr-3">
         <span className="flex items-start gap-2">
           <span className="leading-snug">{c.text}</span>
           {hurts && (
@@ -279,21 +299,29 @@ function CriterionRow({ c }: { c: CriterionPerformance }) {
             />
           )}
         </span>
-      </td>
-      <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-muted-foreground">
+      </TableCell>
+      <TableCell align="right" className="whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground">
         {c.followed}/{c.total} · {Math.round(c.followedPct)}%
-      </td>
-      <td className={cn('px-3 py-2 text-right tabular-nums', followedThin && thin)}>{asPct(c.winRateFollowed)}</td>
-      <td className={cn('px-3 py-2 text-right tabular-nums text-muted-foreground', missedThin && thin)}>
+      </TableCell>
+      <TableCell align="right" className={cn('px-3 py-2 tabular-nums', followedThin && thin)}>
+        {asPct(c.winRateFollowed)}
+      </TableCell>
+      <TableCell align="right" className={cn('px-3 py-2 tabular-nums text-muted-foreground', missedThin && thin)}>
         {asPct(c.winRateMissed)}
-      </td>
-      <td className={cn('px-3 py-2 text-right tabular-nums', followedThin ? thin : pnlClass(c.avgPnlFollowed ?? 0))}>
+      </TableCell>
+      <TableCell
+        align="right"
+        className={cn('px-3 py-2 tabular-nums', followedThin ? thin : pnlClass(c.avgPnlFollowed ?? 0))}
+      >
         {asMoney(c.avgPnlFollowed)}
-      </td>
-      <td className={cn('py-2 pl-3 text-right tabular-nums', missedThin ? thin : pnlClass(c.avgPnlMissed ?? 0))}>
+      </TableCell>
+      <TableCell
+        align="right"
+        className={cn('py-2 pl-3 pr-0 tabular-nums', missedThin ? thin : pnlClass(c.avgPnlMissed ?? 0))}
+      >
         {asMoney(c.avgPnlMissed)}
-      </td>
-    </tr>
+      </TableCell>
+    </TableRow>
   )
 }
 

@@ -12,7 +12,12 @@ import Select from '@/components/ui/Select'
 import { UNGROUPED_ID } from '@/lib/tags-constants'
 import { createTag, updateTag, deleteTag } from '@/lib/actions/tags'
 import ActionMenu from '@/components/ui/ActionMenu'
+import DataTable from '@/components/ui/DataTable'
+import { tagColumns, categoryLabel } from './columns'
+import type { SortDir } from '@/components/ui/DataTable'
 import { Modal, inputClass, labelClass, type Category, type FlatTag } from './shared'
+
+type TagSortKey = 'name' | 'category' | 'used'
 
 export default function TagsView({
   tags,
@@ -32,6 +37,8 @@ export default function TagsView({
   const [dialog, setDialog] = useState<{ mode: 'new' | 'edit'; tag?: FlatTag } | null>(null)
   const [name, setName] = useState('')
   const [categoryId, setCategoryId] = useState<string>(UNGROUPED_ID)
+  const [sortKey, setSortKey] = useState<TagSortKey>('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [saving, setSaving] = useState(false)
 
   const inheritedColor = (catId: string): string => {
@@ -41,7 +48,7 @@ export default function TagsView({
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return tags.filter((tg) => {
+    const filtered = tags.filter((tg) => {
       if (filter !== 'all') {
         const fid = filter === UNGROUPED_ID ? null : filter
         if (tg.categoryId !== fid) return false
@@ -49,12 +56,23 @@ export default function TagsView({
       if (q && !tg.name.toLowerCase().includes(q)) return false
       return true
     })
-  }, [tags, filter, search])
+    return [...filtered].sort((a, b) => {
+      let cmp: number
+      if (sortKey === 'used') cmp = a.used - b.used
+      else if (sortKey === 'category')
+        cmp = categoryLabel(a).localeCompare(categoryLabel(b)) || a.name.localeCompare(b.name)
+      else cmp = a.name.localeCompare(b.name)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [tags, filter, search, sortKey, sortDir])
 
-  const rowIds = rows.map((r) => r.id)
-  const allChecked = sel.allSelected(rowIds)
-  const toggleAll = () => sel.toggleAll(rowIds)
-  const toggle = (id: string) => sel.toggle(id)
+  const onSort = (key: TagSortKey) => {
+    if (key === sortKey) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortKey(key)
+      setSortDir(key === 'used' ? 'desc' : 'asc')
+    }
+  }
 
   const filterOptions = [
     { value: 'all', label: t('settings.tagsManagement.allCategories') },
@@ -88,7 +106,7 @@ export default function TagsView({
     try {
       const res =
         dialog?.mode === 'edit' && dialog.tag
-          ? await updateTag(dialog.tag.id, { name: name.trim(), color })
+          ? await updateTag(dialog.tag.id, { name: name.trim(), color, groupId })
           : await createTag({ name: name.trim(), color, groupId: groupId ?? undefined })
       if (handleRateLimit(res)) return
       toast.success(
@@ -180,71 +198,28 @@ export default function TagsView({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-y border-border bg-muted/30 text-xs text-muted-foreground">
-              <th className="w-12 px-5 py-3 text-left">
-                <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-primary" />
-              </th>
-              <th className="px-3 py-3 text-left font-medium">{t('settings.tagsManagement.col.tagName')}</th>
-              <th className="px-3 py-3 text-left font-medium">{t('settings.tagsManagement.col.category')}</th>
-              <th className="px-3 py-3 text-left font-medium">{t('settings.tagsManagement.col.used')}</th>
-              <th className="w-12 px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((tg) => (
-              <tr key={tg.id} className="border-b border-border/60 transition-colors hover:bg-accent/40 last:border-0">
-                <td className="px-5 py-3">
-                  <input
-                    type="checkbox"
-                    checked={sel.has(tg.id)}
-                    onChange={() => toggle(tg.id)}
-                    className="accent-primary"
-                  />
-                </td>
-                <td className="px-3 py-3">
-                  <span className="inline-flex items-center gap-2 font-medium text-foreground">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tg.categoryColor }} />
-                    {tg.name}
-                  </span>
-                </td>
-                <td className="px-3 py-3">
-                  <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: tg.categoryColor }} />
-                    {tg.categoryId === null ? t('settings.tagsManagement.ungrouped') : tg.categoryName}
-                  </span>
-                </td>
-                <td className="px-3 py-3 tabular text-muted-foreground">{tg.used}</td>
-                <td className="px-5 py-3">
-                  <div className="flex justify-end">
-                    <ActionMenu
-                      width={168}
-                      items={[
-                        { key: 'edit', label: t('settings.tagsManagement.rowMenu.edit'), icon: Pencil },
-                        {
-                          key: 'delete',
-                          label: t('settings.tagsManagement.rowMenu.delete'),
-                          icon: Trash2,
-                          danger: true,
-                        },
-                      ]}
-                      onSelect={(k) => (k === 'edit' ? openEdit(tg) : remove(tg))}
-                    />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length === 0 && (
-          <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-            {t('settings.tagsManagement.emptyTags')}
-          </div>
+      <DataTable
+        bordered={false}
+        data={rows}
+        rowKey={(tg) => tg.id}
+        selection={sel}
+        manualSorting
+        sort={{ by: sortKey, order: sortDir }}
+        onSortChange={(s) => onSort(s.by as TagSortKey)}
+        empty={t('settings.tagsManagement.emptyTags')}
+        className="border-y border-border"
+        columns={tagColumns}
+        actions={(tg) => (
+          <ActionMenu
+            width={168}
+            items={[
+              { key: 'edit', label: t('settings.tagsManagement.rowMenu.edit'), icon: Pencil },
+              { key: 'delete', label: t('settings.tagsManagement.rowMenu.delete'), icon: Trash2, danger: true },
+            ]}
+            onSelect={(k) => (k === 'edit' ? openEdit(tg) : remove(tg))}
+          />
         )}
-      </div>
+      />
 
       {dialog && (
         <Modal
@@ -266,12 +241,10 @@ export default function TagsView({
               className={inputClass}
             />
           </div>
-          {dialog.mode === 'new' && (
-            <div>
-              <label className={labelClass}>{t('settings.tagsManagement.categoryLabel')}</label>
-              <Select value={categoryId} onValueChange={setCategoryId} options={categoryOptions} />
-            </div>
-          )}
+          <div>
+            <label className={labelClass}>{t('settings.tagsManagement.categoryLabel')}</label>
+            <Select value={categoryId} onValueChange={setCategoryId} options={categoryOptions} />
+          </div>
         </Modal>
       )}
     </div>

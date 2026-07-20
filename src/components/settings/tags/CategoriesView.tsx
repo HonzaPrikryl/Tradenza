@@ -11,6 +11,8 @@ import { useSelection } from '@/hooks/useSelection'
 import Select from '@/components/ui/Select'
 import { createTagGroup, createTag, updateTagGroup, deleteTagGroup } from '@/lib/actions/tags'
 import ActionMenu from '@/components/ui/ActionMenu'
+import DataTable from '@/components/ui/DataTable'
+import { categoryColumns } from './columns'
 import { ColorPicker, Modal, DEFAULT_COLOR, inputClass, labelClass, type Category } from './shared'
 
 export default function CategoriesView({ categories, onChanged }: { categories: Category[]; onChanged: () => void }) {
@@ -38,11 +40,6 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
     const filtered = q ? categories.filter((c) => c.name.toLowerCase().includes(q)) : categories
     return [...filtered].sort((a, b) => (sort === 'asc' ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name)))
   }, [categories, search, sort])
-
-  const rowIds = rows.map((r) => r.id)
-  const allChecked = sel.allSelected(rowIds)
-  const toggleAll = () => sel.toggleAll(rowIds)
-  const toggle = (id: string) => sel.toggle(id)
 
   const openNew = () => {
     setName('')
@@ -189,61 +186,28 @@ export default function CategoriesView({ categories, onChanged }: { categories: 
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-y border-border bg-muted/30 text-xs text-muted-foreground">
-              <th className="w-12 px-5 py-3 text-left">
-                <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-primary" />
-              </th>
-              <th className="px-3 py-3 text-left font-medium">{t('settings.tagsManagement.col.categoryName')}</th>
-              <th className="px-3 py-3 text-left font-medium">{t('settings.tagsManagement.col.color')}</th>
-              <th className="w-12 px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((c) => (
-              <tr key={c.id} className="border-b border-border/60 transition-colors hover:bg-accent/40 last:border-0">
-                <td className="px-5 py-3">
-                  <input
-                    type="checkbox"
-                    checked={sel.has(c.id)}
-                    onChange={() => toggle(c.id)}
-                    className="accent-primary"
-                  />
-                </td>
-                <td className="px-3 py-3 font-medium text-foreground">{c.name}</td>
-                <td className="px-3 py-3">
-                  <span className="inline-block h-5 w-5 rounded-full" style={{ backgroundColor: c.color }} />
-                </td>
-                <td className="px-5 py-3">
-                  <div className="flex justify-end">
-                    <ActionMenu
-                      width={168}
-                      items={[
-                        { key: 'edit', label: t('settings.tagsManagement.rowMenu.edit'), icon: Pencil },
-                        {
-                          key: 'delete',
-                          label: t('settings.tagsManagement.rowMenu.delete'),
-                          icon: Trash2,
-                          danger: true,
-                        },
-                      ]}
-                      onSelect={(k) => (k === 'edit' ? openEdit(c) : remove(c))}
-                    />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {rows.length === 0 && (
-          <div className="px-5 py-12 text-center text-sm text-muted-foreground">
-            {t('settings.tagsManagement.emptyCategories')}
-          </div>
+      <DataTable
+        bordered={false}
+        data={rows}
+        rowKey={(c) => c.id}
+        selection={sel}
+        sort={{ by: 'name', order: sort }}
+        onSortChange={(s) => setSort(s.order)}
+        manualSorting
+        empty={t('settings.tagsManagement.emptyCategories')}
+        className="border-y border-border"
+        columns={categoryColumns}
+        actions={(c) => (
+          <ActionMenu
+            width={168}
+            items={[
+              { key: 'edit', label: t('settings.tagsManagement.rowMenu.edit'), icon: Pencil },
+              { key: 'delete', label: t('settings.tagsManagement.rowMenu.delete'), icon: Trash2, danger: true },
+            ]}
+            onSelect={(k) => (k === 'edit' ? openEdit(c) : remove(c))}
+          />
         )}
-      </div>
+      />
 
       {dialog && (
         <Modal

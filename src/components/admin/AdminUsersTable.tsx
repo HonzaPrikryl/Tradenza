@@ -3,93 +3,12 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
-import SortableTh from '@/components/ui/SortableTh'
-import { useTableSort } from '@/hooks/useTableSort'
+import DataTable, { type DataTableColumn } from '@/components/ui/DataTable'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import type { UserOverviewRow } from '@/lib/actions/admin'
 
-type SortKey =
-  | 'id'
-  | 'name'
-  | 'email'
-  | 'tradeCount'
-  | 'journaledCount'
-  | 'accountCount'
-  | 'reviewCount'
-  | 'createdAt'
-  | 'lastActiveAt'
-
-const SORT_KEYS: SortKey[] = [
-  'id',
-  'name',
-  'email',
-  'tradeCount',
-  'journaledCount',
-  'accountCount',
-  'reviewCount',
-  'createdAt',
-  'lastActiveAt',
-]
 const STORAGE_KEY = 'tradenza-admin-users-sort'
-
-interface Column {
-  key: SortKey
-  labelKey: string
-  align: 'left' | 'right'
-  kind: 'text' | 'num' | 'date'
-  width: string
-  muted?: boolean
-  mono?: boolean
-}
-
-const COLUMNS: Column[] = [
-  {
-    key: 'id',
-    labelKey: 'admin.users.columns.id',
-    align: 'left',
-    kind: 'text',
-    width: 'w-[210px]',
-    muted: true,
-    mono: true,
-  },
-  { key: 'name', labelKey: 'admin.users.columns.name', align: 'left', kind: 'text', width: 'w-[150px]' },
-  { key: 'email', labelKey: 'admin.users.columns.email', align: 'left', kind: 'text', width: 'w-[220px]', muted: true },
-  { key: 'tradeCount', labelKey: 'admin.users.columns.trades', align: 'right', kind: 'num', width: 'w-[90px]' },
-  {
-    key: 'journaledCount',
-    labelKey: 'admin.users.columns.journaled',
-    align: 'right',
-    kind: 'num',
-    width: 'w-[100px]',
-    muted: true,
-  },
-  { key: 'accountCount', labelKey: 'admin.users.columns.accounts', align: 'right', kind: 'num', width: 'w-[95px]' },
-  {
-    key: 'reviewCount',
-    labelKey: 'admin.users.columns.reviews',
-    align: 'right',
-    kind: 'num',
-    width: 'w-[90px]',
-    muted: true,
-  },
-  {
-    key: 'createdAt',
-    labelKey: 'admin.users.columns.joined',
-    align: 'left',
-    kind: 'date',
-    width: 'w-[110px]',
-    muted: true,
-  },
-  {
-    key: 'lastActiveAt',
-    labelKey: 'admin.users.columns.lastActive',
-    align: 'left',
-    kind: 'date',
-    width: 'w-[120px]',
-    muted: true,
-  },
-]
 
 function fullName(u: UserOverviewRow): string {
   return [u.firstName, u.lastName].filter(Boolean).join(' ').trim() || u.username || ''
@@ -101,68 +20,92 @@ function formatDate(value: string | null): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-CA')
 }
 
-function sortValue(u: UserOverviewRow, key: SortKey): string | number {
-  switch (key) {
-    case 'id':
-      return u.id.toLowerCase()
-    case 'name':
-      return fullName(u).toLowerCase() || '￿'
-    case 'email':
-      return (u.email ?? '￿').toLowerCase()
-    case 'createdAt':
-      return u.createdAt ? new Date(u.createdAt).getTime() : 0
-    case 'lastActiveAt':
-      return u.lastActiveAt ? new Date(u.lastActiveAt).getTime() : 0
-    default:
-      return u[key] as number
+/** Numeric column shared shape: right-aligned, sorted high-to-low first. */
+function numColumn(
+  key: 'tradeCount' | 'journaledCount' | 'accountCount' | 'reviewCount',
+  labelKey: string,
+  width: string,
+  muted = false,
+): DataTableColumn<UserOverviewRow> {
+  return {
+    key,
+    header: t(labelKey),
+    sortable: true,
+    align: 'right',
+    initialSortDir: 'desc',
+    width,
+    sortValue: (u) => u[key],
+    cellClassName: cn('truncate tabular-nums', muted && 'text-muted-foreground'),
+    cell: (u) => u[key],
   }
 }
 
-function cellText(u: UserOverviewRow, key: SortKey): string {
-  switch (key) {
-    case 'id':
-      return u.id
-    case 'name':
-      return fullName(u) || '—'
-    case 'email':
-      return u.email ?? '—'
-    case 'createdAt':
-      return formatDate(u.createdAt)
-    case 'lastActiveAt':
-      return formatDate(u.lastActiveAt)
-    default:
-      return String(u[key] as number)
-  }
-}
+const columns: DataTableColumn<UserOverviewRow>[] = [
+  {
+    key: 'id',
+    header: t('admin.users.columns.id'),
+    sortable: true,
+    width: 'w-[210px]',
+    sortValue: (u) => u.id.toLowerCase(),
+    cellTitle: (u) => u.id,
+    cellClassName: 'truncate font-mono text-xs text-muted-foreground',
+    cell: (u) => u.id,
+  },
+  {
+    key: 'name',
+    header: t('admin.users.columns.name'),
+    sortable: true,
+    width: 'w-[150px]',
+    sortValue: (u) => fullName(u).toLowerCase() || '￿',
+    cellTitle: (u) => fullName(u) || '—',
+    cellClassName: 'truncate font-medium',
+    cell: (u) => fullName(u) || '—',
+  },
+  {
+    key: 'email',
+    header: t('admin.users.columns.email'),
+    sortable: true,
+    width: 'w-[220px]',
+    sortValue: (u) => (u.email ?? '￿').toLowerCase(),
+    cellTitle: (u) => u.email ?? '—',
+    cellClassName: 'truncate text-muted-foreground',
+    cell: (u) => u.email ?? '—',
+  },
+  numColumn('tradeCount', 'admin.users.columns.trades', 'w-[90px]'),
+  numColumn('journaledCount', 'admin.users.columns.journaled', 'w-[100px]', true),
+  numColumn('accountCount', 'admin.users.columns.accounts', 'w-[95px]'),
+  numColumn('reviewCount', 'admin.users.columns.reviews', 'w-[90px]', true),
+  {
+    key: 'createdAt',
+    header: t('admin.users.columns.joined'),
+    sortable: true,
+    initialSortDir: 'desc',
+    width: 'w-[110px]',
+    sortValue: (u) => (u.createdAt ? new Date(u.createdAt).getTime() : 0),
+    cellClassName: 'truncate text-muted-foreground',
+    cell: (u) => formatDate(u.createdAt),
+  },
+  {
+    key: 'lastActiveAt',
+    header: t('admin.users.columns.lastActive'),
+    sortable: true,
+    initialSortDir: 'desc',
+    width: 'w-[120px]',
+    sortValue: (u) => (u.lastActiveAt ? new Date(u.lastActiveAt).getTime() : 0),
+    cellClassName: 'truncate text-muted-foreground',
+    cell: (u) => formatDate(u.lastActiveAt),
+  },
+]
 
 export default function AdminUsersTable({ users }: { users: UserOverviewRow[] }) {
   const router = useRouter()
   const [query, setQuery] = useState('')
-  const { sortBy, sortOrder, toggleSort } = useTableSort({
-    storageKey: STORAGE_KEY,
-    defaultSortBy: 'createdAt',
-    defaultSortOrder: 'desc',
-    validSortKeys: SORT_KEYS,
-    orderForColumn: (column) => {
-      const col = COLUMNS.find((c) => c.key === column)
-      return col?.kind === 'text' ? 'asc' : 'desc'
-    },
-  })
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const filtered = q
-      ? users.filter((u) => [fullName(u), u.email ?? '', u.username ?? ''].some((f) => f.toLowerCase().includes(q)))
-      : users
-    const key = sortBy as SortKey
-    return [...filtered].sort((a, b) => {
-      const va = sortValue(a, key)
-      const vb = sortValue(b, key)
-      if (va < vb) return sortOrder === 'asc' ? -1 : 1
-      if (va > vb) return sortOrder === 'asc' ? 1 : -1
-      return 0
-    })
-  }, [users, query, sortBy, sortOrder])
+    if (!q) return users
+    return users.filter((u) => [fullName(u), u.email ?? '', u.username ?? ''].some((f) => f.toLowerCase().includes(q)))
+  }, [users, query])
 
   return (
     <div>
@@ -181,65 +124,15 @@ export default function AdminUsersTable({ users }: { users: UserOverviewRow[] })
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
-        <table className="w-full min-w-[1185px] table-fixed text-sm">
-          <colgroup>
-            {COLUMNS.map((col) => (
-              <col key={col.key} className={col.width} />
-            ))}
-          </colgroup>
-          <thead>
-            <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-              {COLUMNS.map((col) => (
-                <SortableTh
-                  key={col.key}
-                  label={t(col.labelKey)}
-                  column={col.key}
-                  activeColumn={sortBy}
-                  sortOrder={sortOrder}
-                  onSort={toggleSort}
-                  align={col.align}
-                />
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={COLUMNS.length} className="px-4 py-8 text-center text-muted-foreground">
-                  {t('common.noResults')}
-                </td>
-              </tr>
-            )}
-            {rows.map((u) => (
-              <tr
-                key={u.id}
-                onClick={() => router.push(`/admin/${u.id}`)}
-                className="cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-muted/40"
-              >
-                {COLUMNS.map((col) => {
-                  const text = cellText(u, col.key)
-                  return (
-                    <td
-                      key={col.key}
-                      title={col.kind === 'text' ? text : undefined}
-                      className={cn(
-                        'truncate px-4 py-3',
-                        col.align === 'right' ? 'text-right tabular-nums' : 'text-left',
-                        col.key === 'name' && 'font-medium',
-                        col.muted && 'text-muted-foreground',
-                        col.mono && 'font-mono text-xs',
-                      )}
-                    >
-                      {text}
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={rows}
+        rowKey={(u) => u.id}
+        sortStorageKey={STORAGE_KEY}
+        defaultSort={{ by: 'createdAt', order: 'desc' }}
+        onRowClick={(u) => router.push(`/admin/${u.id}`)}
+        tableClassName="min-w-[1185px] table-fixed"
+      />
     </div>
   )
 }

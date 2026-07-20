@@ -7,7 +7,8 @@ import { Plus, Pencil, Trash2, Target, Search, LayoutGrid, List as ListIcon } fr
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
-import SortableTh from '@/components/ui/SortableTh'
+import DataTable from '@/components/ui/DataTable'
+import { strategyColumns, winRateText, adherenceText } from '@/components/strategies/strategyColumns'
 import StrategyFormModal from '@/components/strategies/StrategyFormModal'
 import { useTableSort } from '@/hooks/useTableSort'
 import { deleteStrategy, type StrategyDTO, type StrategyOverviewRow } from '@/lib/actions/strategies'
@@ -82,9 +83,6 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
       router.refresh()
     }
   }
-
-  const winRateText = (s: StrategyOverviewRow) => (s.tradeCount > 0 ? `${Math.round(s.winRate)}%` : '—')
-  const adherenceText = (s: StrategyOverviewRow) => (s.adherence !== null ? `${Math.round(s.adherence)}%` : '—')
 
   return (
     <div>
@@ -179,97 +177,38 @@ export default function StrategiesClient({ strategies }: { strategies: StrategyO
           ))}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-border bg-card">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-                <SortableTh
-                  label={t('strategies.list.name')}
-                  column="name"
-                  activeColumn={sortKey}
-                  sortOrder={sortDir}
-                  onSort={toggleSort}
-                />
-                <SortableTh
-                  label={t('strategies.stats.trades')}
-                  column="tradeCount"
-                  activeColumn={sortKey}
-                  sortOrder={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                />
-                <SortableTh
-                  label={t('strategies.stats.netPnl')}
-                  column="netPnl"
-                  activeColumn={sortKey}
-                  sortOrder={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                />
-                <SortableTh
-                  label={t('strategies.stats.winRate')}
-                  column="winRate"
-                  activeColumn={sortKey}
-                  sortOrder={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                />
-                <SortableTh
-                  label={t('strategies.stats.adherence')}
-                  column="adherence"
-                  activeColumn={sortKey}
-                  sortOrder={sortDir}
-                  onSort={toggleSort}
-                  align="right"
-                />
-                <th className="w-20 px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((s) => (
-                <tr
-                  key={s.id}
-                  onClick={() => router.push(`/strategies/${s.id}`)}
-                  className="group cursor-pointer border-b border-border transition-colors last:border-0 hover:bg-muted/40"
-                >
-                  <td className="px-4 py-3 font-medium">{s.name}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{s.tradeCount}</td>
-                  <td
-                    className={cn(
-                      'px-4 py-3 text-right tabular-nums',
-                      s.netPnl > 0 ? 'text-profit' : s.netPnl < 0 ? 'text-loss' : undefined,
-                    )}
-                  >
-                    {formatCurrency(s.netPnl)}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{winRateText(s)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{adherenceText(s)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <IconBtn
-                        label={t('strategies.edit')}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openEdit(s)
-                        }}
-                        icon={Pencil}
-                      />
-                      <IconBtn
-                        label={t('strategies.delete.confirm')}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          remove(s)
-                        }}
-                        icon={Trash2}
-                        danger
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          data={rows}
+          rowKey={(s) => s.id}
+          manualSorting
+          sort={{ by: sortKey, order: sortDir }}
+          onSortChange={(next) => toggleSort(next.by)}
+          onRowClick={(s) => router.push(`/strategies/${s.id}`)}
+          rowClassName={() => 'group'}
+          columns={strategyColumns}
+          actionsClassName="w-20"
+          actions={(s) => (
+            <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <IconBtn
+                label={t('strategies.edit')}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openEdit(s)
+                }}
+                icon={Pencil}
+              />
+              <IconBtn
+                label={t('strategies.delete.confirm')}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  remove(s)
+                }}
+                icon={Trash2}
+                danger
+              />
+            </div>
+          )}
+        />
       )}
 
       {modal && (

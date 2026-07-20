@@ -21,12 +21,13 @@ import {
   ArrowRightLeft,
   X,
 } from 'lucide-react'
-import { cn, formatCurrency, formatDateTime } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
-import { getBroker } from '@/lib/brokers'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
 import Select from '@/components/ui/Select'
 import ActionMenu, { type ActionMenuItem } from '@/components/ui/ActionMenu'
+import DataTable from '@/components/ui/DataTable'
+import { accountColumns, balanceOf } from '@/components/accounts/accountColumns'
 import Dialog from '@/components/ui/Dialog'
 import {
   updateAccount,
@@ -68,8 +69,6 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
   const [transferring, setTransferring] = useState<AccountWithStats | null>(null)
   const [transferTarget, setTransferTarget] = useState('')
   const [transferSaving, setTransferSaving] = useState(false)
-
-  const balanceOf = (a: AccountWithStats): number => (a.startingBalance ? Number(a.startingBalance) : 0) + a.netPnl
 
   const rows = useMemo(() => {
     const filtered = accounts.filter((r) => showArchived || !r.archived)
@@ -270,121 +269,31 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border text-xs text-muted-foreground">
-              <th
-                className="px-5 py-3 text-left font-medium cursor-pointer hover:text-foreground"
-                onClick={() => toggleSort('name')}
-              >
-                <div className="flex items-center gap-1">
-                  {t('tradingAccounts.col.name')}
-                  {sortBy === 'name' && (
-                    <span className="text-muted-foreground">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-              <th className="px-5 py-3 text-left font-medium">{t('tradingAccounts.col.broker')}</th>
-              <th
-                className="px-5 py-3 text-left font-medium cursor-pointer hover:text-foreground"
-                onClick={() => toggleSort('balance')}
-              >
-                <div className="flex items-center gap-1">
-                  {t('tradingAccounts.col.balance')}
-                  {sortBy === 'balance' && (
-                    <span className="text-muted-foreground">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-              <th className="px-5 py-3 text-left font-medium">{t('tradingAccounts.col.lastUpdate')}</th>
-              <th className="px-5 py-3 text-left font-medium">{t('tradingAccounts.col.type')}</th>
-              <th className="px-5 py-3 text-right font-medium">{t('tradingAccounts.col.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const broker = getBroker(r.broker ?? undefined)
-              const balance = balanceOf(r)
-              return (
-                <tr
-                  key={r.id}
-                  className={cn(
-                    'border-b border-border/60 transition-colors hover:bg-accent/40 last:border-0',
-                    r.archived && 'opacity-50',
-                  )}
-                >
-                  {/* Account name */}
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-foreground">{r.name}</span>
-                      {r.archived && (
-                        <span className="rounded px-1.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground">
-                          {t('tradingAccounts.archived')}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-
-                  {/* Broker */}
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn(
-                          'flex items-center justify-center w-5 h-5 rounded text-[11px] font-bold shrink-0',
-                          broker?.className ?? 'bg-primary/15 text-primary',
-                        )}
-                      >
-                        {broker?.short ?? (r.firm?.charAt(0) || 'T')}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {broker?.name ?? r.firm ?? t('tradingAccounts.genericBroker')}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Balance */}
-                  <td className="px-5 py-3.5">
-                    <span className={cn('tabular', balance >= 0 ? 'text-foreground' : 'text-loss')}>
-                      {formatCurrency(balance, r.currency)}
-                    </span>
-                  </td>
-
-                  {/* Last update */}
-                  <td className="px-5 py-3.5 text-muted-foreground tabular">
-                    {r.lastTradeAt ? formatDateTime(new Date(r.lastTradeAt)) : '—'}
-                  </td>
-
-                  {/* Type */}
-                  <td className="px-5 py-3.5 text-muted-foreground">
-                    {r.importedCount > 0 ? t('tradingAccounts.type.fileUpload') : t('tradingAccounts.type.manual')}
-                  </td>
-
-                  {/* Actions */}
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        href={`/add-trade/${r.id}`}
-                        className="flex items-center justify-center w-8 h-8 rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-                        aria-label={t('tradingAccounts.addTrade')}
-                        title={t('tradingAccounts.addTrade')}
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Link>
-                      <ActionMenu items={rowMenu(r)} width={208} align="right" onSelect={(k) => onMenu(r, k)} />
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-
-        {rows.length === 0 && (
-          <div className="px-5 py-12 text-center text-sm text-muted-foreground">{t('tradingAccounts.empty')}</div>
+      <DataTable
+        bordered={false}
+        data={rows}
+        rowKey={(r) => r.id}
+        manualSorting
+        sort={{ by: sortBy, order: sortOrder }}
+        onSortChange={(next) => toggleSort(next.by)}
+        empty={t('tradingAccounts.empty')}
+        rowClassName={(r) => (r.archived ? 'opacity-50' : undefined)}
+        columns={accountColumns}
+        actionsClassName="w-24"
+        actions={(r) => (
+          <div className="flex items-center justify-end gap-1">
+            <Link
+              href={`/add-trade/${r.id}`}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+              aria-label={t('tradingAccounts.addTrade')}
+              title={t('tradingAccounts.addTrade')}
+            >
+              <Plus className="h-4 w-4" />
+            </Link>
+            <ActionMenu items={rowMenu(r)} width={208} align="right" onSelect={(k) => onMenu(r, k)} />
+          </div>
         )}
-      </div>
+      />
 
       {/* Transfer dialog */}
       {transferring &&

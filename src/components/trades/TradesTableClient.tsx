@@ -8,7 +8,9 @@ import type { TagGroupWithValues } from '@/lib/actions/tags'
 import type { StrategyDTO } from '@/lib/actions/strategies'
 import type { BreakevenConfig } from '@/lib/breakeven'
 
-const TRADE_SORT_KEYS = ['entryDatetime', 'netPnl', 'symbol', 'riskRewardRatio'] as const
+// `riskRewardRatio` stays valid so bookmarked URLs and the persisted sort from
+// before the R column switched to the realized R-multiple keep working.
+const TRADE_SORT_KEYS = ['entryDatetime', 'netPnl', 'symbol', 'rMultiple', 'riskRewardRatio'] as const
 
 interface Props {
   trades: (Trade & {
@@ -37,5 +39,8 @@ export default function TradesTableClient(props: Props) {
     validSortKeys: TRADE_SORT_KEYS,
   })
 
-  return <TradesTable {...props} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />
+  // Normalise the legacy key so the R column still renders as the active one.
+  const activeSortBy = sortBy === 'riskRewardRatio' ? 'rMultiple' : sortBy
+
+  return <TradesTable {...props} sortBy={activeSortBy} sortOrder={sortOrder} onSort={handleSort} />
 }

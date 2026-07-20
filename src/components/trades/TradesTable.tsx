@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatCurrency, formatDateTimeTz, cn } from '@/lib/utils'
+import { realizedR, formatR } from '@/lib/r-multiple'
 import { deleteTrade, deleteTrades, addTagToTrades, setTradesAccount, getFilteredTradeIds } from '@/lib/actions/trades'
 import { setTradesStrategy, type StrategyDTO } from '@/lib/actions/strategies'
 import { createTag, createTagGroup, type TagGroupWithValues } from '@/lib/actions/tags'
@@ -20,6 +21,17 @@ import ComboCreate, { type ComboOption } from '@/components/ui/ComboCreate'
 import Pagination from '@/components/ui/Pagination'
 import BulkModal from '@/components/trades/BulkModal'
 import ActionMenu from '@/components/ui/ActionMenu'
+import SortableTh from '@/components/ui/SortableTh'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableCheckbox,
+  TableHead,
+  TableHeadRow,
+  TableHeaderCell,
+  TableRow,
+} from '@/components/ui/Table'
 import { useSelection } from '@/hooks/useSelection'
 import { UNGROUPED_ID } from '@/lib/tags-constants'
 import type { TradeFilters } from '@/types'
@@ -37,6 +49,19 @@ const PALETTE = [
   '#3b82f6',
   '#64748b',
   '#84cc16',
+]
+
+/** Column definitions; `sortKey` marks the columns the server can sort by. */
+const COLUMNS: { key: string; labelKey: string; sortKey?: string }[] = [
+  { key: 'symbol', labelKey: 'trades.col.symbol' },
+  { key: 'dir', labelKey: 'trades.col.dir' },
+  { key: 'entry', labelKey: 'trades.col.entry' },
+  { key: 'qty', labelKey: 'trades.col.qty' },
+  { key: 'exit', labelKey: 'trades.col.exit' },
+  { key: 'date', labelKey: 'trades.col.date', sortKey: 'entryDatetime' },
+  { key: 'strategy', labelKey: 'trades.col.strategy' },
+  { key: 'rmultiple', labelKey: 'trades.col.rmultiple', sortKey: 'rMultiple' },
+  { key: 'pnl', labelKey: 'trades.col.pnl', sortKey: 'netPnl' },
 ]
 
 type TradeRow = Trade & {
@@ -401,43 +426,32 @@ export default function TradesTable({
 
       <div className="bg-card border border-border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="w-10 px-4 py-3 text-left">
-                  <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-primary" />
-                </th>
-                {[
-                  { key: 'symbol', label: t('trades.col.symbol') },
-                  { key: 'dir', label: t('trades.col.dir') },
-                  { key: 'entry', label: t('trades.col.entry') },
-                  { key: 'qty', label: t('trades.col.qty') },
-                  { key: 'exit', label: t('trades.col.exit') },
-                  { key: 'date', label: t('trades.col.date'), sortable: true, sortKey: 'entryDatetime' },
-                  { key: 'strategy', label: t('trades.col.strategy') },
-                  { key: 'rmultiple', label: t('trades.col.rmultiple'), sortable: true, sortKey: 'riskRewardRatio' },
-                  { key: 'pnl', label: t('trades.col.pnl'), sortable: true, sortKey: 'netPnl' },
-                ].map((col, i) => (
-                  <th
-                    key={i}
-                    className={cn(
-                      'text-left text-xs font-medium px-4 py-3',
-                      col.sortable && onSort ? 'cursor-pointer hover:text-foreground' : 'text-muted-foreground',
-                    )}
-                    onClick={() => col.sortable && onSort && onSort(col.sortKey!)}
-                  >
-                    <div className="flex items-center gap-1">
-                      {col.label}
-                      {col.sortable && sortBy === col.sortKey && (
-                        <span className="text-muted-foreground">{sortOrder === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </div>
-                  </th>
-                ))}
-                <th className="w-px px-3 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
+          <Table>
+            <TableHead>
+              <TableHeadRow className="bg-transparent">
+                <TableHeaderCell className="w-10">
+                  <TableCheckbox checked={allChecked} onChange={toggleAll} label={t('common.selectAll')} />
+                </TableHeaderCell>
+                {COLUMNS.map((col) =>
+                  col.sortKey && onSort ? (
+                    <SortableTh
+                      key={col.key}
+                      label={t(col.labelKey)}
+                      column={col.sortKey}
+                      activeColumn={sortBy ?? ''}
+                      sortOrder={sortOrder ?? 'desc'}
+                      onSort={onSort}
+                    />
+                  ) : (
+                    <TableHeaderCell key={col.key} className="text-xs">
+                      {t(col.labelKey)}
+                    </TableHeaderCell>
+                  ),
+                )}
+                <TableHeaderCell className="w-px px-3" />
+              </TableHeadRow>
+            </TableHead>
+            <TableBody className="divide-y divide-border">
               {trades.map((trade) => {
                 const pnl = Number(trade.netPnl ?? 0)
                 const outcome = classifyOutcome(
@@ -451,23 +465,17 @@ export default function TradesTable({
                 )
                 const isSel = sel.has(trade.id)
                 return (
-                  <tr
+                  <TableRow
                     key={trade.id}
+                    interactive
+                    selected={isSel}
                     onClick={() => router.push(`/trades/${trade.id}`)}
-                    className={cn(
-                      'cursor-pointer transition-colors group',
-                      isSel ? 'bg-primary/5' : 'hover:bg-accent/40',
-                    )}
+                    className="group border-0"
                   >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={isSel}
-                        onChange={() => toggle(trade.id)}
-                        className="accent-primary"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <TableCheckbox checked={isSel} onChange={() => toggle(trade.id)} label={t('common.selectRow')} />
+                    </TableCell>
+                    <TableCell>
                       <span className="font-mono font-medium">{trade.symbol}</span>
                       {trade.tradeTags && trade.tradeTags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -483,8 +491,8 @@ export default function TradesTable({
                           ))}
                         </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
                       <span
                         className={cn(
                           'text-xs px-1.5 py-0.5 rounded font-medium uppercase',
@@ -493,20 +501,20 @@ export default function TradesTable({
                       >
                         {trade.direction}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 tabular text-xs">{Number(trade.entryPrice).toFixed(4)}</td>
-                    <td className="px-4 py-3 tabular text-xs">{Number(trade.entryQuantity).toFixed(2)}</td>
-                    <td className="px-4 py-3 tabular text-xs">
+                    </TableCell>
+                    <TableCell className="tabular text-xs">{Number(trade.entryPrice).toFixed(4)}</TableCell>
+                    <TableCell className="tabular text-xs">{Number(trade.entryQuantity).toFixed(2)}</TableCell>
+                    <TableCell className="tabular text-xs">
                       {trade.exitPrice ? (
                         Number(trade.exitPrice).toFixed(4)
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                       {formatDateTimeTz(trade.entryDatetime, timezone)}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground max-w-[140px] truncate">
+                    </TableCell>
+                    <TableCell className="max-w-[140px] truncate text-xs text-muted-foreground">
                       {trade.strategy ? (
                         <Link
                           href={`/trades?strategyId=${trade.strategy.id}`}
@@ -518,11 +526,11 @@ export default function TradesTable({
                       ) : (
                         '—'
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {trade.riskRewardRatio ? Number(trade.riskRewardRatio).toFixed(2) : '—'}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground tabular">
+                      {formatR(realizedR(trade.netPnl, trade.riskAmount))}
+                    </TableCell>
+                    <TableCell>
                       {trade.netPnl !== null ? (
                         <span
                           className={cn(
@@ -535,8 +543,8 @@ export default function TradesTable({
                       ) : (
                         <span className="text-muted-foreground">—</span>
                       )}
-                    </td>
-                    <td className="w-px whitespace-nowrap px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                    </TableCell>
+                    <TableCell className="w-px whitespace-nowrap px-3" onClick={(e) => e.stopPropagation()}>
                       <ActionMenu
                         icon="horizontal"
                         width={176}
@@ -549,12 +557,12 @@ export default function TradesTable({
                         ]}
                         onSelect={(k) => rowMenuSelect(trade, k)}
                       />
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 )
               })}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
 
         <Pagination page={page} totalPages={totalPages} total={total} pageSize={pageSize} />

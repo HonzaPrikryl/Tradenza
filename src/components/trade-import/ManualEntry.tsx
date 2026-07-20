@@ -15,6 +15,16 @@ import { forexContractSize } from '@/lib/forex'
 import { getBroker } from '@/lib/brokers'
 import DateTimeField from '@/components/ui/DateTimeField'
 import DateField from '@/components/ui/DateField'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeadRow,
+  TableHeaderCell,
+  TableRow,
+} from '@/components/ui/Table'
 
 const ASSET_CLASSES = ['stocks', 'futures', 'options', 'forex', 'crypto', 'cfd', 'other'] as const
 type AssetClass = (typeof ASSET_CLASSES)[number]
@@ -245,33 +255,33 @@ export default function ManualEntry({
         </p>
       ) : (
         <>
-          <div className="mt-6 overflow-x-auto rounded-xl border border-border">
-            <table className="w-full min-w-[56rem]">
-              <thead>
-                <tr className="bg-muted/40 text-xs text-muted-foreground">
-                  <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.dateTime')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.expDate')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.multiplier')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">
+          <TableContainer className="mt-6">
+            <Table className="min-w-[56rem]">
+              <TableHead>
+                <TableHeadRow className="border-b-0 bg-muted/40">
+                  <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.dateTime')}</TableHeaderCell>
+                  <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.expDate')}</TableHeaderCell>
+                  <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.multiplier')}</TableHeaderCell>
+                  <TableHeaderCell className="px-3 py-2.5">
                     {t(`addTrades.manual.col.${qtyHeaderKey(assetClass)}`)}
-                  </th>
-                  <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.side')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.price')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.comm')}</th>
-                  <th className="px-3 py-2.5 text-left font-medium">{t('addTrades.manual.col.fee')}</th>
-                  <th className="w-16 pl-3 pr-5 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
+                  </TableHeaderCell>
+                  <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.side')}</TableHeaderCell>
+                  <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.price')}</TableHeaderCell>
+                  <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.comm')}</TableHeaderCell>
+                  <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.fee')}</TableHeaderCell>
+                  <TableHeaderCell className="w-16 py-2.5 pl-3 pr-5" />
+                </TableHeadRow>
+              </TableHead>
+              <TableBody>
                 {execs.map((r) => (
-                  <tr key={r.id} className="border-t border-border align-middle">
-                    <td className="px-3 py-2 min-w-[13rem]">
+                  <TableRow key={r.id} className="border-b-0 border-t border-border align-middle">
+                    <TableCell className="px-3 py-2 min-w-[13rem]">
                       <DateTimeField value={r.dateTime} onChange={(v) => update(r.id, { dateTime: v })} />
-                    </td>
-                    <td className="px-3 py-2 min-w-[11rem]">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 min-w-[11rem]">
                       <DateField value={r.expDate} onChange={(v) => update(r.id, { expDate: v })} />
-                    </td>
-                    <td className="px-3 py-2 w-24">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 w-24">
                       <input
                         inputMode="decimal"
                         value={r.multiplier}
@@ -279,8 +289,8 @@ export default function ManualEntry({
                         placeholder="0"
                         className={cn(cellInput, 'tabular')}
                       />
-                    </td>
-                    <td className="px-3 py-2 w-24">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 w-24">
                       <input
                         inputMode="decimal"
                         value={r.qty}
@@ -288,8 +298,8 @@ export default function ManualEntry({
                         placeholder="0"
                         className={cn(cellInput, 'tabular')}
                       />
-                    </td>
-                    <td className="px-3 py-2">
+                    </TableCell>
+                    <TableCell className="px-3 py-2">
                       <div className="inline-flex rounded-md bg-muted/50 p-0.5">
                         {(['buy', 'sell'] as const).map((s) => (
                           <button
@@ -309,8 +319,8 @@ export default function ManualEntry({
                           </button>
                         ))}
                       </div>
-                    </td>
-                    <td className="px-3 py-2 w-28">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 w-28">
                       <input
                         inputMode="decimal"
                         value={r.price}
@@ -318,8 +328,8 @@ export default function ManualEntry({
                         placeholder="0.00"
                         className={cn(cellInput, 'tabular')}
                       />
-                    </td>
-                    <td className="px-3 py-2 w-24">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 w-24">
                       <input
                         inputMode="decimal"
                         value={r.comm}
@@ -327,8 +337,8 @@ export default function ManualEntry({
                         placeholder="0.00"
                         className={cn(cellInput, 'tabular')}
                       />
-                    </td>
-                    <td className="px-3 py-2 w-24">
+                    </TableCell>
+                    <TableCell className="px-3 py-2 w-24">
                       <input
                         inputMode="decimal"
                         value={r.fee}
@@ -336,8 +346,8 @@ export default function ManualEntry({
                         placeholder="0.00"
                         className={cn(cellInput, 'tabular')}
                       />
-                    </td>
-                    <td className="w-16 pl-3 pr-4 py-2 text-center">
+                    </TableCell>
+                    <TableCell className="w-16 pl-3 pr-4 py-2 text-center">
                       <button
                         type="button"
                         onClick={() => setExecs((rows) => rows.filter((x) => x.id !== r.id))}
@@ -347,11 +357,11 @@ export default function ManualEntry({
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-                <tr className="border-t border-border">
-                  <td colSpan={9} className="px-4 py-3">
+                <TableRow className="border-b-0 border-t border-border">
+                  <TableCell colSpan={9} className="px-4 py-3">
                     <button
                       type="button"
                       onClick={addRow}
@@ -360,11 +370,11 @@ export default function ManualEntry({
                       <Plus className="h-4 w-4" />
                       {t('addTrades.manual.createExecution')}
                     </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
 
           {/* Live summary */}
           {summary && (
