@@ -120,9 +120,32 @@ export function authedAction<const S extends SchemaTuple, R>(
       // Anything else is a bug or infra failure: record it with context and
       // surface a generic message so internals never reach the client.
       Sentry.captureException(err, { tags: { component: 'server-action' }, extra: { userId } })
-      throw new ActionError('INTERNAL', t('errors.internal'))
+      throw new ActionError('INTERNAL', internalMessage(err))
     }
   }
+}
+
+/**
+ * Message for an unexpected failure.
+ *
+ * Everywhere except the dev server this is the generic, client-safe text: internals
+ * never leak, and `getActionErrorMessage` refuses to display an INTERNAL message at all.
+ *
+ * On `NODE_ENV === 'development'` the real reason is appended. A bare "Something went
+ * wrong" hides exactly the failures worth seeing while building — a pending migration, a
+ * column typo, a null deref — and sends you hunting through the server log at the moment
+ * the error overlay is covering it. It's also the only way the cause is visible when the
+ * throw happens inside a server component, where there's no client catch to log it.
+ *
+ * The check is an allow-list ('development'), not `!== 'production'`, deliberately: any
+ * other environment — tests, preview, staging, a self-host that forgot to set NODE_ENV —
+ * keeps the sanitized message rather than opting into the leak by default.
+ */
+function internalMessage(err: unknown): string {
+  const generic = t('errors.internal')
+  if (process.env.NODE_ENV !== 'development') return generic
+  const cause = err instanceof Error ? err.message : String(err)
+  return cause ? `${generic} [dev] ${cause}` : generic
 }
 
 /** `authedAction` pre-tagged with the `mutation` rate-limit policy (writes). */

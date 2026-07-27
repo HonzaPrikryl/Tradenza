@@ -111,6 +111,33 @@ describe('authedAction — error handling', () => {
     expect(ctx.extra.userId).toBe('user_42')
   })
 
+  // The sanitized message is the default in EVERY environment except the dev server —
+  // an allow-list, so a preview deploy or a self-host with an unset NODE_ENV can't
+  // accidentally start echoing internals.
+  it('appends the real cause only on the dev server, never elsewhere', async () => {
+    const action = authedAction([], async () => {
+      throw new Error('column "away" does not exist')
+    })
+    const original = process.env.NODE_ENV
+
+    try {
+      for (const env of ['production', 'test', undefined]) {
+        vi.stubEnv('NODE_ENV', env as string)
+        const err = await rejection(action())
+        expect(err.message).toBe(t('errors.internal'))
+        expect(err.message).not.toContain('away')
+      }
+
+      vi.stubEnv('NODE_ENV', 'development')
+      const err = await rejection(action())
+      expect(err.code).toBe('INTERNAL') // still an INTERNAL error, just diagnosable
+      expect(err.message).toContain('column "away" does not exist')
+    } finally {
+      vi.stubEnv('NODE_ENV', original as string)
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('rethrows Next.js control-flow signals without wrapping or reporting them', async () => {
     const redirect = Object.assign(new Error('NEXT_REDIRECT'), { digest: 'NEXT_REDIRECT;replace;/x;307;' })
     const action = authedAction([], async () => {
