@@ -124,6 +124,41 @@
     background-origin: border-box;
     border-color: hsl(158 48% 40%);
   }
+  /* Excused ("don't count this day"). Deliberately the SAME hatch as .heat-unlogged, only
+     tinted: an excused day is not a separate kind of day, it's an unlogged day with a
+     reason, and the two differ in consequence (streak + coverage) rather than in kind. A
+     solid, saturated tile would put it on the same footing as a scored day. */
+  .heat-away {
+    background-image: linear-gradient(
+      135deg,
+      transparent 25%,
+      hsl(205 42% 48%) 25%,
+      hsl(205 42% 48%) 50%,
+      transparent 50%,
+      transparent 75%,
+      hsl(205 42% 48%) 75%
+    );
+    background-size: 6px 6px;
+    background-origin: border-box;
+    border-color: hsl(205 40% 45%);
+  }
+  /* Something was scheduled, nothing was recorded. A grey hatch rather than a colour:
+     there is no score to show, only an empty slot. It breaks the streak and stays out of
+     every average — but it is still editable, like any past day. */
+  .heat-unlogged {
+    background-image: linear-gradient(
+      135deg,
+      transparent 25%,
+      hsl(220 8% 42%) 25%,
+      hsl(220 8% 42%) 50%,
+      transparent 50%,
+      transparent 75%,
+      hsl(220 8% 42%) 75%
+    );
+    background-size: 6px 6px;
+    background-origin: border-box;
+    border-color: hsl(220 8% 48%);
+  }
 
   /* Light mode: pale → deep, perfect darkest. */
   .light .heat-l1 {
@@ -163,6 +198,36 @@
       transparent 80%
     );
     border-color: hsl(158 54% 60%);
+  }
+  /* Light mode carried the dark theme's muted blue onto a white background, where a
+     desaturated mid-tone reads as "another grey" — the one thing this cell must not do,
+     since its whole job is to say "excused, not missed" at a glance. Brighter and much
+     more saturated, with a darker border to hold the 12px square's edge. */
+  .light .heat-away {
+    background-image: linear-gradient(
+      135deg,
+      transparent 25%,
+      hsl(203 82% 62%) 25%,
+      hsl(203 82% 62%) 50%,
+      transparent 50%,
+      transparent 75%,
+      hsl(203 82% 62%) 75%
+    );
+    background-size: 6px 6px;
+    border-color: hsl(203 72% 50%);
+  }
+  .light .heat-unlogged {
+    background-image: linear-gradient(
+      135deg,
+      transparent 25%,
+      hsl(220 8% 72%) 25%,
+      hsl(220 8% 72%) 50%,
+      transparent 50%,
+      transparent 75%,
+      hsl(220 8% 72%) 75%
+    );
+    background-size: 6px 6px;
+    border-color: hsl(220 8% 62%);
   }
 
   .day-yellow {

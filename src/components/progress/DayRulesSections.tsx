@@ -9,13 +9,21 @@ export default function DayRulesSections({
   busy = false,
   onToggleRule,
   onMarkAllSoft,
+  labels,
 }: {
   rules: DayRule[]
   editable?: boolean
   busy?: boolean
   onToggleRule?: (ruleId: string, next: boolean) => void
   onMarkAllSoft?: () => void
+  /**
+   * Section headings. Defaults to the trading wording; the Habits tab passes its own
+   * ("Avoidance" / "Building") so both day panels share one layout — constraints first
+   * in their own block, then the tasks with the bulk-complete shortcut.
+   */
+  labels?: { constraints: string; tasks: string }
 }) {
+  // Constraints (default-satisfied, breach by logging) always render above the tasks.
   const hardRules = rules.filter((r) => r.type === 'hard')
   const softRules = rules.filter((r) => r.type === 'soft')
   const allSoftDone = softRules.every((r) => r.completed)
@@ -25,7 +33,7 @@ export default function DayRulesSections({
       {hardRules.length > 0 && (
         <div>
           <h4 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-loss/80">
-            {t('progress.day.hardTitle')}
+            {labels?.constraints ?? t('progress.day.hardTitle')}
           </h4>
           <div className="space-y-1.5">
             {hardRules.map((r) => (
@@ -38,7 +46,7 @@ export default function DayRulesSections({
         <div>
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {t('progress.day.softTitle')}
+              {labels?.tasks ?? t('progress.day.softTitle')}
             </h4>
             {editable && onMarkAllSoft && !allSoftDone && (
               <button

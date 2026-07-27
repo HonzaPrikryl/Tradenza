@@ -61,7 +61,7 @@ local build entirely. In `docker-compose.yml`, replace the whole `build:` block
 of the `app` service with:
 
 ```yaml
-image: ghcr.io/honzaprikryl/tradenza:latest # or a pinned version, e.g. :0.2.0
+image: ghcr.io/honzaprikryl/tradenza:latest # or a pinned version, e.g. :0.3.0
 ```
 
 then `docker compose up -d` (add `docker compose pull` when upgrading).
@@ -143,7 +143,7 @@ locked to your domain, and configure the `user.deleted` webhook
   ```
 
   On the prebuilt image, `docker compose pull && docker compose up -d`. Pin a
-  version (`:0.2.0`) rather than `:latest` if you'd rather choose when to move.
+  version (`:0.3.0`) rather than `:latest` if you'd rather choose when to move.
   Take a backup before upgrading — see below.
 
 - **Logs** — `docker compose logs -f app` (migration output included).

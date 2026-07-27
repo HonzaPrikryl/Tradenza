@@ -28,6 +28,15 @@ export const feedbackKindEnum = pgEnum('feedback_kind', ['bug', 'idea', 'other']
 //  - 'soft': quality habits. Each contributes to the day's score proportionally.
 //    Stored as completions (a row = the habit was DONE that day).
 export const ruleTypeEnum = pgEnum('rule_type', ['hard', 'soft'])
+// Domain of a discipline rule:
+//  - 'trading': trading-specific rules & habits. Only these drive the day status
+//    (green/yellow/red) and the PnL correlation stats.
+//  - 'habit': general daily habits (sleep, gym, meditation…). Always 'soft'
+//    semantics (a completion row = done). Tracked with own streaks/completion
+//    rate, never affects the trading day status.
+export const ruleCategoryEnum = pgEnum('rule_category', ['trading', 'habit'])
+// Which side of the app an excused day applies to — see dailyCheckins.awayScope.
+export const awayScopeEnum = pgEnum('away_scope', ['both', 'trading', 'habits'])
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 // Lightweight registry of the app's users. Auth stays owned by Clerk (the source
@@ -271,10 +280,13 @@ export const progressRules = pgTable(
     description: text('description'),
     // Rule tier — see ruleTypeEnum. Existing rules migrate to 'soft'.
     ruleType: ruleTypeEnum('rule_type').notNull().default('soft'),
+    // Domain — see ruleCategoryEnum. Existing rules migrate to 'trading'.
+    category: ruleCategoryEnum('category').notNull().default('trading'),
     sortOrder: integer('sort_order').notNull().default(0),
     active: boolean('active').notNull().default(true), // paused (false) vs running (true)
     // ISO weekdays (1=Mon … 7=Sun) on which the rule applies. Default: every day.
-    // Schedule changes apply retroactively — off-days are simply out of scope.
+    // CURRENT schedule only — it runs from the newest row in `progressRuleSchedules`
+    // (or the rule's creation) onwards. Superseded ones live there; see the note.
     activeDays: integer('active_days')
       .array()
       .notNull()
@@ -289,6 +301,38 @@ export const progressRules = pgTable(
   },
   (t) => ({
     userIdIdx: index('progress_rules_user_id_idx').on(t.userId),
+  }),
+)
+
+// Superseded schedules of a rule — what makes a schedule change forward-only, the same way
+// `createdAt` / `archivedAt` make creating and deleting one forward-only.
+//
+// One row per replaced schedule, closed at the day its replacement took effect: the segment
+// covers days < `effectiveTo` and starts where the previous one ended (or at the rule's
+// creation). A rule that was never edited has no rows here and reads as it always did —
+// which is why this needed no data migration. Pauses are recorded the same way, as a segment
+// with an EMPTY `activeDays`, so a paused stretch can't resurface as missed days later.
+export const progressRuleSchedules = pgTable(
+  'progress_rule_schedules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: text('user_id').notNull(),
+    ruleId: uuid('rule_id')
+      .notNull()
+      .references(() => progressRules.id, { onDelete: 'cascade' }),
+    // EXCLUSIVE end, 'yyyy-MM-dd' in the user's timezone: the day the next schedule took
+    // over. A day key, not a timestamp — scoring is per calendar day.
+    effectiveTo: text('effective_to').notNull(),
+    // ISO weekdays (1=Mon … 7=Sun) that applied during the segment. EMPTY = paused.
+    activeDays: integer('active_days').array().notNull(),
+
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => ({
+    userIdIdx: index('progress_rule_schedules_user_id_idx').on(t.userId),
+    // One segment per rule per day: a same-day second edit must not overwrite the first,
+    // which already holds the state as it stood before today. Writers upsert on this.
+    ruleDayUniq: uniqueIndex('progress_rule_schedules_rule_day_uniq').on(t.ruleId, t.effectiveTo),
   }),
 )
 
@@ -320,10 +364,40 @@ export const dailyCheckins = pgTable(
     userId: text('user_id').notNull(),
     date: text('date').notNull(), // 'yyyy-MM-dd'
     note: text('note'),
-    // Explicit "I reviewed this day" marker. Lets a no-trade day still be scored
-    // (e.g. you did your prep and rightly took no trade) — without it, a day is
-    // only in scope when it has trades or logged rules.
+    // Explicit "I reviewed this day" marker — the day's CONFIRMATION. It does two jobs:
+    //  1. it lets a trade-less day be scored at all (you did your prep and rightly took
+    //     no trade), and
+    //  2. together with "at least one logged rule row" it is what makes a day *confirmed*
+    //     rather than merely *unfilled* — see dayConfirmed in progress-compute. Only
+    //     confirmed days feed the discipline→P&L correlation, so a day the user never
+    //     opened can't pass as evidence that the rules were respected.
     checkedIn: boolean('checked_in').notNull().default(false),
+    // "I was away" — holiday, illness, a public holiday, anything that means the day
+    // should not be measured. An away day is NEUTRAL: grey like a day no rule was
+    // scheduled on, excluded from every average, and skipped by the streaks so it
+    // neither extends nor breaks them.
+    //
+    // ONE flag for the whole calendar day, shared by the Trading and Daily tabs — being
+    // away is a fact about you, not about a domain. What makes that safe is that its
+    // EFFECT is evaluated per domain (see dayIsAway): any evidence you turned up beats the
+    // flag, and the evidence differs — trading counts trades and logged rules, habits count
+    // logged habits. So a holiday you nonetheless kept your habits through is excused for
+    // trading and still scored, and credited, for habits.
+    //
+    // It deliberately does NOT touch `checkedIn`. It used to force it false on the grounds
+    // that "I wasn't here" and "I reviewed my trading" contradict each other — but with a
+    // shared flag that meant excusing a day from the Daily tab destroyed the trading review
+    // of that day, irreversibly. The contradiction resolves itself through the
+    // self-negation above; it never needed a destructive write.
+    away: boolean('away').notNull().default(false),
+    // Which domain the excuse covers. Defaults to 'both', so every row that existed before
+    // this column keeps behaving exactly as it did.
+    //
+    // A holiday is one fact about the day, which is why this is a qualifier on the single
+    // flag rather than a second boolean: the ordinary case stays one click and the two can
+    // never drift into a combination nobody meant. It exists for the case the shared flag
+    // couldn't express — a week off the markets that habits should run straight through.
+    awayScope: awayScopeEnum('away_scope').notNull().default('both'),
 
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

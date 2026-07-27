@@ -1,5 +1,6 @@
 {
   "nameRequired": "Name is required",
+  "noteTooLong": "This note is too long to save. Try removing an image or shortening the text.",
   "invalidColor": "Invalid color",
   "symbolRequired": "Symbol is required",
   "entryPricePositive": "Entry price must be positive",

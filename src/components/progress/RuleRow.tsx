@@ -1,17 +1,21 @@
 import { Check, X, ShieldCheck, ShieldAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
+import { ruleModeOf } from '@/lib/progress-compute'
+import Tooltip from '@/components/ui/Tooltip'
 import type { DayRule } from '@/lib/actions/progress'
 
-// Single discipline-rule row, shared by the discipline overview and the day detail.
+// Single rule row, shared by the trading day panel, the day detail and the habits panel.
 //
 // `rule.completed` is the *good* state:
-//   soft habit → done
-//   hard rule  → respected (no violation logged)
+//   task       → done
+//   constraint → not breached (nothing logged)
 //
-// Soft habits use a checkbox (fill on toggle / ✓ · ✗ when read-only). Hard rules
-// default to respected and are flagged as a violation on toggle — a broken hard
-// rule turns the row red.
+// Tasks use a checkbox (fill on toggle / ✓ · ✗ when read-only). Constraints default to
+// satisfied and are flagged as a breach on toggle — a breached constraint turns the row
+// red. The wording of that state follows the rule's MODE (see ruleModeOf), so a trading
+// constraint reads "Respected / Broken" and a daily one "Clean / Slipped" while both
+// visibly behave the same way.
 export default function RuleRow({
   rule,
   editable = false,
@@ -23,8 +27,10 @@ export default function RuleRow({
   busy?: boolean
   onToggle?: (ruleId: string, next: boolean) => void
 }) {
-  const isHard = rule.type === 'hard'
+  const mode = ruleModeOf(rule)
+  const isHard = mode !== 'building'
   const violated = isHard && !rule.completed
+  const stateKey = mode === 'avoidance' ? 'avoidance' : 'strict'
 
   const box = cn(
     'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md transition-colors',
@@ -75,15 +81,18 @@ export default function RuleRow({
           <span
             className={cn('mt-0.5 block text-[11px] font-medium', violated ? 'text-loss' : 'text-muted-foreground/70')}
           >
-            {violated ? t('progress.day.hardBroken') : t('progress.day.hardRespected')}
+            {t(`progress.mode.state.${stateKey}${violated ? 'Bad' : 'Ok'}`)}
           </span>
         )}
       </span>
     </>
   )
 
+  // `transition-colors`, NOT `transition-all`: the latter also animates box-shadow, so the
+  // focus indicator faded in and out on every click as a pale halo around the row — a
+  // flash nobody asked for on what should be an instant tick.
   const base = cn(
-    'flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-all',
+    'flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors',
     violated
       ? 'border-loss/40 bg-loss/10'
       : rule.completed && !isHard
@@ -92,15 +101,34 @@ export default function RuleRow({
   )
 
   if (!editable) return <div className={base}>{inner}</div>
-  return (
+
+  // A checkbox, not a plain button: `role="checkbox"` + `aria-checked` is what tells a
+  // screen reader the row has a state at all — otherwise "done" vs "not done" is conveyed
+  // only by the fill colour and the icon. For a constraint, checked means "breached", so
+  // the label spells that out rather than leaving the polarity to be inferred.
+  const toggle = (
     <button
       type="button"
+      role="checkbox"
+      aria-checked={isHard ? violated : rule.completed}
+      aria-label={isHard ? `${rule.name} — ${t(`progress.mode.toggleHint.${stateKey}`)}` : rule.name}
       disabled={busy}
       onClick={() => onToggle?.(rule.id, !rule.completed)}
-      title={isHard ? t('progress.day.hardToggleHint') : undefined}
-      className={cn(base, 'group hover:border-border hover:bg-accent/50 disabled:opacity-60')}
+      className={cn(
+        base,
+        'group hover:border-border hover:bg-accent/50 disabled:opacity-60',
+        // A border, not a ring: a ring is a box-shadow, and a halo around a full-width row
+        // reads as "something happened" on every click. The border is already part of the
+        // row, so lighting it up is visible to a keyboard user without adding a layer.
+        'focus-visible:border-primary focus-visible:outline-none',
+      )}
     >
       {inner}
     </button>
   )
+
+  // Constraints invert the usual meaning of a tick, so the hint is worth having — but as a
+  // real tooltip, not `title`, which never appears on touch and can't be reached by
+  // keyboard.
+  return isHard ? <Tooltip label={t(`progress.mode.toggleHint.${stateKey}`)}>{toggle}</Tooltip> : toggle
 }

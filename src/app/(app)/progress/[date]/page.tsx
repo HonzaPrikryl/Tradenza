@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getDayProgress, getDailyNote, getTodayKey } from '@/lib/actions/progress'
+import { dayIsOpen } from '@/lib/progress-compute'
+import { DISPLAY_CURRENCY } from '@/lib/progress-format'
 import { getDayDetail } from '@/lib/actions/dashboard'
 import DayReviewClient from '@/components/progress/DayReviewClient'
 import { t } from '@/i18n'
@@ -26,14 +28,20 @@ export default async function DayReviewPage({ params }: { params: Promise<{ date
   return (
     <DayReviewClient
       date={date}
+      today={today}
       editable={date <= today}
+      isOpen={dayIsOpen(date, today)}
       detail={detail}
       rules={dayProgress.rules}
       anyRules={dayProgress.anyRules}
       hasTrades={dayProgress.hasTrades}
       initialCheckedIn={dayProgress.checkedIn}
+      initialAway={dayProgress.away}
+      initialAwayScope={dayProgress.awayScope}
+      initialConfirmed={dayProgress.confirmed}
+      withinHistory={dayProgress.withinHistory}
       note={note}
-      currency="USD"
+      currency={DISPLAY_CURRENCY}
     />
   )
 }

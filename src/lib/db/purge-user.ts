@@ -10,6 +10,7 @@ import {
   importLogs,
   dashboardTemplates,
   progressRules,
+  progressRuleSchedules,
   ruleCompletions,
   dailyCheckins,
   feedback,
@@ -29,6 +30,9 @@ import { isR2Configured, deleteR2Prefix } from '@/lib/r2'
 export async function purgeUserData(userId: string): Promise<void> {
   await runAtomic((x) => [
     x.delete(ruleCompletions).where(eq(ruleCompletions.userId, userId)),
+    // Before the rules (the FK would cascade anyway) — the purge lists every user-scoped
+    // table explicitly so a new one can't be forgotten. See purge-user.test.
+    x.delete(progressRuleSchedules).where(eq(progressRuleSchedules.userId, userId)),
     x.delete(progressRules).where(eq(progressRules.userId, userId)),
     x.delete(screenshots).where(eq(screenshots.userId, userId)),
     x.delete(candleCache).where(eq(candleCache.userId, userId)),

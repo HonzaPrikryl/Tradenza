@@ -36,10 +36,26 @@ interface Props {
   from?: string
   to?: string
   onChange: (from?: string, to?: string) => void
+  /**
+   * Earliest selectable day ("yyyy-MM-dd"). Days before it are disabled, month navigation
+   * stops there and the year dropdown starts at its year — so a bounded picker can't
+   * offer a date the caller would only have to reject afterwards.
+   */
+  min?: string
+  /**
+   * Show the quick-range column (this week, this month, YTD…). On by default for the
+   * global filter; callers whose ranges aren't calendar periods turn it off rather than
+   * offering shortcuts that make no sense for them.
+   *
+   * Turning it off removes the whole right-hand column, Clear included: such a caller owns
+   * its own layout and places Clear where it makes sense there.
+   */
+  showPresets?: boolean
 }
 
-export default function DateRangePicker({ from, to, onChange }: Props) {
+export default function DateRangePicker({ from, to, onChange, min, showPresets = true }: Props) {
   const today = new Date()
+  const minDate = parse(min)
   const [start, setStart] = useState<Date | null>(parse(from))
   const [end, setEnd] = useState<Date | null>(parse(to))
   const [hover, setHover] = useState<Date | null>(null)
@@ -98,8 +114,14 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
   const hi = start && previewEnd ? (start < previewEnd ? previewEnd : start) : start
 
   return (
-    <div className="flex w-full lg:w-auto lg:max-w-[92vw] flex-col sm:flex-row">
-      <div className="min-w-0 mx-auto lg:mx-0">
+    <div
+      className={cn(
+        'flex w-full flex-col sm:flex-row lg:w-auto lg:max-w-[92vw]',
+        // No side column left to sit beside, so the calendar takes the middle.
+        !showPresets && 'sm:justify-center',
+      )}
+    >
+      <div className={cn('min-w-0', showPresets ? 'mx-auto lg:mx-0' : 'mx-auto')}>
         {/* Range summary */}
         <div className="flex items-center justify-center gap-4 border-b border-border px-4 py-3 text-sm">
           <span className={cn(start ? 'font-medium' : 'text-muted-foreground')}>
@@ -112,35 +134,57 @@ export default function DateRangePicker({ from, to, onChange }: Props) {
         </div>
 
         <div className="flex flex-col items-center gap-6 p-3 sm:flex-row sm:items-start sm:gap-4">
-          <MonthCalendar view={leftView} setView={setLeftView} lo={lo} hi={hi} onPick={pick} onHover={setHover} />
-          <MonthCalendar view={rightView} setView={setRightView} lo={lo} hi={hi} onPick={pick} onHover={setHover} />
+          <MonthCalendar
+            view={leftView}
+            setView={setLeftView}
+            lo={lo}
+            hi={hi}
+            onPick={pick}
+            onHover={setHover}
+            min={minDate}
+          />
+          <MonthCalendar
+            view={rightView}
+            setView={setRightView}
+            lo={lo}
+            hi={hi}
+            onPick={pick}
+            onHover={setHover}
+            min={minDate}
+          />
         </div>
       </div>
 
-      <div className="hidden lg:flex shrink-0 flex-col gap-0.5 border-t border-border p-2 sm:border-l sm:border-t-0 sm:py-3">
-        {presets.map((p) => (
-          <button
-            key={p.label}
-            onClick={() => {
-              const [a, b] = p.range()
-              applyRange(a, b)
-            }}
-            className="whitespace-nowrap rounded-md px-3 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            {p.label}
-          </button>
-        ))}
-        {(start || end) && (
-          <div className="mt-2 border-t border-border pt-2">
+      {/* The side column is the quick-ranges column. Without presets there is nothing to
+          put in it, so it goes — a lone "Clear" pinned to the right of an otherwise centred
+          calendar reads as a leftover. Those callers render Clear themselves, next to
+          whatever summary they already show. */}
+      {showPresets && (
+        <div className="hidden shrink-0 flex-col gap-0.5 border-t border-border p-2 sm:border-l sm:border-t-0 sm:py-3 lg:flex">
+          {presets.map((p) => (
             <button
-              onClick={clear}
-              className="w-full whitespace-nowrap rounded-md px-3 py-1.5 text-left text-sm text-loss transition-colors hover:bg-loss/10"
+              key={p.label}
+              onClick={() => {
+                const [a, b] = p.range()
+                applyRange(a, b)
+              }}
+              className="whitespace-nowrap rounded-md px-3 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
-              {t('datepicker.clearRange')}
+              {p.label}
             </button>
-          </div>
-        )}
-      </div>
+          ))}
+          {(start || end) && (
+            <div className="mt-2 border-t border-border pt-2">
+              <button
+                onClick={clear}
+                className="w-full whitespace-nowrap rounded-md px-3 py-1.5 text-left text-sm text-loss transition-colors hover:bg-loss/10"
+              >
+                {t('datepicker.clearRange')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -152,6 +196,7 @@ function MonthCalendar({
   hi,
   onPick,
   onHover,
+  min,
 }: {
   view: Date
   setView: (d: Date) => void
@@ -159,15 +204,22 @@ function MonthCalendar({
   hi: Date | null
   onPick: (d: Date) => void
   onHover: (d: Date | null) => void
+  /** Earliest selectable day; days before it render disabled and can't be picked. */
+  min: Date | null
 }) {
   const monthStart = startOfMonth(view)
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 })
   const gridEnd = endOfWeek(endOfMonth(monthStart), { weekStartsOn: 0 })
   const days = eachDayOfInterval({ start: gridStart, end: gridEnd })
+  const isBlocked = (d: Date) => !!min && d < min && !isSameDay(d, min)
+  // Nothing left to reach: every day of the previous month is out of bounds.
+  const prevBlocked = !!min && endOfMonth(subMonths(view, 1)) < min
 
   const year = view.getFullYear()
   const nowY = new Date().getFullYear()
-  const yearOptions = Array.from({ length: 14 }, (_, i) => nowY - 10 + i).map((y) => ({
+  // Start the dropdown at the bound's year rather than a decade of unreachable ones.
+  const firstY = min ? min.getFullYear() : nowY - 10
+  const yearOptions = Array.from({ length: Math.max(nowY - firstY + 2, 1) }, (_, i) => firstY + i).map((y) => ({
     value: String(y),
     label: String(y),
   }))
@@ -182,7 +234,8 @@ function MonthCalendar({
         <button
           type="button"
           onClick={() => setView(subMonths(view, 1))}
-          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          disabled={prevBlocked}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-30"
           aria-label={t('datepicker.prev')}
         >
           <ChevronLeft className="h-4 w-4" />
@@ -225,6 +278,7 @@ function MonthCalendar({
           const isEnd = hi && isSameDay(day, hi)
           const isEndpoint = !!(isStart || isEnd)
           const single = !!(lo && hi && isSameDay(lo, hi))
+          const blocked = isBlocked(day)
 
           return (
             <button
@@ -232,7 +286,8 @@ function MonthCalendar({
               type="button"
               onClick={() => onPick(day)}
               onMouseEnter={() => onHover(day)}
-              className="relative flex h-9 items-center justify-center"
+              disabled={blocked}
+              className="relative flex h-9 items-center justify-center disabled:pointer-events-none"
             >
               {inRange && !isEndpoint && <span className="absolute inset-0 bg-primary/15" />}
               {isStart && !single && <span className="absolute inset-y-0 left-1/2 right-0 bg-primary/15" />}
@@ -241,6 +296,9 @@ function MonthCalendar({
                 className={cn(
                   'relative z-10 flex h-9 w-9 items-center justify-center text-sm transition-colors',
                   !inMonth && 'text-muted-foreground/40',
+                  // Out of bounds: visibly struck through rather than merely dimmed, so it
+                  // reads as "not available" instead of "belongs to another month".
+                  blocked && 'text-muted-foreground/25 line-through',
                   isEndpoint && 'rounded-full bg-primary font-medium text-primary-foreground',
                   !inRange && isToday(day) && 'rounded-full ring-1 ring-inset ring-primary/50',
                 )}

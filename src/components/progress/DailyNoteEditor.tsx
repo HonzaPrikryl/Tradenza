@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import { Check, Loader2, AlertCircle, CalendarDays } from 'lucide-react'
+import { getActionErrorMessage } from '@/lib/action-error-message'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
@@ -25,8 +27,17 @@ export default function DailyNoteEditor({
   const reviewedRef = useRef(false)
   const { value, state, onChange, flush, reset } = useAutosave(initialNote, async (text) => {
     const empty = isEmptyHtml(text)
-    const res = await setDayNote(date, empty ? '' : text)
-    if (handleRateLimit(res)) return
+    try {
+      const res = await setDayNote(date, empty ? '' : text)
+      if (handleRateLimit(res)) return
+    } catch (err) {
+      // The badge only ever says "save failed". Autosave retries on every pause, so a
+      // note that's over the size limit would silently fail forever — surface the
+      // actionable reason once (a stable toast id keeps the retries from stacking up)
+      // and rethrow so the badge still shows the error state.
+      toast.error(getActionErrorMessage(err, 'trades.detail.saveFailed'), { id: `day-note-${date}` })
+      throw err
+    }
     if (!empty && !reviewedRef.current) {
       reviewedRef.current = true
       track({ name: 'daily_review_completed' })

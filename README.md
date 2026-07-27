@@ -32,7 +32,7 @@ It is designed for traders who want to improve through data rather than feelings
 - **Rich trade journal** — per-trade detail with an interactive price chart, multi-execution / multi-leg editor, running P&L, star rating, and structured notes (setup, emotions before/after, mistakes, lessons). The detail sidebar is fully customizable — show, hide and drag-to-reorder every panel and stat row to build your own review layout, saved to your account.
 - **Strategies & playbooks** — define each setup you trade as a reusable strategy with its own entry and exit checklists, reference screenshots, and color. Assign a strategy to a trade, tick off the checklist you actually followed, and review per-strategy statistics alongside how closely your executions matched the plan. Retired setups can be archived without losing their trade history.
 - **Deep statistics** — win rate (overall, longs, shorts), profit factor, expectancy, planned vs. realized R-multiples, hold-time analysis, consecutive win/loss streaks, day-level stats, fees/commissions breakdown, and more.
-- **Discipline tracking** — hold yourself to your own rules, separate from P&L. Split them into _hard_ rules (non-negotiable risk limits — one breach turns the day red) and _soft_ habits (scored by how many you keep), each on its own weekday schedule. Every day is graded green / amber / red on a year-long heatmap, with clean-day streaks, a 30-day discipline trend, per-rule and per-weekday consistency, daily reviews, and a "does discipline pay off?" breakdown of average daily P&L and R-multiple by day type. Rules can be paused or archived without losing history.
+- **Discipline tracking** — hold yourself to your own rules, separate from P&L, across two tabs: **Trading** rules and **Daily** habits. Every rule is either a _task_ you tick off (scored by how many you keep) or a _constraint_ you must not break — and a breach costs what it should: a trading limit reddens the day on the first breach, a daily habit follows _never miss twice_. Each rule runs on its own weekday schedule. Every day is graded green / amber / red on a year-long heatmap, with clean-day streaks, a 30-day trend, per-rule and per-weekday consistency, daily reviews you can back-fill without a deadline, days you mark as not counted (holiday, illness — per domain or the whole day), and a "does discipline pay off?" breakdown of average daily P&L and R-multiple by day type. Every change is **forward-only**: pausing, archiving or moving a rule's schedule applies from today and never re-scores a day you already lived through.
 - **Trading accounts** — built around the prop-firm workflow (firm, phase, account size, starting balance, currency). Assign trades to accounts and filter everything by account.
 - **Flexible import** — guided import wizard for CSV exports (large catalog of broker formats), with automatic de-duplication and a full import history.
 - **Tags & categories** — color-coded tags grouped into categories (e.g. _Setup type_, _Mistake_), assignable to trades and usable as filters.
@@ -218,6 +218,7 @@ src/
 │   ├── dashboard/              # Widget compute + default templates
 │   ├── stats-compute.ts        # Pure statistics engine (unit-tested)
 │   ├── progress-compute.ts     # Discipline scoring, streaks & payoff math
+│   ├── progress-format.ts      # Shared discipline formatting (dates, heatmap cell copy)
 │   ├── futures.ts              # Futures contract multipliers
 │   ├── trade-pnl.ts            # P&L calculations
 │   └── ...                     # csv-columns, brokers, global-filters, date-tz, utils…
@@ -249,19 +250,20 @@ Adopting migrations on an **existing** database (already has the tables but no m
 
 ### Schema overview
 
-| Table                                                    | Purpose                                                                              |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `users`                                                  | User records synced from Clerk (email, name) — used by admin & data purge            |
-| `accounts`                                               | Trading accounts (prop-firm model: firm, phase, size, currency)                      |
-| `trades`                                                 | Core trade records (entry/exit, P&L, risk, journaling fields)                        |
-| `strategies`                                             | Reusable playbooks: entry/exit checklists, reference images, color; linked to trades |
-| `tag_groups` / `tags` / `trade_tags`                     | Color-coded tags grouped into categories, linked to trades                           |
-| `screenshots`                                            | Trade screenshots (R2 URLs)                                                          |
-| `market_candles`                                         | Cached OHLC data for the trade detail chart                                          |
-| `import_logs`                                            | One row per import — counts, errors, created trade IDs                               |
-| `dashboard_templates`                                    | Saved dashboard layouts per user                                                     |
-| `progress_rules` / `rule_completions` / `daily_checkins` | Discipline rules, daily completions, and daily review notes                          |
-| `feedback`                                               | In-app user feedback submissions (surfaced in the admin panel)                       |
+| Table                                        | Purpose                                                                                                                     |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `users`                                      | User records synced from Clerk (email, name) — used by admin & data purge                                                   |
+| `accounts`                                   | Trading accounts (prop-firm model: firm, phase, size, currency)                                                             |
+| `trades`                                     | Core trade records (entry/exit, P&L, risk, journaling fields)                                                               |
+| `strategies`                                 | Reusable playbooks: entry/exit checklists, reference images, color; linked to trades                                        |
+| `tag_groups` / `tags` / `trade_tags`         | Color-coded tags grouped into categories, linked to trades                                                                  |
+| `screenshots`                                | Trade screenshots (R2 URLs)                                                                                                 |
+| `market_candles`                             | Cached OHLC data for the trade detail chart                                                                                 |
+| `import_logs`                                | One row per import — counts, errors, created trade IDs                                                                      |
+| `dashboard_templates`                        | Saved dashboard layouts per user                                                                                            |
+| `progress_rules` / `progress_rule_schedules` | Discipline rules (trading + daily habits) and the superseded schedules that keep a schedule change from re-scoring the past |
+| `rule_completions` / `daily_checkins`        | Daily completions, review notes, and days marked as not counted                                                             |
+| `feedback`                                   | In-app user feedback submissions (surfaced in the admin panel)                                                              |
 
 ## Importing trades
 

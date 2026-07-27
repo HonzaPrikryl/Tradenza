@@ -14,6 +14,7 @@ import {
 import ProgressClient from '@/components/progress/ProgressClient'
 import { DisciplineLayoutSkeleton } from '@/components/progress/DisciplineSkeletons'
 import { t } from '@/i18n'
+import { DISPLAY_CURRENCY } from '@/lib/progress-format'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: t('meta.progress') }
@@ -21,10 +22,10 @@ export const metadata: Metadata = { title: t('meta.progress') }
 const EMPTY_STATS: ProgressStats = {
   activeRules: 0,
   currentStreak: 0,
-  bestStreak: 0,
-  greenDaysTotal: 0,
+  streakBlockers: [],
   avgDiscipline30: 0,
   loggedDays30: 0,
+  scheduledDays30: 0,
   todayStatus: 'none',
   todaySoftDone: 0,
   todaySoftTotal: 0,
@@ -37,6 +38,7 @@ const EMPTY_STATS: ProgressStats = {
     green: { days: 0, avgPnl: 0, winRate: 0, avgR: null },
     yellow: { days: 0, avgPnl: 0, winRate: 0, avgR: null },
     red: { days: 0, avgPnl: 0, winRate: 0, avgR: null },
+    unconfirmedDays: 0,
   },
 }
 const emptyYearData = (year: number): ProgressYearData => ({
@@ -53,6 +55,12 @@ const emptyDay = (date: string): DayProgress => ({
   note: '',
   checkedIn: false,
   hasTrades: false,
+  away: false,
+  awayFlag: false,
+  awayScope: 'both',
+  isToday: true, // the empty placeholder is always built for today
+  withinHistory: true,
+  confirmed: false,
   status: 'none',
   rules: [],
   hardTotal: 0,
@@ -70,22 +78,27 @@ export default async function ProgressPage({
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const sp = await searchParams
-  const initialTab = sp.tab === 'rules' ? 'rules' : 'overview'
+  const initialTab = sp.tab === 'rules' ? 'rules' : sp.tab === 'habits' ? 'habits' : 'overview'
   const [today, rules] = await Promise.all([getTodayKey(), getRules()])
   const currentYear = Number(today.slice(0, 4))
 
-  if (!rules.some((r) => r.active)) {
+  // Only active TRADING rules gate the full trading overview; habits render below
+  // regardless (their own panel handles its empty state).
+  if (!rules.some((r) => r.active && r.category !== 'habit')) {
+    // Years still reflect habit history so the Habits tab can browse past years.
+    const years = await getProgressYears()
     return (
       <div className="p-4 sm:p-6 animate-in">
         <ProgressClient
           rules={rules}
           today={today}
-          years={[currentYear]}
+          years={years}
           initialYear={currentYear}
           initialYearData={emptyYearData(currentYear)}
           initialStats={EMPTY_STATS}
           initialDay={emptyDay(today)}
           initialTab={initialTab}
+          currency={DISPLAY_CURRENCY}
         />
       </div>
     )
@@ -109,7 +122,7 @@ async function ProgressOverview({
   rules: ProgressRule[]
   today: string
   currentYear: number
-  initialTab: 'overview' | 'rules'
+  initialTab: 'overview' | 'habits' | 'rules'
 }) {
   const [years, yearData, stats, day] = await Promise.all([
     getProgressYears(),
@@ -128,6 +141,7 @@ async function ProgressOverview({
       initialStats={stats}
       initialDay={day}
       initialTab={initialTab}
+      currency={DISPLAY_CURRENCY}
     />
   )
 }

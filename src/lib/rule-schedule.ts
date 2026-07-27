@@ -2,8 +2,11 @@
 // Compute-side logic lives in progress-compute.ts; this is presentation only.
 
 import { t, tList } from '@/i18n'
+import { WEEKDAYS } from '@/lib/progress-compute'
 
-export const WEEKDAYS_PRESET: readonly number[] = [1, 2, 3, 4, 5]
+/** The "Weekdays" schedule preset (Mon–Fri). Defined with the compute helpers so the
+ *  server-side defaults and the dialog's preset can never drift apart. */
+export const WEEKDAYS_PRESET = WEEKDAYS
 
 /** Short label of an ISO weekday from the datepicker locale list (Sun-first). */
 export function isoWeekdayShort(iso: number): string {

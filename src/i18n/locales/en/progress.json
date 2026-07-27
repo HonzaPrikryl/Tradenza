@@ -1,27 +1,77 @@
 {
   "title": "Discipline",
-  "subtitle": "Track your rules and habits — process over P&L.",
+  "subtitle": "Trading rules and daily habits — process over P&L.",
   "tabs": {
-    "overview": "Overview",
-    "rules": "Rules"
+    "overview": "Trading",
+    "habits": "Daily",
+    "rules": "Manage"
+  },
+  "manage": {
+    "trading": "Trading rules",
+    "daily": "Daily habits",
+    "aria": "Choose which list to manage"
   },
   "hardBroken": {
-    "one": "1 hard rule broken",
-    "other": "{count} hard rules broken"
+    "one": "1 constraint breached",
+    "other": "{count} constraints breached"
+  },
+  "mode": {
+    "kind": {
+      "constraint": "Constraint",
+      "task": "Task"
+    },
+    "kindHint": {
+      "constraint": "Kept unless you log a breach. Never adds to the score — it can only pull the day down.",
+      "task": "You tick it off. Every one you keep adds to the day's score."
+    },
+    "name": {
+      "strict": "Strict",
+      "avoidance": "Avoidance",
+      "building": "Building"
+    },
+    "hint": {
+      "strict": "A limit you never cross. One breach turns the day red — no warning tier.",
+      "avoidance": "A “No X” line. One slip is a warning; two scheduled days in a row turns the day red.",
+      "building": "Something you actively do. The share you keep sets the day's colour."
+    },
+    "state": {
+      "strictOk": "Respected",
+      "strictBad": "Broken",
+      "avoidanceOk": "Clean",
+      "avoidanceBad": "Slipped"
+    },
+    "toggleHint": {
+      "strict": "Tap to flag a breach of this rule",
+      "avoidance": "Tap to log a slip on this habit"
+    }
   },
   "status": {
     "green": "On plan",
     "yellow": "Warning",
     "red": "Off plan",
-    "none": "No activity"
+    "none": "No activity",
+    "pending": "In progress",
+    "unlogged": "Not logged",
+    "away": "Not counted"
+  },
+  "tip": {
+    "away": "Not counted — excused",
+    "noRecord": "No record",
+    "unlogged": "Breaks your streak",
+    "noTrade": "No-trade day",
+    "unloggedFix": "You can still fill it in"
   },
   "process": {
+    "away": "Excused — not scored, and your streak carries over it.",
+    "unlogged": "Nothing recorded. It scores zero in your 30-day figure and breaks your streak — fill it in and it counts properly.",
     "noScope": "No trades or check-in yet — log the day to score it.",
-    "green": "Clean day — no hard rules broken and habits on point.",
-    "yellow": "Solid, but slipping: {completed}/{total} habits. No hard rules broken.",
-    "redSoft": "Only {completed}/{total} habits — tighten the process tomorrow.",
-    "hardBroken": "Hard rule broken ({count}). The day is red no matter what else went right.",
-    "noTrade": "No trade today? If you stuck to your rules, that's still a win."
+    "green": "Clean day — tasks done, nothing breached.",
+    "yellow": "Slipping — {completed}/{total} tasks. No constraint breached.",
+    "redSoft": "Only {completed}/{total} tasks — tighten it up tomorrow.",
+    "hardBroken": "Constraint breached ({count}) — that alone makes the day red.",
+    "noTrade": "No trades today. Stick to your rules and that still counts.",
+    "pending": "In progress — {completed}/{total} tasks.",
+    "noTradeWithTasks": "No trades — it counts as a clean day. Your tasks didn't apply, so they sit out of their own rates and streaks."
   },
   "stats": {
     "currentStreak": "Clean streak",
@@ -30,6 +80,25 @@
     "discipline30": "30-day discipline",
     "days": "days",
     "day": "day",
+    "coverage": "{logged} of {scheduled} days logged",
+    "streakBlocked": {
+      "one": "One unlogged day ({from}) broke your streak. Fill it in — past days have no deadline — or mark it as not counted.",
+      "other": "{days} unlogged days ({from} – {to}) broke your streak. Fill them in — past days have no deadline — or mark them as not counted."
+    },
+    "streakBlockedAction": {
+      "one": "Don't count it",
+      "other": "Don't count them"
+    },
+    "streakBlockedDone": {
+      "one": "Day excused — your streak carries over it",
+      "other": "{days} days excused — your streak carries over them"
+    },
+    "awayRange": "Mark a period",
+    "awayRangeTitle": "Don't count these days",
+    "awayRangeHint": "A holiday, illness, any stretch you're away — past or still ahead. These days won't count against you and your streak carries over them.",
+    "awayRangeEmpty": "Pick a start and end date.",
+    "awayRangeTooLong": "That's more than {max} days — mark it in shorter stretches.",
+    "awayRangeDonePartial": "{days} days won't be counted · {skipped} left as they are — you traded on them",
     "thisYear": "this year",
     "noRulesYetTitle": "Track your discipline, not just your P&L",
     "noRulesExplain": "Define how you want to trade with two kinds of rules:",
@@ -37,36 +106,39 @@
     "noRulesExplain3": "The routines that sharpen your execution.",
     "noRulesExplain4": "Track them daily and watch your discipline build over time — whatever your P&L does.",
     "addStarter": "Add starter rules",
-    "addStarterHint": "6 common rules to get going — edit or delete any of them later.",
+    "addStarterHint": "{count} common rules to get going, Mon–Fri. Edit or delete any of them later.",
     "addOwn": "Create my own",
     "starterAdded": "Starter rules added",
     "perfTitle": "Does discipline pay off?",
     "perfSub": "Average daily P&L & R-multiple, by discipline",
-    "perfGreen": "Disciplined days",
+    "perfGreen": "Clean days",
     "perfYellow": "Warning days",
     "perfRed": "Off-plan days",
     "perfDaysUp": "{pct}% up · {days}d",
     "perfAvgR": "avg {r}R / day",
     "perfNoBucket": "No days yet",
+    "perfLowSample": "Only {days}d — need {min}+",
+    "perfIndicative": "indicative",
+    "perfIndicativeHint": "Enough days to show, not enough to bank on — daily P&L swings hard. Treat it as a direction until this bucket has {solid}+ days.",
+    "perfUnconfirmed": "{days} trading days aren't counted — you never reviewed them. Mark a day reviewed (or tick any rule on it) to include it.",
     "perfNoData": "Log some trades on scored days to see this.",
     "trendTitle": "Discipline trend",
-    "trendSub": "Daily rule completion · last 30 days",
+    "trendSub": "Scheduled days · up to the last 30",
     "perRuleTitle": "Rule consistency",
     "perRuleSub": "Compliance over active days · last 30 days",
-    "perRuleHardTitle": "Hard rules",
-    "perRuleHardSub": "Respect rate",
-    "perRuleSoftTitle": "Soft habits",
+    "perRuleHardTitle": "Constraints",
+    "perRuleHardSub": "Kept rate",
+    "perRuleSoftTitle": "Tasks",
     "perRuleSoftSub": "Completion rate",
     "perRuleNoTrackedDays": "No tracked days yet",
     "showMore": "+{count} more",
     "showLess": "Show less",
     "trendDiscipline": "Discipline",
-    "trendHabits": "habits",
-    "trendMissed": "No record · was scheduled",
-    "trendDayOff": "No rule scheduled",
+    "trendHabits": "tasks",
+    "trendMissed": "Not logged",
     "weekdayTitle": "By weekday",
-    "weekdaySub": "Average completion · last 12 weeks",
-    "weekdayTip": "{pct}% average completion",
+    "weekdaySub": "Average day score · last 12 weeks",
+    "weekdayTip": "{pct}% average day score",
     "weekdayNoData": "No data yet",
     "weekdayNotTracked": "No rule scheduled",
     "noData": "No data yet",
@@ -75,32 +147,73 @@
       "currentStreak": "How many clean days you're on right now.",
       "bestStreak": "Your longest clean streak in the year shown on the heatmap.",
       "greenDays": "Total clean days in the year shown on the heatmap.",
-      "discipline30": "How well you've followed your rules over the last 30 days.",
-      "trend": "Your daily discipline over the last 30 days.",
-      "perRule": "How often you follow each rule.",
+      "discipline30": "How well you kept your process over the last 30 days. A scheduled day you never filled in scores zero — recording is part of the process.",
+      "trend": "Your score on each day something was scheduled. Days off aren't plotted; a scheduled day you never logged scores zero.",
+      "perRule": "How often you keep each rule, over the days you recorded. Tasks and constraints are listed separately — they measure different things.",
       "weekday": "Which days of the week you stay most disciplined.",
-      "perf": "Compares your average daily P&L and R-multiple on disciplined vs warning/off-plan days. Only trading days that had a rule in effect are counted — days before you had rules (or outside a rule's schedule) are excluded. R is averaged only over days with a risk defined."
+      "perf": "Average daily P&L and R on disciplined vs. off-plan days. Only days you reviewed count — an un-reviewed day is silence, not evidence. Correlation, not proof."
     },
     "starterRules": {
       "hard": ["Respect my max daily loss", "No revenge trading", "No trading outside my plan"],
       "soft": ["Waited for my setup", "Sized the position per plan", "Journaled the trade"]
-    }
+    },
+    "awayRangeCount": {
+      "one": "1 day selected",
+      "other": "{days} days selected"
+    },
+    "awayRangeDone": {
+      "one": "1 day won't be counted",
+      "other": "{days} days won't be counted"
+    },
+    "awayRangeAllTraded": {
+      "one": "You traded that day, so there's nothing to excuse.",
+      "other": "You traded on all {days} of those days, so there's nothing to excuse."
+    },
+    "staleWarning": "These numbers couldn't be refreshed, so they may be behind what you just logged.",
+    "staleRetry": "Refresh",
+    "streakBlockedKeep": "Leave them",
+    "streakBlockedFill": "Fill them in",
+    "streakBlockedFillOne": "Fill it in",
+    "awayRangeScopeLabel": "What these days off cover",
+    "awayRangeButtonHint": "Mark a whole stretch off at once."
   },
   "day": {
-    "noActiveRules": "No active rules. Add rules in the Rules tab.",
+    "noActiveRules": "No active rules. Add some in the Manage tab.",
     "noScheduledRules": "No rules scheduled for this day.",
     "viewDay": "View day",
-    "hardTitle": "Hard rules",
-    "softTitle": "Soft habits",
-    "hardRespected": "Respected",
-    "hardBroken": "Broken",
-    "hardToggleHint": "Tap to flag a violation of this hard rule",
-    "hardClean": "{total} hard rules respected",
+    "hardTitle": "Constraints",
+    "softTitle": "Tasks",
     "markAllDone": "Mark all done",
-    "hardViolationLogged": "Hard rule flagged as broken",
+    "hardViolationLogged": "Constraint flagged as breached",
     "undo": "Undo",
-    "checkInNoTrade": "No-trade day — count it",
-    "checkInNoTradeHint": "Scores this day by the rules you tick below — no trade needed."
+    "checkInNoTrade": "No trades today",
+    "checkInNoTradeHint": "Didn't trade? Mark it so the day still counts — stick to your rules and it scores green.",
+    "confirmDay": "Mark as reviewed",
+    "confirmDayHint": "Only reviewed days count in “Does discipline pay off?”.",
+    "away": "Don't count this day",
+    "awayOn": "Marked as a day off",
+    "awayHint": "Holiday, illness, a day off. It won't count against you and your streak keeps running.",
+    "hardClean": {
+      "one": "1 constraint respected",
+      "other": "{total} constraints respected"
+    },
+    "checkInNoTradeOn": "Counted as a no-trade day",
+    "checkInNoTradeOnHint": "This day counts as a disciplined no-trade day. Click to undo.",
+    "confirmDayOn": "Reviewed",
+    "confirmDayOnHint": "This day is marked as reviewed. Click to undo.",
+    "awayOnHint": "This day is marked off. Click to count it again.",
+    "awayKeptTrading": "You traded on this day, so Trading counts it anyway.",
+    "awayScopeLabel": "What this day off covers",
+    "awayScope": {
+      "both": "Whole day",
+      "trading": "Trading only",
+      "habits": "Daily only"
+    },
+    "awayScopeHint": {
+      "both": "Neither Trading nor Daily counts this day.",
+      "trading": "Trading skips this day. Your daily habits still count.",
+      "habits": "Daily habits skip this day. Your trading still counts."
+    }
   },
   "dayReview": {
     "back": "Back to Discipline",
@@ -125,41 +238,35 @@
   "calendar": {
     "green": "clean",
     "logged": "logged",
-    "avg": "avg",
-    "legendGreen": "Disciplined",
+    "avg": "avg tasks",
     "legendYellow": "Warning",
     "legendRed": "Off plan",
-    "legendNone": "No activity",
-    "legendNoTrade": "No-trade day",
+    "legendNotLogged": "Not logged (blue = excused)",
     "legendLess": "Less",
     "legendMore": "More",
-    "info": "Your whole year — one square per day, coloured by how disciplined it was.",
-    "status": {
-      "green": "On plan — disciplined",
-      "yellow": "Warning — slipping",
-      "red": "Off plan — rules broken"
-    },
-    "tipSoft": "{completed}/{total} habits",
-    "tipNoTrade": "No-trade day",
-    "tipNoRecord": "No record"
+    "info": "One square per day, shaded by how much of your process you kept. Hatched = something was scheduled but nothing recorded; it breaks your streak (blue = excused). You can fill in any past day.\n\n“Avg tasks” is your task completion on the days you recorded.",
+    "gridAria": "Day-by-day grid for {year}. Use the arrow keys to move between days.",
+    "legendNone": "No activity",
+    "legendNoTrade": "No-trade day",
+    "tally": {
+      "tasks": "{done}/{total} tasks",
+      "kept": "All {total} constraints kept",
+      "keptOne": "Constraint kept",
+      "keptPending": "{total} constraints clean so far",
+      "breached": "{count} of {total} constraints breached",
+      "breachedOne": "Constraint breached"
+    }
   },
   "rules": {
-    "title": "Your rules",
-    "subtitle": "Define the rules and habits you want to follow. Drag to reorder.",
+    "title": "Your trading rules",
+    "subtitle": "Define the trading rules you want to follow. Drag to reorder.",
     "add": "Add rule",
     "newTitle": "New rule",
     "editTitle": "Edit rule",
     "nameLabel": "Rule",
     "namePlaceholder": "e.g. No trading before the open",
-    "typeLabel": "Rule type",
-    "type": {
-      "hard": "Hard",
-      "soft": "Soft"
-    },
-    "typeHint": {
-      "hard": "Non-negotiable. One violation makes the day red.",
-      "soft": "Quality habit. Adds to the day's score."
-    },
+    "typeLabel": "Rule mode",
+    "typeLocked": "Fixed once a rule exists — it decides how every logged day is read. To switch, delete this rule (past days keep their score) and add a new one.",
     "descLabel": "Description",
     "descPlaceholder": "Optional — why this rule matters",
     "inactive": "Inactive",
@@ -173,18 +280,22 @@
       "customHint": "Tap the days to build your own schedule",
       "customBadge": "Custom",
       "activeSummary": "Active on",
-      "retroHint": "Days outside the schedule won't count toward this rule — past days included."
+      "forwardTitle": "This starts today",
+      "forwardNarrowed": "The days you removed stop counting from today. Past days keep the schedule they were scored under.",
+      "forwardWidened": "The days you added start counting from today. Past days on those weekdays stay out of scope.",
+      "forwardBoth": "The new schedule applies from today. Every past day keeps the schedule it was scored under.",
+      "changedBadge": "Schedule changed",
+      "changedOn": "Runs on {days} since {date}"
     },
-    "empty": "No rules yet. Add your first rule to start tracking.",
-    "hardEmpty": "No hard rules yet. Add a non-negotiable rule.",
-    "softEmpty": "No soft habits yet. Add a quality habit.",
+    "hardEmpty": "No constraints yet — add a limit you never cross.",
+    "softEmpty": "No tasks yet — add a routine you want to keep.",
     "menu": {
       "edit": "Edit",
       "activate": "Activate",
       "deactivate": "Deactivate",
       "delete": "Delete"
     },
-    "confirmDelete": "Delete rule {name}? Its tracking history will be removed.",
+    "confirmDelete": "Delete {name}? It stops applying from today, and past days keep their score.",
     "toast": {
       "created": "Rule created",
       "updated": "Rule updated",
@@ -195,5 +306,108 @@
   },
   "cancel": "Cancel",
   "save": "Save",
-  "saving": "Saving…"
+  "saving": "Saving…",
+  "habits": {
+    "title": "Daily habits",
+    "subtitle": "Everyday habits outside trading — sleep, gym, mindset.",
+    "add": "Add habit",
+    "newTitle": "New habit",
+    "editTitle": "Edit habit",
+    "nameLabel": "Habit",
+    "namePlaceholder": "e.g. 8 hours of sleep",
+    "descPlaceholder": "Optional — why this habit matters",
+    "empty": "No habits yet. Track everyday habits separately from your trading rules.",
+    "addStarter": "Add starter habits",
+    "starterAdded": "Starter habits added",
+    "addOwn": "Add your own",
+    "day": {
+      "allDone": "All habits done for this day. Nice.",
+      "someDone": "{done}/{total} habits kept.",
+      "someDoneYellow": "Slipping — {done}/{total} habits kept.",
+      "someDoneRed": "Only {done}/{total} habits kept — tighten the routine tomorrow.",
+      "none": "No habits yet. Add habits to start tracking.",
+      "dayOff": "No habit scheduled for this day.",
+      "pending": "In progress — finish your habits before the day ends.",
+      "unlogged": "Nothing recorded. It scores zero in your 30-day figure and breaks your streak — fill it in and it counts properly.",
+      "avoidSlippedCount": "{count} slipped",
+      "avoidCleanOnly": "All clear — your avoidance habits count by staying untouched.",
+      "avoidPendingOnly": "In progress — staying clean counts once the day is over.",
+      "avoidWarning": "An avoidance habit slipped — that caps the day at warning. {done}/{total} building habits kept.",
+      "avoidWarningOnly": "An avoidance habit slipped — that caps the day at warning. Twice in a row turns it red.",
+      "avoidBroken": "Avoidance habit slipped two scheduled days running — the day is red, even with {done}/{total} building habits kept.",
+      "avoidBrokenOnly": "Avoidance habit slipped two scheduled days running — the day is red.",
+      "avoidCleanCount": {
+        "one": "1 avoidance habit clean",
+        "other": "{total} avoidance habits clean"
+      }
+    },
+    "starter": ["Slept 7+ hours", "Exercise / movement", "No screens after 10pm", "Read 20 minutes"],
+    "toast": {
+      "created": "Habit created",
+      "updated": "Habit updated",
+      "deleted": "Habit deleted"
+    },
+    "confirmDelete": "Delete {name}? It stops applying from today, and past days keep their score.",
+    "category": {
+      "habit": "Daily habit"
+    },
+    "perf": {
+      "title": "Do your habits pay off?",
+      "sub": "Average trading-day P&L on days you kept each habit vs. days you missed it.",
+      "done": "Kept",
+      "missed": "Missed",
+      "winRate": "{pct}% up",
+      "delta": "{sign}{amount} / day",
+      "noData": "Not enough trading days to compare yet.",
+      "days": "{count}d",
+      "info": "Your trading days split by whether you kept each habit — average net P&L and win rate. Only scheduled days count. Correlation, not proof."
+    },
+    "year": {
+      "info": "One square per day, shaded by how many building habits you kept. Avoidance habits never add to the score — they only pull a day down: one slip caps the day at warning, two scheduled days in a row turn it off plan.\n\n“Avg tasks” is your completion on the days you recorded.",
+      "error": "Couldn't load habit history.",
+      "tally": {
+        "tasks": "{done}/{total} building habits done",
+        "kept": "All {total} avoidance habits clean",
+        "keptOne": "Avoidance habit clean",
+        "keptPending": "{total} avoidance habits clean so far",
+        "breached": "{count} of {total} avoidance habits slipped",
+        "breachedOne": "Avoidance habit slipped"
+      }
+    },
+    "stats": {
+      "trendTitle": "Completion trend",
+      "trendSub": "Scheduled days · up to the last 30",
+      "trendDone": "{done}/{total} habits",
+      "consistencyTitle": "Per-habit consistency",
+      "consistencySub": "How often you keep each habit, over the last 30 tracked days.",
+      "avoidTitle": "Avoidance habits",
+      "avoidSub": "Clean rate",
+      "buildingTitle": "Building habits",
+      "buildingSub": "Kept rate",
+      "weekdayTitle": "By weekday",
+      "weekdaySub": "Which weekdays you keep your habits, last 12 weeks.",
+      "noData": "No data yet.",
+      "noTrackedDays": "No tracked days yet",
+      "info": {
+        "trend": "The share of each day's building habits you completed. Avoidance habits can only pull a day down; a scheduled day you never filled in scores zero.",
+        "consistency": "How often you keep each habit, over the days it was scheduled in the last 30. Building and avoidance are listed separately — they measure different things.",
+        "weekday": "Average day score by weekday over the last 12 weeks, counting only days a habit was scheduled."
+      },
+      "trendDiscipline": "Completion",
+      "trendMissed": "Not logged",
+      "trendAvoid": "{kept}/{total} avoidance habits clean"
+    },
+    "cards": {
+      "streak": "Current streak",
+      "streakInfo": "Days in a row you kept your scheduled habits — 50%+ of building habits done, no avoidance habit broken. Today counts once it's over.",
+      "best": "Best streak",
+      "bestInfo": "Your longest habit streak in the year shown on the heatmap.",
+      "green": "Clean days",
+      "greenInfo": "Days you kept 50%+ of your building habits with no avoidance habit broken, in the year shown.",
+      "completion": "30-day completion",
+      "completionInfo": "Average day score over the last 30 days: the share of building habits done, zeroed if an avoidance habit broke or you never filled the day in. Days off and today sit out."
+    },
+    "typeLabel": "Habit mode",
+    "typeLocked": "Fixed once a habit exists — it decides how every logged day is read. To switch, delete this habit (past days keep their score) and add a new one."
+  }
 }

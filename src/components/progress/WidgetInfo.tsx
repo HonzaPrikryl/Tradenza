@@ -11,7 +11,13 @@ import Tooltip from '@/components/ui/Tooltip'
 // running off the edge of the page).
 export default function WidgetInfo({ text, className }: { text: string; className?: string }) {
   return (
-    <Tooltip label={text} className={cn('max-w-[15rem] font-normal leading-relaxed text-muted-foreground', className)}>
+    // `whitespace-pre-line` so a blank line in the copy renders as a paragraph break. A few
+    // of these carry a second thought — usually "this number is not the other number" — and
+    // without it the two ran together into one wall of text.
+    <Tooltip
+      label={text}
+      className={cn('max-w-[17rem] whitespace-pre-line font-normal leading-relaxed text-muted-foreground', className)}
+    >
       <button
         type="button"
         aria-label={t('progress.stats.info.label')}

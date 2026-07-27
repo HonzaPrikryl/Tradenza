@@ -106,6 +106,34 @@
       "when": 1784575842285,
       "tag": "0014_tag_color_from_category",
       "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1784735038549,
+      "tag": "0015_rule_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785064990270,
+      "tag": "0016_day_away",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785178319183,
+      "tag": "0017_away_scope",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1785186977564,
+      "tag": "0018_rule_schedule_history",
+      "breakpoints": true
     }
   ]
 }

@@ -1,305 +1,145 @@
 'use client'
 
-import { useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useEffect, useState } from 'react'
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Flame, Trophy, Sparkles, Gauge } from 'lucide-react'
+import { Trophy, Sparkles, Gauge, Plane, PenLine, Loader2 } from 'lucide-react'
 import { cn, formatCurrency } from '@/lib/utils'
-import { t, tList } from '@/i18n'
+import { t } from '@/i18n'
 import type { ProgressStats as Stats } from '@/lib/actions/progress'
+import { DAY_PERF_MIN_SAMPLE, DAY_PERF_SOLID_SAMPLE } from '@/lib/progress-compute'
+import { prettyDayMonth } from '@/lib/progress-format'
 import { useChartColors } from '@/components/dashboard/widgets/shared'
+// Aliased: `Tooltip` is already taken by recharts' chart tooltip in this file.
+import UiTooltip from '@/components/ui/Tooltip'
+import Collapse from '@/components/ui/Collapse'
 import WidgetInfo from './WidgetInfo'
+import ConsistencyList from './ConsistencyList'
+import { StatCard, StreakCard } from './StatCards'
+import SharedTrendTooltip from './TrendTooltip'
+import WeekdayBars from './WeekdayBars'
 
-const WD = tList('datepicker.weekdaysMin')
-const WD_FULL = tList('datepicker.weekdays')
-
-interface WeekdayTip {
-  label: string
-  pct: number
-  /** No in-scope samples fed this weekday's average. */
-  noData: boolean
-  /** At least one live rule runs on this weekday (drives no-data wording). */
-  scheduled: boolean
-  x: number
-  y: number
+// Trading discipline-trend tooltip — the shared TrendTooltip with a trading-specific
+// third line (hard-rule break / no-trade / soft X-Y).
+function TrendTooltip(props: { active?: boolean; payload?: { payload: Stats['trend'][number] }[] }) {
+  return (
+    <SharedTrendTooltip
+      {...props}
+      disciplineLabel={t('progress.stats.trendDiscipline')}
+      missedLabel={t('progress.stats.trendMissed')}
+      renderExtra={(d) =>
+        d.hardViolations > 0 ? (
+          <div className="mt-0.5 font-medium text-muted-foreground">
+            {d.hardViolations === 1
+              ? t('progress.hardBroken.one')
+              : t('progress.hardBroken.other', { count: d.hardViolations })}
+          </div>
+        ) : d.cleanNoTrade ? (
+          <div className="mt-0.5 text-muted-foreground">{t('progress.tip.noTrade')}</div>
+        ) : (
+          <div className="mt-0.5 text-muted-foreground">
+            {d.completed}/{d.total} {t('progress.stats.trendHabits')}
+          </div>
+        )
+      }
+    />
+  )
 }
 
-// Custom discipline-trend tooltip: the % is coloured by the day's status and a
-// hard-rule break is called out on its own line under the discipline figure.
-function TrendTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[]
-}) {
-  if (!active || !payload?.length) return null
-  const d = payload[0].payload as Stats['trend'][number]
-  // Day with no rule scheduled (day off / before any rule existed): the line just
-  // bridges it, so label it plainly rather than as a discipline reading.
-  if (!d.scheduled) {
-    return (
-      <div className="rounded-lg border border-border bg-popover px-2.5 py-1.5 text-xs shadow-2xl">
-        <div className="font-medium text-foreground">{d.date}</div>
-        <div className="mt-0.5 text-muted-foreground">{t('progress.stats.trendDayOff')}</div>
-      </div>
-    )
+/**
+ * "Leave them" has to STICK, or it isn't a choice — a prompt that returns on every reload
+ * is the nag this pair of buttons exists to avoid. It's remembered against the exact run
+ * of days it was answered for, so a NEW gap asks again: the user declined to excuse *those*
+ * days, not to ever be offered again.
+ *
+ * localStorage rather than the database: it's a UI preference about a prompt, it must not
+ * cost a write, and losing it is harmless. Read in an effect so the server render and the
+ * first client render agree.
+ */
+function useDismissedStreakGap(blockers: string[]): [boolean | null, (v: boolean) => void] {
+  const key = blockers.join(',')
+  // The answer is UNKNOWN (null) until the client has read storage, and the caller renders
+  // nothing while it is. Starting at `false` instead meant "not dismissed" was asserted on
+  // the server and on the first client render, so a dismissed prompt painted once and then
+  // vanished — a flash on every reload. Nothing can flash if nothing is claimed yet.
+  //
+  // The stored answer is kept WITH the key it answers. If the gap changes, the remembered
+  // value belongs to a different run of days, so it reads as unknown again rather than
+  // briefly applying a stale decision to the new one.
+  const [state, setState] = useState<{ key: string; dismissed: boolean } | null>(null)
+
+  useEffect(() => {
+    try {
+      setState({ key, dismissed: window.localStorage.getItem(DISMISS_KEY) === key })
+    } catch {
+      setState({ key, dismissed: false }) // private mode / storage disabled — just show it
+    }
+  }, [key])
+
+  const dismiss = (v: boolean) => {
+    setState({ key, dismissed: v }) // synchronous: no frame where the card is still up
+    try {
+      if (v) window.localStorage.setItem(DISMISS_KEY, key)
+      else window.localStorage.removeItem(DISMISS_KEY)
+    } catch {
+      /* non-fatal: the choice simply won't survive a reload */
+    }
   }
-  // Scheduled but never logged: a genuine dip to 0, called out as a missed record
-  // rather than a silent "No record".
-  if (d.status === 'none') {
-    return (
-      <div className="rounded-lg border border-border bg-popover px-2.5 py-1.5 text-xs shadow-2xl">
-        <div className="font-medium text-foreground">{d.date}</div>
-        <div className="mt-0.5 text-muted-foreground">{t('progress.stats.trendMissed')}</div>
-      </div>
-    )
-  }
-  const color = d.status === 'green' ? 'text-primary' : d.status === 'yellow' ? 'text-amber-500' : 'text-loss'
-  return (
-    <div className="rounded-lg border border-border bg-popover px-2.5 py-1.5 text-xs shadow-2xl">
-      <div className="font-medium text-foreground">{d.date}</div>
-      <div className={cn('mt-0.5 font-semibold', color)}>
-        {t('progress.stats.trendDiscipline')} {Math.round((d.ratio ?? 0) * 100)}%
-      </div>
-      {d.hardViolations > 0 ? (
-        <div className="mt-0.5 font-medium text-muted-foreground">
-          {d.hardViolations === 1
-            ? t('progress.hardBroken.one')
-            : t('progress.hardBroken.other', { count: d.hardViolations })}
-        </div>
-      ) : d.cleanNoTrade ? (
-        <div className="mt-0.5 text-muted-foreground">{t('progress.calendar.tipNoTrade')}</div>
-      ) : (
-        <div className="mt-0.5 text-muted-foreground">
-          {d.completed}/{d.total} {t('progress.stats.trendHabits')}
-        </div>
-      )}
-    </div>
-  )
+
+  return [state?.key === key ? state.dismissed : null, dismiss]
 }
 
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-  accent,
-  info,
-}: {
-  icon: React.ReactNode
-  label: string
-  value: React.ReactNode
-  sub?: string
-  accent?: boolean
-  info?: string
-}) {
-  return (
-    <div
-      className={cn(
-        'flex flex-col gap-1 rounded-xl border bg-card p-4',
-        accent ? 'border-primary/30' : 'border-border',
-      )}
-    >
-      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span className="flex min-w-0 items-center gap-2">
-          {icon}
-          <span className="truncate">{label}</span>
-        </span>
-        {info && <WidgetInfo text={info} />}
-      </div>
-      <div className="text-2xl font-bold tabular text-foreground">{value}</div>
-      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
-    </div>
-  )
-}
-
-// Ember-glow intensity per streak tier: the longer the run, the more flames and the
-// brighter the pulse. Purely decorative — driven off the streak count.
-const STREAK_GLOW = [
-  { min: 0, max: 0 },
-  { min: 0.12, max: 0.24 },
-  { min: 0.2, max: 0.4 },
-  { min: 0.32, max: 0.56 },
-  { min: 0.46, max: 0.72 },
-]
-
-function streakTier(streak: number): number {
-  if (streak <= 0) return 0
-  if (streak >= 100) return 4
-  if (streak >= 30) return 3
-  if (streak >= 7) return 2
-  return 1
-}
-
-// The Clean-streak card, gamified: flickering flames and a pulsing ember glow that
-// grow with the streak. The flame count itself marks the milestones (a 3rd flame at
-// 30 days, etc.), so no separate badge is needed next to the count.
-function StreakCard({ streak, info }: { streak: number; info: string }) {
-  const tier = streakTier(streak)
-  const flames = Math.min(tier, 3)
-  const glow = STREAK_GLOW[tier]
-  const glowStyle = {
-    background: 'radial-gradient(120% 100% at 50% 100%, rgba(251,146,60,0.9), transparent 70%)',
-    '--streak-glow-min': `${glow.min}`,
-    '--streak-glow-max': `${glow.max}`,
-  } as React.CSSProperties
-
-  return (
-    <div
-      className={cn(
-        'relative flex flex-col gap-1 overflow-hidden rounded-xl border bg-card p-4',
-        tier > 0 ? 'border-orange-400/30' : 'border-border',
-      )}
-    >
-      {tier > 0 && (
-        <div className="streak-glow pointer-events-none absolute inset-x-0 bottom-0 h-2/3" style={glowStyle} />
-      )}
-      {flames > 0 && (
-        <div className="pointer-events-none absolute bottom-1.5 right-2 flex items-end gap-0.5" aria-hidden>
-          {Array.from({ length: flames }).map((_, i) => (
-            <Flame
-              key={i}
-              className={cn('streak-flame text-orange-500/70', tier >= 4 ? 'h-5 w-5' : 'h-4 w-4')}
-              style={{ animationDelay: `${i * 0.25}s` }}
-              strokeWidth={2}
-            />
-          ))}
-        </div>
-      )}
-      <div className="relative flex items-center justify-between gap-2 text-xs text-muted-foreground">
-        <span className="flex min-w-0 items-center gap-2">
-          <Flame className="h-3.5 w-3.5 text-orange-400" />
-          <span className="truncate">{t('progress.stats.currentStreak')}</span>
-        </span>
-        <WidgetInfo text={info} />
-      </div>
-      <div className="relative text-2xl font-bold tabular text-foreground">{streak}</div>
-      <div className="relative text-[11px] text-muted-foreground">
-        {streak === 1 ? t('progress.stats.day') : t('progress.stats.days')}
-      </div>
-    </div>
-  )
-}
-
-// One rule's consistency bar. The fill is always the "performance" colour (green):
-// a longer bar means better compliance for BOTH tiers — a respected hard rule and a
-// completed soft habit both read as "good". The tier is conveyed by the badge, not
-// the bar colour, so a well-respected hard rule no longer paints a misleading red
-// bar. Rules with no tracked days show "no data" instead of a phantom 0%.
-function PerRuleRow({ rule }: { rule: Stats['perRule'][number] }) {
-  const pct = Math.round(rule.rate * 100)
-  const noData = rule.tracked === 0
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span
-            className={cn(
-              'shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide',
-              rule.type === 'hard' ? 'bg-loss/15 text-loss' : 'bg-primary/15 text-primary',
-            )}
-          >
-            {t(`progress.rules.type.${rule.type}`)}
-          </span>
-          <span className="min-w-0 truncate text-foreground/90">{rule.name}</span>
-        </span>
-        <span
-          className={cn(
-            'shrink-0 tabular font-semibold',
-            noData ? 'text-muted-foreground/60' : 'text-muted-foreground',
-          )}
-        >
-          {noData ? t('progress.stats.perRuleNoTrackedDays') : `${pct}%`}
-        </span>
-      </div>
-      {!noData && (
-        <div className="h-2 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full bg-primary opacity-60 transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
-// A titled block of consistency rows (Hard rules / Soft habits) with its own
-// scale label ("Respect rate" vs "Completion rate") so the inverted semantics of
-// the two tiers are spelled out instead of silently mixed in one list.
-function PerRuleGroup({
-  title,
-  sub,
-  accent,
-  children,
-}: {
-  title: string
-  sub: string
-  accent?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <div>
-      <div className="mb-2 flex items-baseline justify-between gap-2">
-        <h4
-          className={cn(
-            'text-[11px] font-semibold uppercase tracking-wide',
-            accent ? 'text-loss/80' : 'text-muted-foreground',
-          )}
-        >
-          {title}
-        </h4>
-        <span className="shrink-0 text-[10px] text-muted-foreground/70">{sub}</span>
-      </div>
-      <div className="space-y-2.5">{children}</div>
-    </div>
-  )
-}
-
-// Identical expand/collapse control shared by both consistency columns.
-function ShowMoreButton({ expanded, hidden, onToggle }: { expanded: boolean; hidden: number; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="mt-1 w-full rounded-md border border-dashed border-border py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
-    >
-      {expanded ? t('progress.stats.showLess') : t('progress.stats.showMore', { count: hidden })}
-    </button>
-  )
-}
+const DISMISS_KEY = 'tradenza:streak-gap-dismissed'
 
 export default function ProgressStats({
   stats,
+  currency,
   section = 'all',
   year,
+  currentYear,
+  yearStats,
+  onExcuseStreakBlockers,
+  onFillIn,
+  excusing = false,
 }: {
   stats: Stats
+  /** Display currency for money figures — see the note in progress/page.tsx. */
+  currency: string
   section?: 'all' | 'cards' | 'trend' | 'breakdown'
+  /**
+   * Excuse the days that broke the streak (see ProgressStats.streakBlockers). Offered
+   * here because this is where the loss is noticed — nobody marks absence in advance.
+   */
+  onExcuseStreakBlockers?: () => void
+  /**
+   * Jump to the first day of the gap so the user can record what actually happened. The
+   * parent owns it because only it knows where the day panel lives and how to reveal it.
+   */
+  onFillIn?: () => void
+  excusing?: boolean
   /** Calendar year the year-scoped cards (best streak, clean days) reflect. */
   year?: number
+  /** Today's calendar year — when `year` matches it, cards read "this year". */
+  currentYear?: number
+  /**
+   * The two YEAR-SCOPED card values, taken from the heatmap's year data rather than
+   * from `stats` — they follow whichever year the user selected. Required by the
+   * `cards` section; the other sections don't read them.
+   */
+  yearStats?: { bestStreak: number; greenDays: number }
 }) {
+  // Year-scoped cards read "this year" for the live year and the bare number for a
+  // past year the user has scrolled to on the heatmap.
+  const yearSub =
+    year == null || (currentYear != null && year === currentYear) ? t('progress.stats.thisYear') : String(year)
   const C = useChartColors()
+  const [streakPromptDismissed, setStreakPromptDismissed] = useDismissedStreakGap(stats.streakBlockers)
   const showCards = section === 'all' || section === 'cards'
   const showTrend = section === 'all' || section === 'trend'
   const showBreakdown = section === 'all' || section === 'breakdown'
-  const [wdTip, setWdTip] = useState<WeekdayTip | null>(null)
-  // Both columns are capped to the same length and each gets its own show more/less
-  // toggle, so neither column can grow the widget on its own.
-  const [showAllHard, setShowAllHard] = useState(false)
-  const [showAllSoft, setShowAllSoft] = useState(false)
-  const RULE_LIMIT = 4
-  const hardRules = stats.perRule.filter((r) => r.type === 'hard')
-  const softRules = stats.perRule.filter((r) => r.type === 'soft')
-  const hardShown = showAllHard ? hardRules : hardRules.slice(0, RULE_LIMIT)
-  const hardHidden = hardRules.length - hardShown.length
-  const softShown = showAllSoft ? softRules : softRules.slice(0, RULE_LIMIT)
-  const softHidden = softRules.length - softShown.length
-  // Only split the consistency card into two columns when BOTH tiers exist; with a
-  // single tier the one group spans the full width instead of leaving a dead column.
-  const bothTiers = hardRules.length > 0 && softRules.length > 0
+
+  const blockers = stats.streakBlockers
+  const streakPromptOpen =
+    showCards && blockers.length > 0 && streakPromptDismissed === false && !!onExcuseStreakBlockers
 
   return (
     <div className="space-y-4">
@@ -310,26 +150,108 @@ export default function ProgressStats({
           <StatCard
             icon={<Trophy className="h-3.5 w-3.5 text-amber-400" />}
             label={t('progress.stats.bestStreak')}
-            value={stats.bestStreak}
-            sub={year != null ? String(year) : t('progress.stats.thisYear')}
+            value={yearStats?.bestStreak ?? 0}
+            sub={yearSub}
             info={t('progress.stats.info.bestStreak')}
           />
           <StatCard
             icon={<Sparkles className="h-3.5 w-3.5 text-primary" />}
             label={t('progress.stats.greenDays')}
-            value={stats.greenDaysTotal}
-            sub={year != null ? String(year) : t('progress.stats.thisYear')}
+            value={yearStats?.greenDays ?? 0}
+            sub={yearSub}
             info={t('progress.stats.info.greenDays')}
           />
           <StatCard
             icon={<Gauge className="h-3.5 w-3.5 text-sky-400" />}
             label={t('progress.stats.discipline30')}
             value={`${Math.round(stats.avgDiscipline30 * 100)}%`}
-            sub={`${stats.loggedDays30} ${t('progress.stats.days')}`}
+            // The average is computed over RECORDED days only, so the sub-line carries
+            // its denominator: a flawless 100% off three logged days out of twenty is a
+            // coverage problem, and the card has to admit that on its face.
+            sub={t('progress.stats.coverage', {
+              logged: stats.loggedDays30,
+              scheduled: stats.scheduledDays30,
+            })}
             info={t('progress.stats.info.discipline30')}
           />
         </div>
       )}
+
+      {/* Streak repair. The server only fills `streakBlockers` when excusing that run would
+          actually stitch a real streak back together — there has to be a clean run on the
+          far side of the gap (see runBehindGap). So this can't greet a new user who simply
+          hasn't logged much yet: it appears when a streak was genuinely lost, next to the
+          number it affects, and never otherwise. */}
+      {/* Collapsed rather than switched on and off. This card appears and disappears in
+          response to things the user just did — excusing a run, dismissing the prompt,
+          back-filling a day — and every one of those snapped the whole page up or down by
+          its height. The gap lives on the CHILD (`mt-4`) so it collapses with the card;
+          Collapse cancels its own outer margin for exactly that reason.
+
+          `=== false`, not `!dismissed`: `null` means "we haven't read the user's answer
+          yet" and must render nothing, or a dismissed prompt flashes on every load. */}
+      <Collapse open={streakPromptOpen}>
+        {/* Guarded, because JSX children are BUILT on every parent render whether or not
+            the collapse shows them — reading `blockers[0]` off an empty array threw while
+            the element was merely being constructed. Collapse replays the last open subtree
+            during the exit, so returning null here doesn't blank the closing card. */}
+        {blockers.length === 0 ? null : (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+            {/* `streakBlockers` is newest-first, so the run reads [to … from]. A single day
+                gets its own phrasing — "(21 Jul – 21 Jul)" is not a range. */}
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t(`progress.stats.streakBlocked.${blockers.length === 1 ? 'one' : 'other'}`, {
+                days: blockers.length,
+                from: prettyDayMonth(blockers[blockers.length - 1]),
+                to: prettyDayMonth(blockers[0]),
+              })}
+            </p>
+            {/* THREE paths, because there are three — and the card used to admit only one.
+                Back-filling has no deadline (any past day is editable), yet the prompt never
+                said so, which left "excuse it" looking like the only way out of a gap.
+
+                Order runs from most to least honest: record what actually happened, excuse
+                it if you genuinely weren't there, or accept the gap. Only "Fill in" is
+                emphasised, and deliberately so — it is the option that produces DATA, and it
+                is not the flattering one (an honest back-fill may well turn the day red).
+                The other two are weighted identically, because nothing here can verify
+                whether you were away and the app must not lean on an answer it can't
+                check. */}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {onFillIn && (
+                <button
+                  type="button"
+                  onClick={onFillIn}
+                  disabled={excusing}
+                  className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                  {t(
+                    blockers.length === 1 ? 'progress.stats.streakBlockedFillOne' : 'progress.stats.streakBlockedFill',
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onExcuseStreakBlockers}
+                disabled={excusing}
+                className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+              >
+                {excusing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plane className="h-3.5 w-3.5" />}
+                {t(`progress.stats.streakBlockedAction.${blockers.length === 1 ? 'one' : 'other'}`)}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStreakPromptDismissed(true)}
+                disabled={excusing}
+                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+              >
+                {t('progress.stats.streakBlockedKeep')}
+              </button>
+            </div>
+          </div>
+        )}
+      </Collapse>
 
       {/* Trend */}
       {showTrend && (
@@ -339,46 +261,53 @@ export default function ProgressStats({
             <WidgetInfo text={t('progress.stats.info.trend')} />
           </div>
           <p className="mb-3 text-xs text-muted-foreground">{t('progress.stats.trendSub')}</p>
-          <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.trend} margin={{ top: 6, right: 8, bottom: 0, left: -16 }}>
-                <defs>
-                  <linearGradient id="discGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={C.primary} stopOpacity={0.35} />
-                    <stop offset="100%" stopColor={C.primary} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={C.grid} vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10, fill: C.axis }}
-                  tickFormatter={(v) => v.slice(5)}
-                  axisLine={false}
-                  tickLine={false}
-                  minTickGap={28}
-                />
-                <YAxis
-                  domain={[0, 1]}
-                  tick={{ fontSize: 10, fill: C.axis }}
-                  tickFormatter={(v) => `${Math.round(v * 100)}%`}
-                  axisLine={false}
-                  tickLine={false}
-                  width={44}
-                />
-                <Tooltip content={<TrendTooltip />} cursor={{ stroke: C.grid }} />
-                <Area
-                  type="monotone"
-                  dataKey="ratio"
-                  stroke={C.primary}
-                  strokeWidth={2}
-                  fill="url(#discGrad)"
-                  dot={false}
-                  connectNulls
-                  animationDuration={600}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          {stats.trend.length === 0 ? (
+            // The series now contains only days something was SCHEDULED, so it can be empty
+            // — every rule paused, a brand-new user, a stretch entirely marked off. An empty
+            // recharts area is a blank box with axes, which reads as broken rather than as
+            // "nothing to plot yet".
+            <p className="py-10 text-center text-sm text-muted-foreground">{t('progress.stats.noData')}</p>
+          ) : (
+            <div className="h-44">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stats.trend} margin={{ top: 6, right: 8, bottom: 0, left: -4 }}>
+                  <defs>
+                    <linearGradient id="discGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={C.primary} stopOpacity={0.35} />
+                      <stop offset="100%" stopColor={C.primary} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={C.grid} vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 10, fill: C.axis }}
+                    tickFormatter={(v) => v.slice(5)}
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={28}
+                  />
+                  <YAxis
+                    domain={[0, 1]}
+                    tick={{ fontSize: 10, fill: C.axis }}
+                    tickFormatter={(v) => `${Math.round(v * 100)}%`}
+                    axisLine={false}
+                    tickLine={false}
+                    width={44}
+                  />
+                  <Tooltip content={<TrendTooltip />} cursor={{ stroke: C.grid }} />
+                  <Area
+                    type="monotone"
+                    dataKey="ratio"
+                    stroke={C.primary}
+                    strokeWidth={2}
+                    fill="url(#discGrad)"
+                    dot={false}
+                    animationDuration={600}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       )}
 
@@ -411,33 +340,72 @@ export default function ProgressStats({
                     },
                     { key: 'red', label: t('progress.stats.perfRed'), dot: 'bg-loss', b: stats.performance.red },
                   ] as const
-                ).map(({ key, label, dot, b }) => (
-                  <div key={key} className="rounded-lg border border-border bg-background/40 p-3">
-                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                      <span className={cn('h-2 w-2 shrink-0 rounded-full', dot)} />
-                      <span className="truncate">{label}</span>
-                    </div>
-                    <div
-                      className={cn(
-                        'mt-1 text-lg font-bold tabular',
-                        b.days === 0 ? 'text-muted-foreground' : b.avgPnl >= 0 ? 'text-profit' : 'text-loss',
-                      )}
-                    >
-                      {b.days === 0 ? '—' : formatCurrency(b.avgPnl)}
-                    </div>
-                    {b.days > 0 && b.avgR !== null && (
-                      <div className={cn('text-[11px] font-medium tabular', b.avgR >= 0 ? 'text-profit' : 'text-loss')}>
-                        {t('progress.stats.perfAvgR', { r: `${b.avgR >= 0 ? '+' : ''}${b.avgR.toFixed(2)}` })}
+                ).map(({ key, label, dot, b }) => {
+                  // Three confidence tiers, because daily P&L is fat-tailed enough that a
+                  // small sample IS its own outlier:
+                  //   < MIN   → withhold the number entirely, show the day count only.
+                  //   < SOLID → show it, but visibly marked as an early read.
+                  //   ≥ SOLID → show it plainly.
+                  const lowSample = b.days > 0 && b.days < DAY_PERF_MIN_SAMPLE
+                  const indicative = b.days >= DAY_PERF_MIN_SAMPLE && b.days < DAY_PERF_SOLID_SAMPLE
+                  return (
+                    <div key={key} className="rounded-lg border border-border bg-background/40 p-3">
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <span className={cn('h-2 w-2 shrink-0 rounded-full', dot)} />
+                        <span className="truncate">{label}</span>
                       </div>
-                    )}
-                    <div className="text-[11px] text-muted-foreground">
-                      {b.days === 0
-                        ? t('progress.stats.perfNoBucket')
-                        : t('progress.stats.perfDaysUp', { pct: Math.round(b.winRate * 100), days: b.days })}
+                      <div
+                        className={cn(
+                          'mt-1 flex items-baseline gap-1.5 text-lg font-bold tabular',
+                          b.days === 0 || lowSample
+                            ? 'text-muted-foreground'
+                            : b.avgPnl >= 0
+                              ? 'text-profit'
+                              : 'text-loss',
+                        )}
+                      >
+                        <span className={cn(indicative && 'decoration-dotted underline-offset-4 underline opacity-80')}>
+                          {b.days === 0 || lowSample ? '—' : formatCurrency(b.avgPnl, currency)}
+                        </span>
+                        {indicative && (
+                          // "indicative" means nothing on its own, so the explanation has
+                          // to be reachable — `title` is invisible on touch and to the
+                          // keyboard, which is most of the people who'd need it.
+                          <UiTooltip label={t('progress.stats.perfIndicativeHint', { solid: DAY_PERF_SOLID_SAMPLE })}>
+                            <span
+                              tabIndex={0}
+                              className="shrink-0 cursor-help rounded bg-muted px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground focus-visible:ring-2 focus-visible:ring-primary focus:outline-none"
+                            >
+                              {t('progress.stats.perfIndicative')}
+                            </span>
+                          </UiTooltip>
+                        )}
+                      </div>
+                      {!lowSample && b.days > 0 && b.avgR !== null && (
+                        <div
+                          className={cn('text-[11px] font-medium tabular', b.avgR >= 0 ? 'text-profit' : 'text-loss')}
+                        >
+                          {t('progress.stats.perfAvgR', { r: `${b.avgR >= 0 ? '+' : ''}${b.avgR.toFixed(2)}` })}
+                        </div>
+                      )}
+                      <div className="text-[11px] text-muted-foreground">
+                        {b.days === 0
+                          ? t('progress.stats.perfNoBucket')
+                          : lowSample
+                            ? t('progress.stats.perfLowSample', { days: b.days, min: DAY_PERF_MIN_SAMPLE })
+                            : t('progress.stats.perfDaysUp', { pct: Math.round(b.winRate * 100), days: b.days })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
+            )}
+            {/* Say out loud why the sample is thinner than the trade count, instead of
+                quietly under-reporting. */}
+            {stats.performance.unconfirmedDays > 0 && (
+              <p className="mt-3 text-[11px] text-muted-foreground/80">
+                {t('progress.stats.perfUnconfirmed', { days: stats.performance.unconfirmedDays })}
+              </p>
             )}
           </div>
 
@@ -452,134 +420,33 @@ export default function ProgressStats({
               {stats.perRule.length === 0 ? (
                 <p className="py-6 text-center text-sm text-muted-foreground">{t('progress.stats.noData')}</p>
               ) : (
-                // Hard rules and soft habits sit side by side when both exist; a lone
-                // tier takes the full width. Stacks on narrow screens either way.
-                <div className={cn('grid grid-cols-1 gap-x-5 gap-y-4', bothTiers && 'sm:grid-cols-2')}>
-                  {hardRules.length > 0 && (
-                    <PerRuleGroup
-                      title={t('progress.stats.perRuleHardTitle')}
-                      sub={t('progress.stats.perRuleHardSub')}
-                      accent
-                    >
-                      {hardShown.map((r) => (
-                        <PerRuleRow key={r.id} rule={r} />
-                      ))}
-                      {(hardHidden > 0 || showAllHard) && (
-                        <ShowMoreButton
-                          expanded={showAllHard}
-                          hidden={hardHidden}
-                          onToggle={() => setShowAllHard((v) => !v)}
-                        />
-                      )}
-                    </PerRuleGroup>
-                  )}
-                  {softRules.length > 0 && (
-                    <PerRuleGroup title={t('progress.stats.perRuleSoftTitle')} sub={t('progress.stats.perRuleSoftSub')}>
-                      {softShown.map((r) => (
-                        <PerRuleRow key={r.id} rule={r} />
-                      ))}
-                      {(softHidden > 0 || showAllSoft) && (
-                        <ShowMoreButton
-                          expanded={showAllSoft}
-                          hidden={softHidden}
-                          onToggle={() => setShowAllSoft((v) => !v)}
-                        />
-                      )}
-                    </PerRuleGroup>
-                  )}
-                </div>
+                <ConsistencyList
+                  items={stats.perRule.map((r) => ({
+                    id: r.id,
+                    name: r.name,
+                    type: r.type,
+                    rate: r.rate,
+                    tracked: r.tracked,
+                    streak: r.streak,
+                  }))}
+                  constraintTitle={t('progress.stats.perRuleHardTitle')}
+                  constraintSub={t('progress.stats.perRuleHardSub')}
+                  taskTitle={t('progress.stats.perRuleSoftTitle')}
+                  taskSub={t('progress.stats.perRuleSoftSub')}
+                  noDataLabel={t('progress.stats.perRuleNoTrackedDays')}
+                />
               )}
             </div>
 
-            {/* Weekday */}
-            <div className="rounded-xl border border-border bg-card p-4">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-foreground">{t('progress.stats.weekdayTitle')}</h3>
-                <WidgetInfo text={t('progress.stats.info.weekday')} className="translate-x-[-100%]" />
-              </div>
-              <p className="mb-3 text-xs text-muted-foreground">{t('progress.stats.weekdaySub')}</p>
-              <div className="flex h-60 flex-col">
-                <div className="flex flex-1 items-end gap-2">
-                  {stats.weekday.map((w) => {
-                    const pct = Math.round(w.ratio * 100)
-                    const noData = w.samples === 0
-                    // Empty state wording: a weekday no rule runs on is "not tracked";
-                    // a scheduled one with no logged days yet is "no data yet".
-                    const aria = noData
-                      ? `${WD_FULL[w.dow]}: ${w.scheduled ? t('progress.stats.weekdayNoData') : t('progress.stats.weekdayNotTracked')}`
-                      : `${WD_FULL[w.dow]}: ${t('progress.stats.weekdayTip', { pct })}`
-                    // Anchor the tooltip to the bar's top-centre — works for both a
-                    // hover (mouse) and a keyboard/touch focus, where there are no
-                    // cursor coords to read.
-                    const tip = (x: number, y: number): WeekdayTip => ({
-                      label: WD_FULL[w.dow],
-                      pct,
-                      noData,
-                      scheduled: w.scheduled,
-                      x,
-                      y,
-                    })
-                    const showTip = (el: HTMLElement) => {
-                      const r = el.getBoundingClientRect()
-                      setWdTip(tip(r.left + r.width / 2, r.top))
-                    }
-                    return (
-                      <div
-                        key={w.dow}
-                        role="img"
-                        tabIndex={0}
-                        aria-label={aria}
-                        className="flex h-full flex-1 cursor-default flex-col justify-end rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                        onMouseMove={(e) => setWdTip(tip(e.clientX, e.clientY))}
-                        onMouseLeave={() => setWdTip(null)}
-                        onFocus={(e) => showTip(e.currentTarget)}
-                        onBlur={() => setWdTip(null)}
-                      >
-                        {noData ? (
-                          // No samples: a short dashed stub reads "empty", clearly
-                          // distinct from a real low bar sitting near the baseline.
-                          <div className="h-2 w-full rounded-sm border border-dashed border-muted-foreground/30" />
-                        ) : (
-                          <div
-                            className="w-full rounded-t-md bg-primary transition-all duration-500"
-                            style={{ height: `${Math.max(6, Math.round(w.ratio * 100))}%`, opacity: 0.5 }}
-                          />
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-                <div className="mt-1.5 flex gap-2">
-                  {stats.weekday.map((w) => (
-                    <span key={w.dow} className="flex-1 text-center text-[10px] text-muted-foreground">
-                      {WD[w.dow]}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <WeekdayBars
+              weekday={stats.weekday}
+              title={t('progress.stats.weekdayTitle')}
+              sub={t('progress.stats.weekdaySub')}
+              info={t('progress.stats.info.weekday')}
+            />
           </div>
         </div>
       )}
-
-      {wdTip &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <div
-            className="pointer-events-none fixed z-[70] -translate-x-1/2 -translate-y-full rounded-lg border border-border bg-popover px-2.5 py-1.5 text-xs shadow-2xl"
-            style={{ left: wdTip.x, top: wdTip.y - 8 }}
-          >
-            <div className="font-medium text-foreground">{wdTip.label}</div>
-            <div className="mt-0.5 text-muted-foreground">
-              {wdTip.noData
-                ? wdTip.scheduled
-                  ? t('progress.stats.weekdayNoData')
-                  : t('progress.stats.weekdayNotTracked')
-                : t('progress.stats.weekdayTip', { pct: wdTip.pct })}
-            </div>
-          </div>,
-          document.body,
-        )}
     </div>
   )
 }

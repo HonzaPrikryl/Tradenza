@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Area, AreaChart, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { ArrowLeft, ChevronRight, ListChecks, Lock, CheckCircle2, Circle } from 'lucide-react'
+import { ArrowLeft, CalendarRange, ChevronRight, ListChecks, Lock, CheckCircle2, Circle, Plane } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
@@ -13,13 +13,17 @@ import { t } from '@/i18n'
 import { getUiLocale } from '@/i18n/config'
 import type { DayDetail } from '@/lib/dashboard/types'
 import type { DayRule } from '@/lib/actions/progress'
-import { toggleRuleCompletion, setDayCheckedIn, markAllSoftDone } from '@/lib/actions/progress'
-import { computeDayStatus, dayInScope, isCleanNoTrade } from '@/lib/progress-compute'
+import { toggleRuleCompletion, setDayCheckedIn, setDayAway, markAllSoftDone } from '@/lib/actions/progress'
+import { tallyDayRules, type AwayScope } from '@/lib/progress-compute'
 import { useChartColors, makeTooltipStyle } from '@/components/dashboard/widgets/shared'
 import ProgressRing from './ProgressRing'
 import DailyNoteEditor from './DailyNoteEditor'
 import DayRulesSections from './DayRulesSections'
 import DayStatusBadge from './DayStatusBadge'
+// Aliased: `Tooltip` is already taken by recharts' chart tooltip in this file.
+import UiTooltip from '@/components/ui/Tooltip'
+import AwayScopePicker from './AwayScopePicker'
+import AwayRangeDialog from './AwayRangeDialog'
 
 function formatDateHeader(date: string) {
   return new Date(`${date}T00:00:00`).toLocaleDateString(getUiLocale(), {
@@ -43,22 +47,44 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: num
 
 export default function DayReviewClient({
   date,
+  today,
   editable,
+  isOpen = false,
   detail,
   rules: initialRules,
   anyRules = true,
   hasTrades = false,
   initialCheckedIn = false,
+  initialAway = false,
+  initialAwayScope = 'both',
+  initialConfirmed = false,
+  withinHistory = true,
   note,
   currency,
 }: {
   date: string
+  /** Today in the user's timezone — anchors the range picker's history bound. */
+  today: string
   editable: boolean
+  /**
+   * The day is still running (today). A scheduled-but-unmet task holds at `pending` while
+   * it is; once the day settles it reads as a real miss. Must be derived with the server's
+   * `dayIsOpen` or the optimistic status would disagree with the refetch.
+   */
+  isOpen?: boolean
   detail: DayDetail
   rules: DayRule[]
   anyRules?: boolean
   hasTrades?: boolean
   initialCheckedIn?: boolean
+  /** Marked away — the day isn't measured (see setDayAway). */
+  initialAway?: boolean
+  /** Which domains the excuse covers. */
+  initialAwayScope?: AwayScope
+  /** Already engaged with (a rule logged or reviewed) — hides the confirm prompt. */
+  initialConfirmed?: boolean
+  /** Inside the rolling stats window — beyond it the excuse control is withheld. */
+  withinHistory?: boolean
   note: string
   currency: string
 }) {
@@ -66,25 +92,23 @@ export default function DayReviewClient({
   const c = useChartColors()
   const [rules, setRules] = useState(initialRules)
   const [checkedIn, setCheckedIn] = useState(initialCheckedIn)
+  const [away, setAway] = useState(initialAway)
+  const [awayScope, setAwayScope] = useState<AwayScope>(initialAwayScope)
+  const [showAwayRange, setShowAwayRange] = useState(false)
+  const confirmed = initialConfirmed || checkedIn || rules.some((r) => (r.type === 'hard' ? !r.completed : r.completed))
   const [pending, startTransition] = useTransition()
 
   const s = detail.stats
   const color = (s?.netPnl ?? 0) >= 0 ? c.profit : c.loss
 
-  const hardRules = rules.filter((r) => r.type === 'hard')
-  const softRules = rules.filter((r) => r.type === 'soft')
-  const softDone = softRules.filter((r) => r.completed).length
-  const softTotal = softRules.length
-  const hardTotal = hardRules.length
-  const hardViolations = hardRules.filter((r) => !r.completed).length
-  const ratio = softTotal > 0 ? softDone / softTotal : 0
-  const inScope = dayInScope({
+  // Trading tallies + colour; habits are tracked but never score the day (see
+  // tallyDayRules). Single source of truth shared with the overview day panel.
+  const { status, softDone, softTotal, hardTotal, hardViolations } = tallyDayRules(rules, {
     hasTrades,
     checkedIn,
-    hasLoggedRules: rules.some((r) => (r.type === 'hard' ? !r.completed : r.completed)),
+    isOpen,
   })
-  const cleanNoTrade = isCleanNoTrade(checkedIn, hasTrades)
-  const status = computeDayStatus({ inScope, cleanNoTrade, hardTotal, hardViolations, softTotal, softDone })
+  const ratio = softTotal > 0 ? softDone / softTotal : 0
 
   const toggle = (ruleId: string, next: boolean) => {
     if (!editable) return
@@ -112,7 +136,7 @@ export default function DayReviewClient({
   const markAllSoft = () => {
     if (!editable) return
     const prev = rules
-    setRules((arr) => arr.map((r) => (r.type === 'soft' ? { ...r, completed: true } : r)))
+    setRules((arr) => arr.map((r) => (r.type === 'soft' && r.category !== 'habit' ? { ...r, completed: true } : r)))
     startTransition(async () => {
       try {
         if (handleRateLimit(await markAllSoftDone(date))) {
@@ -140,6 +164,25 @@ export default function DayReviewClient({
         router.refresh()
       } catch (err) {
         setCheckedIn(!next)
+        toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
+      }
+    })
+  }
+
+  const toggleAway = () => {
+    if (!editable) return
+    const next = !away
+    // The review flag is deliberately untouched — see setDayAway.
+    setAway(next)
+    startTransition(async () => {
+      try {
+        if (handleRateLimit(await setDayAway(date, next, awayScope))) {
+          setAway(!next)
+          return
+        }
+        router.refresh()
+      } catch (err) {
+        setAway(!next)
         toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
       }
     })
@@ -303,8 +346,8 @@ export default function DayReviewClient({
                 {t('progress.dayReview.rulesTitle')}
               </h3>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                {rules.length > 0 && <DayStatusBadge status={status} className="text-xs" />}
-                {hardTotal > 0 && (
+                {(rules.length > 0 || away) && <DayStatusBadge status={status} away={away} className="text-xs" />}
+                {!away && hardTotal > 0 && (
                   <span
                     className={cn('text-xs font-medium', hardViolations > 0 ? 'text-loss' : 'text-muted-foreground')}
                   >
@@ -312,7 +355,7 @@ export default function DayReviewClient({
                       ? hardViolations === 1
                         ? t('progress.hardBroken.one')
                         : t('progress.hardBroken.other', { count: hardViolations })
-                      : t('progress.day.hardClean', { total: hardTotal })}
+                      : t(`progress.day.hardClean.${hardTotal === 1 ? 'one' : 'other'}`, { total: hardTotal })}
                   </span>
                 )}
               </div>
@@ -332,23 +375,118 @@ export default function DayReviewClient({
             </div>
           )}
 
-          {editable && !hasTrades && (
-            <div className="mb-3">
-              <button
-                type="button"
-                onClick={toggleCheckIn}
-                aria-pressed={checkedIn}
-                className={cn(
-                  'flex w-full items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
-                  checkedIn
-                    ? 'border-primary/40 bg-primary/10 text-primary'
-                    : 'border-border text-muted-foreground hover:bg-accent/50',
-                )}
-              >
-                {checkedIn ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
-                {t('progress.day.checkInNoTrade')}
-              </button>
-              <p className="mt-1 px-1 text-[11px] text-muted-foreground/80">{t('progress.day.checkInNoTradeHint')}</p>
+          {/* Day-level controls — one inline row, exactly as on the overview panel (see
+              DaySummaryPanel for why review and away are separate concerns, why each stays
+              visible once it's on, and why a no-trade day always offers the first).
+
+              They used to be full-width blocks stacked with a hint paragraph under each,
+              which turned three related actions into three sections and pushed the rule
+              list below the fold. The hints moved into tooltips, where the other two
+              surfaces already keep them. */}
+          {editable && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {!away && (!hasTrades || !confirmed || checkedIn) && (
+                <UiTooltip
+                  label={t(
+                    hasTrades
+                      ? checkedIn
+                        ? 'progress.day.confirmDayOnHint'
+                        : 'progress.day.confirmDayHint'
+                      : checkedIn
+                        ? 'progress.day.checkInNoTradeOnHint'
+                        : 'progress.day.checkInNoTradeHint',
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={toggleCheckIn}
+                    aria-pressed={checkedIn}
+                    className={cn(
+                      'flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
+                      'focus-visible:ring-2 focus-visible:ring-primary focus:outline-none',
+                      checkedIn
+                        ? 'border-primary/40 bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground hover:bg-accent/50',
+                    )}
+                  >
+                    {checkedIn ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+                    {t(
+                      hasTrades
+                        ? checkedIn
+                          ? 'progress.day.confirmDayOn'
+                          : 'progress.day.confirmDay'
+                        : checkedIn
+                          ? 'progress.day.checkInNoTradeOn'
+                          : 'progress.day.checkInNoTrade',
+                    )}
+                  </button>
+                </UiTooltip>
+              )}
+
+              {/* Withheld beyond the stats window for the same reason as on the overview
+                  panel: the day is out of every rolling calculation, so excusing it would
+                  change nothing. */}
+              {!hasTrades && withinHistory && (
+                <UiTooltip label={t(away ? 'progress.day.awayOnHint' : 'progress.day.awayHint')}>
+                  <button
+                    type="button"
+                    onClick={toggleAway}
+                    aria-pressed={away}
+                    className={cn(
+                      'flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
+                      'focus-visible:ring-2 focus-visible:ring-primary focus:outline-none',
+                      away
+                        ? 'border-sky-500/40 bg-sky-500/10 text-sky-400'
+                        : 'border-border text-muted-foreground hover:bg-accent/50',
+                    )}
+                  >
+                    <Plane className="h-3.5 w-3.5" />
+                    {t(away ? 'progress.day.awayOn' : 'progress.day.away')}
+                  </button>
+                </UiTooltip>
+              )}
+
+              {/* Outside the away condition on purpose: that one hides itself on a day you
+                  traded, and this dialog is about OTHER days. */}
+              <UiTooltip label={t('progress.stats.awayRangeButtonHint')}>
+                <button
+                  type="button"
+                  onClick={() => setShowAwayRange(true)}
+                  className={cn(
+                    'flex items-center gap-2 rounded-md border border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground',
+                    'focus-visible:ring-2 focus-visible:ring-primary focus:outline-none',
+                  )}
+                >
+                  <CalendarRange className="h-3.5 w-3.5" />
+                  {t('progress.stats.awayRange')}
+                </button>
+              </UiTooltip>
+
+              {/* Scope refinement — only once the day is excused, on its own line so the
+                  row above stays a row of actions. See AwayScopePicker. */}
+              {away && (
+                <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+                  <AwayScopePicker
+                    value={awayScope}
+                    onChange={(next) => {
+                      setAwayScope(next)
+                      startTransition(async () => {
+                        try {
+                          if (handleRateLimit(await setDayAway(date, true, next))) return
+                          router.refresh()
+                        } catch (err) {
+                          setAwayScope(awayScope)
+                          toast.error(getActionErrorMessage(err, 'progress.rules.toast.saveError'))
+                        }
+                      })
+                    }}
+                    disabled={pending}
+                  />
+                  <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+                    {t(`progress.day.awayScopeHint.${awayScope}`)}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -371,6 +509,10 @@ export default function DayReviewClient({
       <div className="mt-5">
         <DailyNoteEditor date={date} initialNote={note} />
       </div>
+
+      {showAwayRange && (
+        <AwayRangeDialog today={today} onClose={() => setShowAwayRange(false)} onSaved={() => router.refresh()} />
+      )}
     </div>
   )
 }

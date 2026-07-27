@@ -21,7 +21,8 @@
   "rule": {
     "notFound": "Rule not found.",
     "future": "You can't log a day that hasn't happened yet.",
-    "notScheduled": "This rule is not scheduled for that day."
+    "notScheduled": "This rule is not scheduled for that day.",
+    "tooOld": "Your statistics only go back {days} days — anything older can't be changed."
   },
   "strategy": {
     "notFound": "Strategy not found."
