@@ -1,6 +1,7 @@
 'use server'
 
 import { db, tags, tagGroups, tradeTags, trades } from '@/lib/db'
+import { runAtomic } from '@/lib/db/atomic'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
@@ -128,27 +129,29 @@ export const reorderTagGroups = mutationAction([uuidArray], async ({ userId }, o
 })
 
 export const updateTagGroup = mutationAction([uuid, nameColorSchema], async ({ userId }, id, { name, color }) => {
-  const group = await db.transaction(async (tx) => {
-    const [updated] = await tx
+  // A tag has no colour of its own — it wears its category's. The colour is
+  // denormalised onto the row (every reader joins tags, not groups), so
+  // recolouring a category has to cascade or the copies go stale. Both writes
+  // therefore go out as one atomic unit (see runAtomic: batch on neon-http,
+  // transaction on node-postgres).
+  //
+  // The cascade is unconditional rather than gated on the group update having
+  // matched: it is scoped to this user's tags in this group, so when the group
+  // isn't theirs (or doesn't exist) it simply matches nothing.
+  const [[updated]] = await runAtomic((x) => [
+    x
       .update(tagGroups)
       .set({ name, color })
       .where(and(eq(tagGroups.id, id), eq(tagGroups.userId, userId)))
-      .returning()
-    if (!updated) return undefined
-
-    // A tag has no colour of its own — it wears its category's. The colour is
-    // denormalised onto the row (every reader joins tags, not groups), so
-    // recolouring a category has to cascade or the copies go stale.
-    await tx
+      .returning(),
+    x
       .update(tags)
       .set({ color })
-      .where(and(eq(tags.groupId, id), eq(tags.userId, userId)))
-
-    return updated
-  })
+      .where(and(eq(tags.groupId, id), eq(tags.userId, userId))),
+  ])
 
   revalidateTags()
-  return { success: true, group }
+  return { success: true, group: updated }
 })
 
 export const deleteTagGroup = mutationAction([uuid], async ({ userId }, id) => {

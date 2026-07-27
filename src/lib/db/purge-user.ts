@@ -1,7 +1,6 @@
 import * as Sentry from '@sentry/nextjs'
 import { eq } from 'drizzle-orm'
 import {
-  db,
   accounts,
   trades,
   tags,
@@ -17,6 +16,7 @@ import {
   strategies,
   users,
 } from '@/lib/db'
+import { runAtomic } from './atomic'
 import { isR2Configured, deleteR2Prefix } from '@/lib/r2'
 
 // Irreversibly delete every piece of data belonging to a user. Used both by the
@@ -27,21 +27,21 @@ import { isR2Configured, deleteR2Prefix } from '@/lib/r2'
 // keyed by contract root, containing no personal data. User preferences live in
 // cookies, so they disappear with the session.
 export async function purgeUserData(userId: string): Promise<void> {
-  await db.batch([
-    db.delete(ruleCompletions).where(eq(ruleCompletions.userId, userId)),
-    db.delete(progressRules).where(eq(progressRules.userId, userId)),
-    db.delete(screenshots).where(eq(screenshots.userId, userId)),
-    db.delete(candleCache).where(eq(candleCache.userId, userId)),
-    db.delete(trades).where(eq(trades.userId, userId)),
-    db.delete(tags).where(eq(tags.userId, userId)),
-    db.delete(tagGroups).where(eq(tagGroups.userId, userId)),
-    db.delete(importLogs).where(eq(importLogs.userId, userId)),
-    db.delete(dashboardTemplates).where(eq(dashboardTemplates.userId, userId)),
-    db.delete(dailyCheckins).where(eq(dailyCheckins.userId, userId)),
-    db.delete(feedback).where(eq(feedback.userId, userId)),
-    db.delete(strategies).where(eq(strategies.userId, userId)),
-    db.delete(accounts).where(eq(accounts.userId, userId)),
-    db.delete(users).where(eq(users.id, userId)),
+  await runAtomic((x) => [
+    x.delete(ruleCompletions).where(eq(ruleCompletions.userId, userId)),
+    x.delete(progressRules).where(eq(progressRules.userId, userId)),
+    x.delete(screenshots).where(eq(screenshots.userId, userId)),
+    x.delete(candleCache).where(eq(candleCache.userId, userId)),
+    x.delete(trades).where(eq(trades.userId, userId)),
+    x.delete(tags).where(eq(tags.userId, userId)),
+    x.delete(tagGroups).where(eq(tagGroups.userId, userId)),
+    x.delete(importLogs).where(eq(importLogs.userId, userId)),
+    x.delete(dashboardTemplates).where(eq(dashboardTemplates.userId, userId)),
+    x.delete(dailyCheckins).where(eq(dailyCheckins.userId, userId)),
+    x.delete(feedback).where(eq(feedback.userId, userId)),
+    x.delete(strategies).where(eq(strategies.userId, userId)),
+    x.delete(accounts).where(eq(accounts.userId, userId)),
+    x.delete(users).where(eq(users.id, userId)),
   ])
 
   // Best-effort: remove the user's uploaded note images from object storage.
