@@ -36,3 +36,37 @@ jobs:
 
       - name: Unit tests
         run: npm run test:run
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 22, not the 20 the test job runs: this job stands in for the Docker
+      # image build, and the image is `node:22-alpine`. Lint/tests keep running
+      # on the declared floor (Node 20+) so support for it stays honest.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Compiles the app the same way the Docker image does (standalone output),
+      # so config/instrumentation regressions surface here instead of at deploy
+      # time. NEXT_PUBLIC_* values are format-valid placeholders — nothing here
+      # is a secret, and env validation is skipped during the build phase.
+      - name: Next.js build (standalone)
+        run: npm run build
+        env:
+          BUILD_STANDALONE: '1'
+          NEXT_TELEMETRY_DISABLED: '1'
+          DATABASE_URL: postgresql://build:build@localhost:5432/build
+          CLERK_SECRET_KEY: sk_test_build_placeholder
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_Y2xlcmsuZXhhbXBsZS5jb20k
+          NEXT_PUBLIC_CLERK_SIGN_IN_URL: /sign-in
+          NEXT_PUBLIC_CLERK_SIGN_UP_URL: /sign-up
+          NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: /dashboard
+          NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: /dashboard

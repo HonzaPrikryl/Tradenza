@@ -1,0 +1,16 @@
+.git
+.github
+.husky
+.next
+.vercel
+.vscode
+node_modules
+coverage
+docs
+*.md
+.env
+.env.*
+tsconfig.tsbuildinfo
+Dockerfile
+docker-compose.yml
+.dockerignore

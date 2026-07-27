@@ -2,8 +2,13 @@ import * as Sentry from '@sentry/nextjs'
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    const { validateEnv } = await import('./lib/env')
-    validateEnv()
+    // Validate at server boot, not at build: `next build` also runs this hook
+    // (for prerendering), but a Docker image build has no runtime secrets — the
+    // real environment only exists once the container starts.
+    if (process.env.NEXT_PHASE !== 'phase-production-build') {
+      const { validateEnv } = await import('./lib/env')
+      validateEnv()
+    }
 
     await import('./sentry.server.config')
   }

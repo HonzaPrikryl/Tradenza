@@ -1,0 +1,75 @@
+# Self-hosted Tradenza: app + PostgreSQL.
+#
+#   1. cp .env.example .env   → fill in POSTGRES_PASSWORD + the Clerk keys
+#   2. docker compose up -d --build
+#   3. open http://localhost:3000
+#
+# Migrations run automatically when the app container starts. Full guide:
+# docs/SELF_HOSTING.md.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tradenza
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: tradenza
+    # Bound to loopback on purpose: handy for local development (`npm run dev`
+    # against this container, psql, Drizzle Studio) without ever exposing
+    # Postgres to the network on a VPS. The app container reaches it over the
+    # compose network regardless of this mapping.
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U tradenza -d tradenza']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    # Prefer not to build locally? Replace the whole `build:` block with the
+    # prebuilt image (see docs/SELF_HOSTING.md → "Prebuilt image"):
+    #   image: ghcr.io/honzaprikryl/tradenza:latest
+    build:
+      context: .
+      # NEXT_PUBLIC_* values are inlined into the client bundle, so they must be
+      # known at build time (values are read from .env).
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:?set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY in .env}
+        NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/sign-in}
+        NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/sign-up}
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL:-/dashboard}
+        NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL:-/dashboard}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-}
+        NEXT_PUBLIC_MARKETING_URL: ${NEXT_PUBLIC_MARKETING_URL:-}
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_POSTHOG_KEY: ${NEXT_PUBLIC_POSTHOG_KEY:-}
+        NEXT_PUBLIC_POSTHOG_HOST: ${NEXT_PUBLIC_POSTHOG_HOST:-}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Host port only — the container always listens on 3000 (see PORT below).
+    ports:
+      - '${APP_PORT:-3000}:3000'
+    # Runtime secrets (Clerk secret key, R2, Databento, …) come from .env;
+    # the explicit values below are set after it and therefore win over anything
+    # .env happens to contain.
+    env_file: .env
+    environment:
+      # Pinned on purpose: `env_file` would otherwise leak a stray PORT from .env
+      # into the container, so the server would listen on a port the published
+      # mapping and the image HEALTHCHECK know nothing about. Change the HOST
+      # port with APP_PORT instead.
+      PORT: 3000
+      # Points at the bundled Postgres by default; set DATABASE_URL in .env to
+      # use an external database instead.
+      # NOTE: the password is interpolated into a URL, so it must not contain
+      # characters that are special there (@ : / ? # [ ] %). Stick to
+      # letters/digits or URL-encode them — e.g. `openssl rand -hex 32`.
+      DATABASE_URL: ${DATABASE_URL:-postgresql://tradenza:${POSTGRES_PASSWORD}@db:5432/tradenza}
+
+volumes:
+  db-data:

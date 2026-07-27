@@ -11,7 +11,7 @@ First off — thank you for taking the time to contribute. Tradenza started as a
 
 ## Development setup
 
-You'll need **Node.js 20+**, a **PostgreSQL/Neon** database, and a **Clerk** application. Full instructions are in the [README quick start](README.md#quick-start).
+You'll need **Node.js 20+**, a **PostgreSQL** database (local, Docker or Neon), and a **Clerk** application. Full instructions are in the [README quick start](README.md#quick-start).
 
 ```bash
 git clone https://github.com/HonzaPrikryl/tradenza.git
@@ -22,6 +22,17 @@ npm run db:migrate
 npm run dev
 ```
 
+No database at hand? Start one with the bundled compose file and point
+`DATABASE_URL` at it:
+
+```bash
+POSTGRES_PASSWORD=devpassword docker compose up -d db
+# DATABASE_URL=postgresql://tradenza:devpassword@localhost:5432/tradenza
+```
+
+The container publishes Postgres on `127.0.0.1:5432` (loopback only). To run the
+whole stack in Docker instead, see [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
+
 ## Project conventions
 
 - **Language & framework:** TypeScript, Next.js App Router, React Server Components + Server Actions. Prefer server actions in `src/lib/actions/` for data mutations rather than ad-hoc API routes.
@@ -29,6 +40,7 @@ npm run dev
 - **UI text goes through i18n.** User-facing strings live in `src/i18n/locales/en/*.json` and are read via the `t()` helper — please don't hardcode display strings in components.
 - **Styling** uses Tailwind with the design tokens defined in `src/app/globals.css` (e.g. `bg-card`, `text-profit`, `text-loss`). Reuse the tokens instead of hardcoding colors so both dark and light themes keep working.
 - **Database changes:** edit `src/lib/db/schema.ts`, then generate a migration with `npm run db:generate -- --name my_change`, review the SQL in `drizzle/`, and apply it with `npm run db:migrate`. Do **not** use `db:push`. See the [Database & migrations](README.md#database--migrations) section.
+- **Multi-statement writes must use `runAtomic`.** The app supports two drivers and their atomicity APIs do not overlap: neon-http has `db.batch` but throws on `db.transaction`, node-postgres is the other way round. Never call either directly — use `runAtomic(...)` from `src/lib/db/atomic.ts`, which picks the right one. Code that calls `db.transaction` works locally on Postgres and fails in production on Neon.
 
 ## Before you open a pull request
 

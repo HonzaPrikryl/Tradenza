@@ -22,7 +22,7 @@ Tradenza is an open-source trading journal I originally built for my own trading
 
 It is designed for traders who want to improve through data rather than feelings: log every trade, review the chart and your execution, track the statistics that actually matter, and hold yourself accountable to your own trading rules.
 
-> **Two ways to use Tradenza:** use the hosted version at **[tradenza.dev](https://tradenza.dev)** — sign up and start journaling, no setup required — or self-host your own instance (see [Quick start](#quick-start)). Both run the same open-source code, and it's free either way.
+> **Two ways to use Tradenza:** use the hosted version at **[tradenza.dev](https://tradenza.dev)** — sign up and start journaling, no setup required — or self-host your own instance with Docker (see [Self-hosting](#self-hosting-docker)) or locally (see [Quick start](#quick-start)). Both run the same open-source code, and it's free either way.
 
 > **Status:** Active development by a solo maintainer. The app is feature-rich and used daily, but it is pre-1.0 — expect rough edges and breaking changes. Issues and pull requests are very welcome.
 
@@ -37,7 +37,7 @@ It is designed for traders who want to improve through data rather than feelings
 - **Flexible import** — guided import wizard for CSV exports (large catalog of broker formats), with automatic de-duplication and a full import history.
 - **Tags & categories** — color-coded tags grouped into categories (e.g. _Setup type_, _Mistake_), assignable to trades and usable as filters.
 - **Futures-aware P&L** — built-in contract multipliers for common futures (ES, NQ, GC, CL, …) so P&L and R are computed correctly per instrument.
-- **Global filters** — app-wide header to switch accounts, pick a date range (with presets), toggle the unit between **$** and **R**, and apply filters across every page.
+- **Global filters** — app-wide header to switch accounts, pick a date range (with presets), toggle the unit between **$** and **R**, and apply filters across the P&L screens (dashboard, trades, statistics, strategies). Discipline is intentionally exempt — it tracks your process over the full calendar, not a filtered slice of trades.
 - **Polished UX** — dark-first design with a light theme, responsive layout with a mobile navigation sheet, installable as a PWA, and consistent skeleton loading states throughout.
 
 See [`docs/UX_UI.md`](docs/UX_UI.md) for a full UX/UI walkthrough of the screens, flows, and design system.
@@ -49,7 +49,7 @@ See [`docs/UX_UI.md`](docs/UX_UI.md) for a full UX/UI walkthrough of the screens
 | Framework                     | [Next.js 15](https://nextjs.org) (App Router, Server Actions) + React 19                                                         |
 | Language                      | TypeScript                                                                                                                       |
 | Styling                       | Tailwind CSS with custom HSL design tokens; MUI + Radix UI primitives; Emotion                                                   |
-| Database                      | [PostgreSQL](https://www.postgresql.org) via [Neon](https://neon.tech) (serverless)                                              |
+| Database                      | [PostgreSQL](https://www.postgresql.org) — any standard Postgres (node-postgres) or [Neon](https://neon.tech) (serverless HTTP)  |
 | ORM                           | [Drizzle ORM](https://orm.drizzle.team) + drizzle-kit                                                                            |
 | Auth                          | [Clerk](https://clerk.com)                                                                                                       |
 | Charts                        | [Recharts](https://recharts.org) (analytics) + [Lightweight Charts](https://tradingview.github.io/lightweight-charts/) (candles) |
@@ -64,12 +64,26 @@ See [`docs/UX_UI.md`](docs/UX_UI.md) for a full UX/UI walkthrough of the screens
 | Analytics _(optional)_        | [PostHog](https://posthog.com)                                                                                                   |
 | Quality                       | Vitest, ESLint, Prettier, Husky + lint-staged, GitHub Actions CI                                                                 |
 
+## Self-hosting (Docker)
+
+The fastest way to run your own instance — app + PostgreSQL in two containers,
+with database migrations applied automatically on start:
+
+```bash
+git clone https://github.com/HonzaPrikryl/tradenza.git
+cd tradenza
+cp .env.example .env    # set POSTGRES_PASSWORD + your Clerk keys
+docker compose up -d --build
+```
+
+Open [http://localhost:3000](http://localhost:3000) and sign up. The only external service required is a free-tier [Clerk](https://clerk.com) application for auth. Prefer not to build locally? A prebuilt image is published to GHCR on every release (`ghcr.io/honzaprikryl/tradenza`). The full guide — prebuilt images, external databases, reverse proxy + HTTPS, backups, upgrades, multi-replica migrations — lives in [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
+
 ## Quick start
 
 ### Prerequisites
 
 - **Node.js 20+** and npm
-- A **Neon** (or any PostgreSQL) database — free tier is plenty
+- A **PostgreSQL** database — local (e.g. Docker), Neon free tier, or any other Postgres
 - A **Clerk** application for authentication — free tier is plenty
 
 ### 1. Clone & install
@@ -115,7 +129,8 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 
 | Variable                                                  | Required | Purpose                                                                                      |
 | --------------------------------------------------------- | :------: | -------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                            |    ✅    | Neon / PostgreSQL connection string                                                          |
+| `DATABASE_URL`                                            |    ✅    | PostgreSQL connection string (any Postgres or Neon; driver auto-detected)                    |
+| `DATABASE_DRIVER` / `DATABASE_POOL_MAX`                   |    ▫️    | Force the DB driver (`pg` / `neon`) · node-postgres pool size (default 10)                   |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`                       |    ✅    | Clerk publishable key                                                                        |
 | `CLERK_SECRET_KEY`                                        |    ✅    | Clerk secret key                                                                             |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `..._SIGN_UP_URL`       |    ✅    | Auth route paths (`/sign-in`, `/sign-up`)                                                    |
@@ -159,7 +174,7 @@ Users can permanently delete their account and all associated data from **Settin
 
 The app runs in three isolated environments. Each service provides its own separation, so local testing never touches production data or users.
 
-| Layer          | Loaded from                                                          | Clerk                              | Database (Neon)           | Domain split                                             |
+| Layer          | Loaded from                                                          | Clerk                              | Database                  | Domain split                                             |
 | -------------- | -------------------------------------------------------------------- | ---------------------------------- | ------------------------- | -------------------------------------------------------- |
 | **Local**      | `.env.development` (committed) + `.env.local` (secrets, git-ignored) | Development instance (`pk_test_…`) | `dev` branch              | Off — everything on `http://localhost:3000`              |
 | **Preview**    | Host dashboard → Preview env                                         | Development instance               | `dev` (or preview) branch | Off / per-branch URL                                     |
@@ -168,7 +183,7 @@ The app runs in three isolated environments. Each service provides its own separ
 How the separation works:
 
 - **Auth (Clerk)** — Clerk ships two instances. The **Development** instance works on `localhost`; the **Production** instance is locked to the production domain. Use the matching key pair per environment.
-- **Database (Neon)** — create a **branch** (`Neon → Branches → dev`) and use its connection string in `.env.local`, so local writes go to the dev branch and production keeps its own data.
+- **Database** — use a separate database per environment so local writes never touch production data. With any standard Postgres that's simply a second database — e.g. the local container from `docker-compose.yml` (`docker compose up -d db`). On Neon (which the hosted instance uses) the same is done with a **branch** (`Neon → Branches → dev`); either way, put that connection string in `.env.local`.
 - **Domain routing** — `NEXT_PUBLIC_APP_URL` / `NEXT_PUBLIC_MARKETING_URL` drive the host split in `middleware.ts`. They are **empty locally** (single host, no redirects) and set to the real domains only in the Production environment.
 
 Local secrets live in `.env.local` (never committed). Production and preview values are set in your host's dashboard (e.g. Vercel → Settings → Environment Variables), scoped to the matching environment. The committed `.env.development` only pins non-secret defaults (the domain split stays off locally).
@@ -196,7 +211,7 @@ src/
 │   └── globals.css             # Design tokens + Tailwind layers
 ├── components/                 # Feature + UI components (dashboard, trades, stats, progress, settings, ui…)
 ├── lib/
-│   ├── db/                     # Drizzle schema + Neon client
+│   ├── db/                     # Drizzle schema + DB client (auto-selects pg / Neon driver)
 │   ├── actions/                # Server Actions (trades, stats, import, accounts, tags, progress, dashboard, candles, strategies, wizard, admin, feedback)
 │   ├── dashboard/              # Widget compute + default templates
 │   ├── stats-compute.ts        # Pure statistics engine (unit-tested)
@@ -263,13 +278,13 @@ Manual single-trade entry is also available for trades you don't import.
 npx vercel
 ```
 
-Add the environment variables in the Vercel dashboard, then apply migrations to your production database with `db:migrate` pointed at the production `DATABASE_URL` (`vercel env pull`, then `dotenv -e .env.production.local -- npm run db:migrate`). Adopting an already-populated production DB requires the one-time baseline seed in [`drizzle/MIGRATIONS.md`](drizzle/MIGRATIONS.md) first. The app is a standard Next.js project and will run on any platform that supports Next.js 15 (Vercel, Netlify, Fly.io, a Docker container, …).
+Add the environment variables in the Vercel dashboard, then apply migrations to your production database with `db:migrate` pointed at the production `DATABASE_URL` (`vercel env pull`, then `dotenv -e .env.production.local -- npm run db:migrate`). Adopting an already-populated production DB requires the one-time baseline seed in [`drizzle/MIGRATIONS.md`](drizzle/MIGRATIONS.md) first. The app is a standard Next.js project and will run on any platform that supports Next.js 15 (Vercel, Netlify, Fly.io, …). For a Docker/VPS deployment use the bundled `Dockerfile` + `docker-compose.yml` — see [Self-hosting](#self-hosting-docker) and [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
 
 A strict, nonce-based **Content-Security-Policy** is enforced per request in `src/middleware.ts` (production drops `unsafe-inline`/`unsafe-eval` in favour of a per-request nonce + `strict-dynamic`). If you add a third-party script or origin, extend the allow-list in `src/lib/csp.ts`.
 
 ### Backups & monitoring
 
-The production database is the only irreplaceable state. Set up both a Neon point-in-time-recovery window and off-Neon logical dumps — the scheduled `DB Backup` workflow (`.github/workflows/db-backup.yml`) and full recovery steps are documented in [`docs/BACKUPS.md`](docs/BACKUPS.md).
+The production database is the only irreplaceable state. Set up point-in-time recovery where your provider offers it (e.g. Neon history) plus scheduled **off-provider logical dumps** — the scheduled `DB Backup` workflow (`.github/workflows/db-backup.yml`) and full recovery steps are documented in [`docs/BACKUPS.md`](docs/BACKUPS.md). Docker self-hosts have a one-line `pg_dump` recipe in [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
 
 A public **health check** lives at `/api/health` (returns `200` with `"status":"ok"` when the app can reach its database, `503` otherwise). Point an uptime monitor (UptimeRobot, Better Stack, …) at it, or use the bundled `Uptime` workflow (`.github/workflows/uptime.yml`). To report a security issue, see [`SECURITY.md`](SECURITY.md).
 

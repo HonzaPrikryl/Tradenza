@@ -27,6 +27,10 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Docker builds set BUILD_STANDALONE=1 to emit the self-contained
+  // `.next/standalone` server (see Dockerfile). Kept off otherwise so the
+  // Vercel/`next start` workflow is untouched.
+  ...(process.env.BUILD_STANDALONE === '1' ? { output: 'standalone' } : {}),
   // Optional rate-limit deps are loaded at runtime (only when Upstash is set), so
   // keep them external instead of bundling — this also ensures they're included in
   // the serverless deployment.

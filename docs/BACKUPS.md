@@ -1,9 +1,15 @@
 # Database backups & recovery
 
-Tradenza's only stateful, irreplaceable component is the **Neon PostgreSQL**
+Tradenza's only stateful, irreplaceable component is the **PostgreSQL**
 database. Everything else (the app, R2 screenshots, Clerk users) can be
 rebuilt or is owned by a third party. This document describes how the database
 is protected and how to restore it.
+
+> The principles here apply to any Postgres; the concrete provider steps are
+> written for **Neon**, which the hosted instance (tradenza.dev) runs on. If you
+> self-host with the Docker Compose stack, the equivalent is the `pg_dump`
+> recipe in [`SELF_HOSTING.md`](SELF_HOSTING.md#operations) — plus whatever
+> snapshot/PITR mechanism your own Postgres or provider offers.
 
 There are two independent layers, and you want both:
 
