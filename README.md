@@ -78,6 +78,8 @@ docker compose up -d --build
 
 Open [http://localhost:3000](http://localhost:3000) and sign up. The only external service required is a free-tier [Clerk](https://clerk.com) application for auth. Prefer not to build locally? A prebuilt image is published to GHCR on every release (`ghcr.io/honzaprikryl/tradenza`). The full guide — prebuilt images, external databases, reverse proxy + HTTPS, backups, upgrades, multi-replica migrations — lives in [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md).
 
+Every release is written up in [`CHANGELOG.md`](CHANGELOG.md), including anything self-hosters have to do when upgrading. Worth a look before you pull a new image.
+
 ## Quick start
 
 ### Prerequisites

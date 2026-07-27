@@ -60,8 +60,19 @@ Git hooks (Husky + lint-staged) will auto-format and lint staged files on commit
 - Keep PRs focused — one logical change per PR is much easier to review.
 - Write a clear description: what changed, why, and how to test it.
 - Update the README / docs if you change behavior, config, or setup.
+- **Add a line to `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md)** if the change is user-visible — a new or changed feature, a bug fix people would notice, a new or renamed environment variable, a database migration, or anything that alters how the app is deployed. Skip it for refactors, formatting, tests and CI tweaks with no observable effect. Write it in the same PR, not later: a changelog assembled from memory at release time is how half a release goes missing.
 - Use clear, present-tense commit messages (e.g. `Add max-drawdown widget`). [Conventional Commits](https://www.conventionalcommits.org) are welcome but not required.
 - By submitting a contribution, you agree that it will be licensed under the project's [AGPL-3.0 license](LICENSE).
+
+## Releasing
+
+Maintainer notes — you don't need this to contribute.
+
+**Versioning.** [Semantic Versioning](https://semver.org/spec/v2.0.0.html), pre-1.0: `0.x.0` for a new feature _or_ a breaking change (pre-1.0 allows breaking changes in a minor — they just have to be called out explicitly in the changelog), `0.0.x` for fixes and small improvements with no new surface. `1.0.0` waits until the database schema and the self-hosting path are stable enough to commit to. Release when there is something worth shipping, not on a calendar.
+
+**The tag is the release.** `.github/workflows/docker.yml` triggers on `v*` tags and nothing else, so pushing the tag is what builds and publishes `ghcr.io/honzaprikryl/tradenza:<version>` and `:latest`. Without a tag there is no image, and the install instructions in the README point at nothing.
+
+Then watch the **Docker image** workflow finish and confirm the new tag is listed on the [package page](https://github.com/HonzaPrikryl/tradenza/pkgs/container/tradenza). A manual `workflow_dispatch` run publishes `:edge` instead, which is useful for testing the image build without cutting a release.
 
 ## Reporting security issues
 

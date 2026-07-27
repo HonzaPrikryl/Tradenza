@@ -133,12 +133,18 @@ locked to your domain, and configure the `user.deleted` webhook
 
   See [`docs/BACKUPS.md`](BACKUPS.md) for the full strategy.
 
-- **Upgrades** —
+- **Upgrades** — read [`CHANGELOG.md`](../CHANGELOG.md) first: every release
+  lists what changed and, when a version needs a manual step (a new required
+  environment variable, a breaking change), says so under **Upgrading**. Then:
 
   ```bash
   git pull
   docker compose up -d --build   # migrations apply automatically on start
   ```
+
+  On the prebuilt image, `docker compose pull && docker compose up -d`. Pin a
+  version (`:0.2.0`) rather than `:latest` if you'd rather choose when to move.
+  Take a backup before upgrading — see below.
 
 - **Logs** — `docker compose logs -f app` (migration output included).
 
