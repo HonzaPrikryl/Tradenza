@@ -70,9 +70,31 @@ Maintainer notes — you don't need this to contribute.
 
 **Versioning.** [Semantic Versioning](https://semver.org/spec/v2.0.0.html), pre-1.0: `0.x.0` for a new feature _or_ a breaking change (pre-1.0 allows breaking changes in a minor — they just have to be called out explicitly in the changelog), `0.0.x` for fixes and small improvements with no new surface. `1.0.0` waits until the database schema and the self-hosting path are stable enough to commit to. Release when there is something worth shipping, not on a calendar.
 
-**The tag is the release.** `.github/workflows/docker.yml` triggers on `v*` tags and nothing else, so pushing the tag is what builds and publishes `ghcr.io/honzaprikryl/tradenza:<version>` and `:latest`. Without a tag there is no image, and the install instructions in the README point at nothing.
+**The tag is the release.** [`.github/workflows/release.yml`](.github/workflows/release.yml) triggers on `v*` tags and nothing else. Pushing the tag publishes `ghcr.io/honzaprikryl/tradenza:<version>` (plus `:<major>.<minor>` and `:latest`) and then opens the GitHub release, using the matching `CHANGELOG.md` section as its notes. Without a tag there is no image and no release, and the install instructions in the README point at nothing.
 
-Then watch the **Docker image** workflow finish and confirm the new tag is listed on the [package page](https://github.com/HonzaPrikryl/tradenza/pkgs/container/tradenza). A manual `workflow_dispatch` run publishes `:edge` instead, which is useful for testing the image build without cutting a release.
+**Release notes come from the changelog, not from you.** The workflow extracts everything between `## [<version>]` and the next heading. That is why the file has to keep the Keep a Changelog format — an ASCII hyphen in `## [0.3.0] - 2026-08-14`, not an en dash — and why a missing section fails the job instead of shipping empty notes.
+
+### Cutting a release
+
+1. **Write the changelog entry.** Move the accumulated `## [Unreleased]` items under a new heading, `## [0.3.0] - YYYY-MM-DD`, using today's date. Keep the section order Keep a Changelog defines: Added, Changed, Deprecated, Removed, Fixed, Security — omit the ones you don't need. Open with a sentence or two on what the release is _for_; that paragraph is the first thing anyone reads on the release page.
+
+2. **Add an `**Upgrading.**` paragraph whenever a self-hoster has to do something** — a new required environment variable, a renamed setting, a manual step, a breaking change. Migrations apply themselves on container start, so they only need a mention if they are destructive, slow, or irreversible. If the upgrade really is a no-op, say that too: "existing deployments need no action" saves people a nervous evening.
+
+3. **Update the link definitions** at the bottom of the changelog: point `[unreleased]` at `compare/v0.3.0...HEAD` and add a line for the new version.
+
+4. **Bump, commit, tag, push.**
+
+   ```bash
+   npm version 0.3.0 --no-git-tag-version
+   git add CHANGELOG.md package.json package-lock.json
+   git commit -m "chore(release): 0.3.0"
+   git tag -a v0.3.0 -m "Example feature change message"
+   git push --follow-tags        # pushes the commit and the tag together
+   ```
+
+5. **Watch the run finish** and check the [package page](https://github.com/HonzaPrikryl/tradenza/pkgs/container/tradenza) for the new image tag and the [releases page](https://github.com/HonzaPrikryl/tradenza/releases) for the notes. If the extraction step fails, the changelog heading doesn't match the tag — fix it, delete the tag locally and remotely, and push it again.
+
+A manual `workflow_dispatch` run builds and publishes `:edge` and creates no release. Use it to check the image still builds without cutting a version.
 
 ## Reporting security issues
 

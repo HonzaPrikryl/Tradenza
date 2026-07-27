@@ -1,0 +1,115 @@
+name: Release
+
+# Pushing a version tag is the whole release. This workflow turns it into the
+# two artefacts a release consists of:
+#   1. the production image on GitHub Container Registry
+#      (v0.2.0 → :0.2.0, :0.2, :latest), so self-hosters can run
+#      `image: ghcr.io/honzaprikryl/tradenza:latest` instead of building, and
+#   2. the GitHub Release, whose notes are lifted verbatim from CHANGELOG.md.
+# Nothing to run by hand: `git push --follow-tags` is the last manual step.
+#
+# The image is compiled with a placeholder Clerk publishable key; the container
+# entrypoint swaps in the real one from the environment at startup (see
+# scripts/docker-entrypoint.sh), so one public image serves every deployment.
+#
+# A manual run (workflow_dispatch) publishes `:edge` and creates no release —
+# it exists to test that the image still builds without cutting a version.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    name: Build & push to GHCR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            # A manual run is not on a tag, so every rule above yields nothing and
+            # `push: true` would fail on an empty tag list. Give those runs their
+            # own moving tag instead.
+            type=raw,value=edge,enable=${{ github.ref_type != 'tag' }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  github-release:
+    name: Publish GitHub release
+    # Only for real version tags, and only once the image is actually on GHCR —
+    # a release announcing an image that failed to build is worse than no
+    # release, and the notes tell people to pull it.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    # Narrower than the workflow default: this job writes releases, not packages.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # The release notes ARE the changelog entry — one source of truth, so the
+      # two can't drift. This is why CHANGELOG.md sticks to the Keep a Changelog
+      # heading format (`## [0.2.0] - 2026-07-27`): it has to stay parseable.
+      - name: Extract the changelog section for this tag
+        id: notes
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          awk -v v="$version" '
+            # Start at this version'"'"'s heading, stop at the next release
+            # heading or at the link definitions that close the file.
+            $0 ~ "^## \\[" v "\\]" { found = 1; next }
+            found && /^## \[/       { exit }
+            found && /^\[[^]]+\]:/  { exit }
+            found                   { print }
+          ' CHANGELOG.md > notes.md
+          # Trim leading/trailing blank lines.
+          sed -i -e '/./,$!d' notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::No '## [$version]' section found in CHANGELOG.md." \
+                 "Add the entry before tagging, or the release would ship empty notes."
+            exit 1
+          fi
+          echo "--- release notes ---"
+          cat notes.md
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes-file notes.md \
+            --verify-tag

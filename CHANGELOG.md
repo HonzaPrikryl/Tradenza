@@ -33,9 +33,10 @@ set `POSTGRES_PASSWORD` plus the Clerk keys before the first
   Database migrations run automatically on container start
   (`SKIP_MIGRATIONS=1` to opt out for multi-replica setups).
 - **Published images** — every `v*` tag builds and pushes
-  `ghcr.io/honzaprikryl/tradenza` (GitHub Actions → GHCR). Prebuilt images are
-  compiled with a placeholder Clerk publishable key that the entrypoint swaps
-  for the real one at startup.
+  `ghcr.io/honzaprikryl/tradenza` (GitHub Actions → GHCR), then opens the
+  matching GitHub release with this file's entry as its notes. Prebuilt images
+  are compiled with a placeholder Clerk publishable key that the entrypoint
+  swaps for the real one at startup.
 - **`runAtomic` helper** (`src/lib/db/atomic.ts`) — driver-agnostic atomic
   multi-statement writes: `batch` on neon-http, a real transaction on
   node-postgres. New project convention: never call `db.transaction` /
