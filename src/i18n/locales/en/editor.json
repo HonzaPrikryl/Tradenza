@@ -18,9 +18,17 @@
   "imgMedium": "Medium",
   "imgLarge": "Large",
   "imgFull": "Full width",
-  "alignLeft": "Align left (wrap text)",
-  "alignCenter": "Center",
-  "alignRight": "Align right (wrap text)",
+  "alignLeft": "Float left — text wraps on the right",
+  "alignCenter": "Center — image on its own line",
+  "alignRight": "Float right — text wraps on the left",
+  "imgWriteBeside": "Write next to the image",
   "imgDelete": "Remove image",
-  "imgResize": "Drag to resize"
+  "imgResize": "Drag to resize",
+  "imageUploading": "Uploading image…",
+  "imageFailed": "Could not add the image",
+  "dropNotImage": "Only JPG, PNG, GIF and WebP images can be added here",
+  "linkEdit": "Edit link",
+  "linkUpdate": "Update link",
+  "linkRemove": "Remove link",
+  "ariaLabel": "Rich text editor"
 }
