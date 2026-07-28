@@ -3,7 +3,7 @@ name: Release
 # Pushing a version tag is the whole release. This workflow turns it into the
 # two artefacts a release consists of:
 #   1. the production image on GitHub Container Registry
-#      (v0.2.0 → :0.2.0, :0.2, :latest), so self-hosters can run
+#      (vx.x.x → :x.x.x, :x.x, :latest), so self-hosters can run
 #      `image: ghcr.io/honzaprikryl/tradenza:latest` instead of building, and
 #   2. the GitHub Release, whose notes are lifted verbatim from CHANGELOG.md.
 # Nothing to run by hand: `git push --follow-tags` is the last manual step.
@@ -79,7 +79,7 @@ jobs:
 
       # The release notes ARE the changelog entry — one source of truth, so the
       # two can't drift. This is why CHANGELOG.md sticks to the Keep a Changelog
-      # heading format (`## [0.2.0] - 2026-07-27`): it has to stay parseable.
+      # heading format (`## [x.x.x] - YYYY-MM-DD`): it has to stay parseable.
       - name: Extract the changelog section for this tag
         id: notes
         env:
