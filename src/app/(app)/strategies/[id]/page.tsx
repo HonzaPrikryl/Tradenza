@@ -19,6 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/Table'
 import { formatCurrency, cn } from '@/lib/utils'
+import { sanitizeRichText } from '@/lib/rich-text'
 import type { ChecklistAnalytics, ComplianceSplit, CriterionPerformance } from '@/lib/strategy-checklist'
 import { t } from '@/i18n'
 
@@ -74,7 +75,7 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
           <div className="bg-card rounded-lg mt-4 p-4">
             <div
               className="rte mt-2 w-full text-sm text-foreground"
-              dangerouslySetInnerHTML={{ __html: strategy.description }}
+              dangerouslySetInnerHTML={{ __html: sanitizeRichText(strategy.description) }}
             />
           </div>
         )}

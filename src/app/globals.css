@@ -369,6 +369,13 @@
 .rte {
   font-size: 0.875rem;
   line-height: 1.65;
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+.rte [style*='color'],
+.rte font {
+  color: inherit !important;
+  background-color: transparent !important;
 }
 /* Contain floated images so the editor always grows to fit them (otherwise a
    floated/large image escapes the box and only its top edge stays visible). */
@@ -379,11 +386,6 @@
 }
 .rte:focus {
   outline: none;
-}
-.rte:empty::before {
-  content: attr(data-placeholder);
-  color: hsl(var(--muted-foreground));
-  pointer-events: none;
 }
 .rte h1 {
   font-size: 1.5rem;

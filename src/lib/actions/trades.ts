@@ -19,6 +19,7 @@ import { uuid, uuidArray } from '@/lib/validation'
 import { authedAction, mutationAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 import { t } from '@/i18n'
+import { sanitizeRichText } from '@/lib/rich-text'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -166,7 +167,12 @@ export const updateTrade = mutationAction(
 )
 
 const journalSchema = z.object({
-  notes: z.string().max(8_000_000).nullable().optional(),
+  notes: z
+    .string()
+    .max(8_000_000)
+    .nullable()
+    .optional()
+    .transform((v) => (v ? sanitizeRichText(v) : v)),
   rating: z.number().min(0).max(5).multipleOf(0.5).nullable().optional(),
 })
 

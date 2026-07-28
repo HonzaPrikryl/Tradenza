@@ -13,6 +13,7 @@ import {
   Image as ImageIcon,
   Heading1,
   Heading2,
+  Pilcrow,
   Check,
   X,
   AlignLeft,
@@ -26,6 +27,8 @@ import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import { uploadNoteImage } from '@/lib/actions/uploads'
+import { isEmptyHtml } from '@/lib/html'
+import { sanitizeRichText } from '@/lib/rich-text'
 
 // Downscale + recompress an image client-side, returning both a Blob (for
 // upload to object storage) and a data URL (used as an inline fallback when R2
@@ -61,6 +64,12 @@ function processImage(file: File, maxW = 1280, quality = 0.82): Promise<{ blob: 
   })
 }
 
+/** Block-level tags the editor can produce — used to detect the caret's block. */
+const BLOCK_TAGS = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'pre', 'li', 'div'])
+
+const escapeText = (value: string) =>
+  value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
 interface ToolButton {
   key: string
   icon: LucideIcon
@@ -86,15 +95,30 @@ export default function RichTextEditor({
   const wrapRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const savedRange = useRef<Range | null>(null)
+  const emitted = useRef<string | null>(null)
   const [, force] = useState(0)
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
+  const [empty, setEmpty] = useState(() => isEmptyHtml(value ?? ''))
   const [selImg, setSelImg] = useState<HTMLImageElement | null>(null)
 
   useEffect(() => {
-    if (ref.current && ref.current.innerHTML !== value) ref.current.innerHTML = value || ''
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      document.execCommand('styleWithCSS', false, 'false')
+    } catch {
+      /* not supported — the sanitizer still strips any colour that slips in */
+    }
   }, [])
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (emitted.current !== null && value === emitted.current) return
+    const clean = sanitizeRichText(value ?? '')
+    if (el.innerHTML !== clean) el.innerHTML = clean
+    emitted.current = value ?? ''
+    setEmpty(isEmptyHtml(clean))
+  }, [value])
 
   // Keep the image overlay glued to the picture while scrolling / resizing, and
   // deselect when clicking away from the editor.
@@ -114,7 +138,23 @@ export default function RichTextEditor({
     }
   }, [selImg])
 
-  const emit = () => onChange(ref.current?.innerHTML ?? '')
+  const emit = () => {
+    const html = ref.current?.innerHTML ?? ''
+    emitted.current = html
+    setEmpty(isEmptyHtml(html))
+    onChange(html)
+  }
+
+  const onPaste = (e: React.ClipboardEvent) => {
+    const html = e.clipboardData.getData('text/html')
+    const text = e.clipboardData.getData('text/plain')
+    if (!html && !text) return
+    e.preventDefault()
+    const payload = html ? sanitizeRichText(html) : escapeText(text).replace(/\r?\n/g, '<br>')
+    ref.current?.focus()
+    document.execCommand('insertHTML', false, payload)
+    emit()
+  }
 
   // ─── Image manipulation ───────────────────────────────────────────────────
   const styleImg = (apply: (img: HTMLImageElement) => void) => {
@@ -193,14 +233,62 @@ export default function RichTextEditor({
       return false
     }
   }
-  const blockIs = (tag: string) => {
+
+  const blockTag = (): string => {
     try {
-      return document.queryCommandValue('formatBlock').toLowerCase() === tag
+      const reported = document.queryCommandValue('formatBlock').toLowerCase()
+      if (reported) return reported
     } catch {
-      return false
+      /* fall through to the DOM walk */
     }
+    const root = ref.current
+    const sel = typeof window !== 'undefined' ? window.getSelection() : null
+    if (!root || !sel || sel.rangeCount === 0) return ''
+    let node: Node | null = sel.getRangeAt(0).startContainer
+    if (!root.contains(node)) return ''
+    while (node && node !== root) {
+      if (node.nodeType === 1) {
+        const tag = (node as HTMLElement).tagName.toLowerCase()
+        if (BLOCK_TAGS.has(tag)) return tag
+      }
+      node = node.parentNode
+    }
+    return ''
   }
-  const toggleBlock = (tag: string) => exec('formatBlock', blockIs(tag) ? 'P' : tag)
+
+  // Case-insensitive: the toolbar passes tags like 'H1', the browser reports 'h1'.
+  const blockIs = (tag: string) => blockTag() === tag.toLowerCase()
+
+  /** Back to ordinary body text — the way out of any heading or quote. */
+  const setParagraph = () => {
+    ref.current?.focus()
+    // Chrome's `formatBlock` cannot unwrap a <blockquote>; `outdent` can.
+    let guard = 0
+    while (blockTag() === 'blockquote' && guard++ < 5) {
+      document.execCommand('outdent')
+    }
+    // Angle-bracket form — required by Firefox, accepted everywhere else.
+    document.execCommand('formatBlock', false, '<p>')
+    emit()
+    force((n) => n + 1)
+  }
+
+  const toggleBlock = (tag: string) => {
+    if (blockIs(tag)) {
+      setParagraph()
+      return
+    }
+    ref.current?.focus()
+    // Leave a quote before applying a heading, otherwise the heading ends up
+    // nested inside the blockquote instead of replacing it.
+    if (tag !== 'BLOCKQUOTE') {
+      let guard = 0
+      while (blockTag() === 'blockquote' && guard++ < 5) {
+        document.execCommand('outdent')
+      }
+    }
+    exec('formatBlock', `<${tag.toLowerCase()}>`)
+  }
 
   const openLinkDialog = () => {
     const sel = window.getSelection()
@@ -221,7 +309,8 @@ export default function RichTextEditor({
       sel.addRange(savedRange.current)
     }
     if (savedRange.current && savedRange.current.collapsed) {
-      document.execCommand('insertHTML', false, `<a href="${url}">${raw}</a>`)
+      const label = escapeText(raw)
+      document.execCommand('insertHTML', false, sanitizeRichText(`<a href="${escapeText(url)}">${label}</a>`))
     } else {
       document.execCommand('createLink', false, url)
     }
@@ -265,10 +354,18 @@ export default function RichTextEditor({
     }
   }
 
+  const current = blockTag()
   const groups: ToolButton[][] = [
     [
-      { key: 'h1', icon: Heading1, label: t('editor.h1'), run: () => toggleBlock('H1'), active: blockIs('h1') },
-      { key: 'h2', icon: Heading2, label: t('editor.h2'), run: () => toggleBlock('H2'), active: blockIs('h2') },
+      {
+        key: 'p',
+        icon: Pilcrow,
+        label: t('editor.paragraph'),
+        run: setParagraph,
+        active: current === 'p' || current === 'div',
+      },
+      { key: 'h1', icon: Heading1, label: t('editor.h1'), run: () => toggleBlock('H1'), active: current === 'h1' },
+      { key: 'h2', icon: Heading2, label: t('editor.h2'), run: () => toggleBlock('H2'), active: current === 'h2' },
     ],
     [
       { key: 'bold', icon: Bold, label: t('editor.bold'), run: () => exec('bold'), active: isActive('bold') },
@@ -308,7 +405,7 @@ export default function RichTextEditor({
         icon: Quote,
         label: t('editor.quote'),
         run: () => toggleBlock('BLOCKQUOTE'),
-        active: blockIs('blockquote'),
+        active: current === 'blockquote',
       },
     ],
     [
@@ -382,27 +479,38 @@ export default function RichTextEditor({
       )}
 
       {/* Editor */}
-      <div
-        ref={ref}
-        contentEditable
-        suppressContentEditableWarning
-        role="textbox"
-        aria-multiline="true"
-        data-placeholder={placeholder}
-        onInput={() => {
-          emit()
-          if (selImg) setSelImg(null)
-        }}
-        onBlur={onBlur}
-        onClick={(e) => {
-          const tgt = e.target as HTMLElement
-          setSelImg(tgt.tagName === 'IMG' ? (tgt as HTMLImageElement) : null)
-        }}
-        onMouseUp={() => force((n) => n + 1)}
-        onKeyUp={() => force((n) => n + 1)}
-        className="rte px-5 py-4"
-        style={{ minHeight }}
-      />
+      <div className="relative">
+        {empty && placeholder && (
+          <div
+            aria-hidden
+            className="rte pointer-events-none absolute inset-x-0 top-0 select-none px-5 py-4 text-muted-foreground"
+          >
+            {placeholder}
+          </div>
+        )}
+        <div
+          ref={ref}
+          contentEditable
+          suppressContentEditableWarning
+          role="textbox"
+          aria-multiline="true"
+          aria-label={placeholder}
+          onInput={() => {
+            emit()
+            if (selImg) setSelImg(null)
+          }}
+          onPaste={onPaste}
+          onBlur={onBlur}
+          onClick={(e) => {
+            const tgt = e.target as HTMLElement
+            setSelImg(tgt.tagName === 'IMG' ? (tgt as HTMLImageElement) : null)
+          }}
+          onMouseUp={() => force((n) => n + 1)}
+          onKeyUp={() => force((n) => n + 1)}
+          className="rte px-5 py-4"
+          style={{ minHeight }}
+        />
+      </div>
 
       {/* Image manipulation overlay */}
       {selImg &&

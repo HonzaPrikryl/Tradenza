@@ -50,6 +50,7 @@ import {
   type DayStatus,
   type HabitPerfSplit,
 } from '@/lib/progress-compute'
+import { sanitizeRichText } from '@/lib/rich-text'
 
 // NOTE — the global header filters (account, date range, $/R unit) are deliberately
 // NOT read here. Discipline records the trader's process, not a slice of trades:
@@ -965,7 +966,13 @@ export const getDailyNote = authedAction([dateKey], async ({ userId }, day): Pro
 })
 
 export const setDayNote = mutationAction(
-  [dateKey, z.string().max(NOTE_MAX, t('validation.noteTooLong'))],
+  [
+    dateKey,
+    z
+      .string()
+      .max(NOTE_MAX, t('validation.noteTooLong'))
+      .transform((v) => sanitizeRichText(v)),
+  ],
   async ({ userId }, day, note) => {
     await db
       .insert(dailyCheckins)
