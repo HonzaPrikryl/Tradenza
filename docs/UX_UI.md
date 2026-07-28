@@ -99,7 +99,7 @@ This shell is the backbone of the UX: a trader sets account + date range + unit 
 Landing page → Sign up (Clerk) → Dashboard
 ```
 
-The landing page (`/`) is a focused marketing page: a hero ("Improve your trades with data, not feelings"), four feature cards (Import, Statistics, Journal, Dashboard), and clear "Start free" CTAs. Authenticated users see "Go to dashboard" instead. After sign-up, the user lands on the dashboard with a sensible default layout and is prompted toward adding or importing trades.
+The landing page (`/`) is a focused marketing page: a hero ("Improve your trades with data, not feelings"), a trust strip, a three-part showcase of real screens (dashboard, trade detail, discipline), a grid of supporting features, a four-step "how it works", the open-source pitch, an FAQ, and clear "Start free" CTAs. Authenticated users see "Go to dashboard" instead. After sign-up, the user lands on the dashboard with a sensible default layout and is prompted toward adding or importing trades.
 
 ### 4.2 Importing trades (the primary onboarding path)
 
@@ -130,7 +130,7 @@ The trade detail screen is the journaling heart of the app:
 - **Stats panel** — per-trade metrics (R, hold time, fees, etc.).
 - **Notes tabs** — structured journaling split into setup, emotions (before / after), mistakes, and lessons, with a rich-text editor and **autosave** (`useAutosave`).
 - **Star rating** — a quick subjective grade of execution quality.
-- **Tags panel** — assign color-coded tags/categories.
+- **Tags panel** — assign tags and categories.
 - **Strategy & playbook** — link the trade to one of your strategies, then tick off its **entry** and **exit** checklist items as you review. The trade records how faithfully you followed the plan, which rolls up into per-strategy adherence stats.
 - **Customizable sidebar** — a gear-menu (`SidebarSettings`, dnd-kit) lets the trader show, hide and drag-to-reorder every sidebar panel (running P&L, strategy, details, risk, tags) and individual stat row (R, ROI, MAE/MFE, entry/exit times, star rating…), with a one-click reset. Preferences are saved to the user's account (`SidebarPrefs`), so a review layout persists across trades and sessions rather than living in one browser.
 
@@ -220,7 +220,7 @@ This closes the loop with the journal: the strategy defines the plan, the trade 
 | **Add trade**          | `/add-trade`, `/add-trade/[accountId]` | Quick single-trade entry.                                                          |
 | **Trade import**       | `/trade-import/*`                      | Guided multi-step CSV/manual import wizard.                                        |
 | **Statistics**         | `/stats`                               | Full statistical breakdown of the filtered trade set.                              |
-| **Discipline**         | `/progress`, `/progress/[date]`        | Rules, daily check-ins/reviews, streaks, year heatmap.                             |
+| **Discipline**         | `/progress`, `/progress/[date]`        | Trading rules and daily habits, day reviews, streaks, year heatmaps, payoff views. |
 | **Strategies**         | `/strategies`, `/strategies/[id]`      | Strategy playbooks (entry/exit checklists, reference images) + per-strategy stats. |
 | **Accounts**           | `/accounts`                            | List and manage trading accounts (prop-firm model).                                |
 | **Settings**           | `/settings/*`                          | Accounts, tags & categories, trade settings, global settings, import history.      |
@@ -275,3 +275,18 @@ This lets each trader build the cockpit that matches how _they_ think, instead o
 | **Scratch / breakeven** | A trade closed at (approximately) no gain or loss.                        |
 | **Phase (account)**     | Stage of a prop-firm account, e.g. _Step 1_, _Funded_.                    |
 | **Trade score**         | A composite 0–100 health score blending several performance metrics.      |
+
+### Discipline vocabulary
+
+| Term              | Meaning                                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Task**          | A rule you actively do and tick off. Counts toward the day's `x/y` and its completion rate.                                                    |
+| **Constraint**    | A rule you must not break. Satisfied by default, breached by _logging_ it; never counts toward `x/y` or any completion rate.                   |
+| **Strict**        | The trading constraint mode. One breach reddens the day — a risk limit has no warning tier.                                                    |
+| **Avoidance**     | The habit constraint mode, _never miss twice_: one slip is amber, two consecutive scheduled days is red.                                       |
+| **Building**      | The task mode, shared by both domains — the share you keep sets the day's colour.                                                              |
+| **Mode**          | `strict` / `avoidance` / `building`, derived from `(type, category)`. Fixed once a rule exists: it decides how logged days read back.          |
+| **Unlogged**      | A settled scheduled day you never filled in. Excluded from every rate and diagnostic, but scores zero in the headline and breaks the streak.   |
+| **Confirmed day** | A day you engaged with — ticked or flagged a rule, or marked it reviewed. Only confirmed days feed the discipline→P&L payoff.                  |
+| **Excused day**   | A day marked _not counted_ (holiday, illness). Carries a scope: whole day, trading only, or daily only. Evidence you turned up beats the flag. |
+| **Forward-only**  | Creating, pausing, archiving or rescheduling a rule applies from today and never re-scores a day already lived through.                        |

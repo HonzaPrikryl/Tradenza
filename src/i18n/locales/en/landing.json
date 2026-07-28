@@ -31,7 +31,7 @@
   "features": {
     "kicker": "And more",
     "heading": "Everything else you'd expect",
-    "subheading": "Beyond the dashboard, journal and discipline tracker — playbooks, analytics and the tooling that makes daily logging fast and keeps your data yours.",
+    "subheading": "Beyond the dashboard, journal and discipline tracker — playbooks, daily reviews, analytics and the tooling that makes logging fast and keeps your data yours.",
     "strategies": {
       "title": "Strategies & playbooks",
       "desc": "Define each setup you trade as a reusable strategy with entry and exit checklists and a reference screenshots. Assign it to trades, tick off what you actually followed, and review per-strategy stats and how closely you stuck to the plan."
@@ -82,11 +82,13 @@
     },
     "discipline": {
       "title": "Process over P&L",
-      "desc": "Hold yourself to your own rules, separate from P&L. Split non-negotiable limits from quality habits, check them off each day, and watch a year-long heatmap paint the health of your discipline at a glance. Streaks and consistency stats keep you honest — and a payoff view shows whether discipline actually pays.",
+      "desc": "Hold yourself to your own rules, separate from P&L — across two tabs. Trading scores how you executed; Daily tracks how you showed up: sleep, gym, screens, mindset. Every rule is either a task you tick off or a constraint you must not break, each on its own weekday schedule. A year-long heatmap paints both at a glance, and a payoff view shows whether any of it actually pays.",
       "points": [
-        "Hard rules vs. soft habits, each on its own daily schedule",
-        "Year heatmap, clean-day streaks and a 30-day discipline trend",
-        "See if discipline pays: daily P&L and R-multiple by day type"
+        "Trading rules and daily habits, one model, two tabs",
+        "Tasks you tick off vs. constraints you must not break",
+        "Year heatmap, clean-day streaks and a 30-day trend",
+        "Mark days you were away — a holiday won't break your streak",
+        "See if it pays: daily P&L and R-multiple by day type"
       ]
     }
   },
@@ -102,6 +104,10 @@
       "desc": "Open each trade on the chart, grade your execution, and capture the setup, emotions and lessons while they're fresh."
     },
     "step3": {
+      "title": "Close the day",
+      "desc": "Tick off the rules you kept, flag the ones you broke, and write the day up — trading and everyday habits alike."
+    },
+    "step4": {
       "title": "Improve with data",
       "desc": "Watch your statistics and discipline streaks, find your edge — and your leaks — and trade the plan, not the feeling."
     }

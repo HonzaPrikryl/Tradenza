@@ -2,7 +2,7 @@ import { t } from '@/i18n'
 import Blob from './Blob'
 import Reveal from './Reveal'
 
-const steps = ['step1', 'step2', 'step3'] as const
+const steps = ['step1', 'step2', 'step3', 'step4'] as const
 
 export default function HowItWorksSection() {
   return (
@@ -13,11 +13,11 @@ export default function HowItWorksSection() {
           <p className="mb-3 text-sm font-semibold uppercase tracking-widest text-primary">{t('landing.how.kicker')}</p>
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">{t('landing.how.heading')}</h2>
         </Reveal>
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, i) => (
             <Reveal
               key={step}
-              delay={i * 110}
+              delay={(i % 4) * 110}
               className="rounded-xl border border-border bg-background/50 p-6 transition-colors hover:border-primary/40"
             >
               <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-base font-semibold text-primary">

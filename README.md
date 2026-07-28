@@ -4,7 +4,7 @@
 
 **A professional, self-hostable trading journal for serious traders.**
 
-Import your trades, analyze your edge with data, and build discipline — all in one place.
+Import your trades, analyze your edge with data, and hold yourself to your own rules — all in one place.
 
 [![CI](https://github.com/HonzaPrikryl/tradenza/actions/workflows/ci.yml/badge.svg)](https://github.com/HonzaPrikryl/tradenza/actions/workflows/ci.yml)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
@@ -20,7 +20,7 @@ Import your trades, analyze your edge with data, and build discipline — all in
 
 Tradenza is an open-source trading journal I originally built for my own trading. After living in it for a while, I decided to release it to the community — free to use, free to self-host, and open to contributions.
 
-It is designed for traders who want to improve through data rather than feelings: log every trade, review the chart and your execution, track the statistics that actually matter, and hold yourself accountable to your own trading rules.
+It is designed for traders who want to improve through data rather than feelings: log every trade, review the chart and your execution, track the statistics that actually matter, and hold yourself accountable — both to your trading rules and to the everyday habits that decide how you show up.
 
 > **Two ways to use Tradenza:** use the hosted version at **[tradenza.dev](https://tradenza.dev)** — sign up and start journaling, no setup required — or self-host your own instance with Docker (see [Self-hosting](#self-hosting-docker)) or locally (see [Quick start](#quick-start)). Both run the same open-source code, and it's free either way.
 
@@ -35,7 +35,7 @@ It is designed for traders who want to improve through data rather than feelings
 - **Discipline tracking** — hold yourself to your own rules, separate from P&L, across two tabs: **Trading** rules and **Daily** habits. Every rule is either a _task_ you tick off (scored by how many you keep) or a _constraint_ you must not break — and a breach costs what it should: a trading limit reddens the day on the first breach, a daily habit follows _never miss twice_. Each rule runs on its own weekday schedule. Every day is graded green / amber / red on a year-long heatmap, with clean-day streaks, a 30-day trend, per-rule and per-weekday consistency, daily reviews you can back-fill without a deadline, days you mark as not counted (holiday, illness — per domain or the whole day), and a "does discipline pay off?" breakdown of average daily P&L and R-multiple by day type. Every change is **forward-only**: pausing, archiving or moving a rule's schedule applies from today and never re-scores a day you already lived through.
 - **Trading accounts** — built around the prop-firm workflow (firm, phase, account size, starting balance, currency). Assign trades to accounts and filter everything by account.
 - **Flexible import** — guided import wizard for CSV exports (large catalog of broker formats), with automatic de-duplication and a full import history.
-- **Tags & categories** — color-coded tags grouped into categories (e.g. _Setup type_, _Mistake_), assignable to trades and usable as filters.
+- **Tags & categories** — tags grouped into categories (e.g. _Setup type_, _Mistake_), assignable to trades and usable as filters.
 - **Futures-aware P&L** — built-in contract multipliers for common futures (ES, NQ, GC, CL, …) so P&L and R are computed correctly per instrument.
 - **Global filters** — app-wide header to switch accounts, pick a date range (with presets), toggle the unit between **$** and **R**, and apply filters across the P&L screens (dashboard, trades, statistics, strategies). Discipline is intentionally exempt — it tracks your process over the full calendar, not a filtered slice of trades.
 - **Polished UX** — dark-first design with a light theme, responsive layout with a mobile navigation sheet, installable as a PWA, and consistent skeleton loading states throughout.
@@ -256,9 +256,9 @@ Adopting migrations on an **existing** database (already has the tables but no m
 | `accounts`                                   | Trading accounts (prop-firm model: firm, phase, size, currency)                                                             |
 | `trades`                                     | Core trade records (entry/exit, P&L, risk, journaling fields)                                                               |
 | `strategies`                                 | Reusable playbooks: entry/exit checklists, reference images, color; linked to trades                                        |
-| `tag_groups` / `tags` / `trade_tags`         | Color-coded tags grouped into categories, linked to trades                                                                  |
+| `tag_groups` / `tags` / `trade_tags`         | Tags grouped into categories, linked to trades                                                                              |
 | `screenshots`                                | Trade screenshots (R2 URLs)                                                                                                 |
-| `market_candles`                             | Cached OHLC data for the trade detail chart                                                                                 |
+| `market_candles` / `candle_cache`            | Cached OHLC data for the trade detail chart                                                                                 |
 | `import_logs`                                | One row per import — counts, errors, created trade IDs                                                                      |
 | `dashboard_templates`                        | Saved dashboard layouts per user                                                                                            |
 | `progress_rules` / `progress_rule_schedules` | Discipline rules (trading + daily habits) and the superseded schedules that keep a schedule change from re-scoring the past |
