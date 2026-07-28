@@ -50,7 +50,7 @@ import {
   type DayStatus,
   type HabitPerfSplit,
 } from '@/lib/progress-compute'
-import { sanitizeRichText } from '@/lib/rich-text'
+import { sanitizeRichTextValue } from '@/lib/rich-text'
 
 // NOTE — the global header filters (account, date range, $/R unit) are deliberately
 // NOT read here. Discipline records the trader's process, not a slice of trades:
@@ -965,27 +965,20 @@ export const getDailyNote = authedAction([dateKey], async ({ userId }, day): Pro
   return row?.note ?? ''
 })
 
-export const setDayNote = mutationAction(
-  [
-    dateKey,
-    z
-      .string()
-      .max(NOTE_MAX, t('validation.noteTooLong'))
-      .transform((v) => sanitizeRichText(v)),
-  ],
-  async ({ userId }, day, note) => {
-    await db
-      .insert(dailyCheckins)
-      .values({ userId, date: day, note })
-      .onConflictDoUpdate({
-        target: [dailyCheckins.userId, dailyCheckins.date],
-        set: { note, updatedAt: new Date() },
-      })
-    revalidatePath('/progress')
-    revalidatePath(`/progress/${day}`)
-    return { success: true }
-  },
-)
+const dayNoteSchema = z.string().max(NOTE_MAX, t('validation.noteTooLong')).transform(sanitizeRichTextValue)
+
+export const setDayNote = mutationAction([dateKey, dayNoteSchema], async ({ userId }, day, note) => {
+  await db
+    .insert(dailyCheckins)
+    .values({ userId, date: day, note })
+    .onConflictDoUpdate({
+      target: [dailyCheckins.userId, dailyCheckins.date],
+      set: { note, updatedAt: new Date() },
+    })
+  revalidatePath('/progress')
+  revalidatePath(`/progress/${day}`)
+  return { success: true }
+})
 
 // Explicitly mark (or unmark) a day as REVIEWED. Two jobs (see dailyCheckins.checkedIn):
 // it puts an otherwise trade-less day into scope so a disciplined "no-trade" day can

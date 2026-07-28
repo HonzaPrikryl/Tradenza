@@ -19,7 +19,7 @@ import {
   type ChecklistAnalytics,
   type ChecklistTrade,
 } from '@/lib/strategy-checklist'
-import { sanitizeRichText } from '@/lib/rich-text'
+import { sanitizeRichTextValue } from '@/lib/rich-text'
 
 // Columns needed to build a `TradeRow` for `computeBundle` (the shared, tested
 // P&L/stats engine). Kept in one place so per-strategy stats are computed exactly
@@ -102,13 +102,7 @@ const strategySchema = z.object({
   name: z.string().trim().min(1, t('validation.nameRequired')).max(80),
   // Rich-text HTML; large cap because the editor can embed inline (data-URL)
   // images, exactly like trade notes.
-  description: z
-    .string()
-    .trim()
-    .max(8_000_000)
-    .optional()
-    .nullable()
-    .transform((v) => (v ? sanitizeRichText(v) : v)),
+  description: z.string().trim().max(8_000_000).optional().nullable().transform(sanitizeRichTextValue),
   entryChecklist: z.array(z.string().trim().min(1).max(200)).max(30).optional(),
   exitChecklist: z.array(z.string().trim().min(1).max(200)).max(30).optional(),
   imageUrls: z.array(z.string().url().max(2048)).max(8).optional(),

@@ -213,6 +213,17 @@ export interface SanitizeOptions {
  * Return `html` with unsafe markup removed and all colour/font styling stripped,
  * so the result always renders in the current theme's text colour.
  */
+/**
+ * `zod().transform()` helper that passes `null` / `undefined` / `''` through.
+ *
+ * Exists as a named function so `'use server'` modules don't need an inline
+ * arrow in their schemas — Next's Server Actions compiler rejects any
+ * non-async function expression it finds inside an exported action.
+ */
+export function sanitizeRichTextValue<T extends string | null | undefined>(html: T): T {
+  return (html ? sanitizeRichText(html) : html) as T
+}
+
 export function sanitizeRichText(html: string, options: SanitizeOptions = {}): string {
   if (!html) return ''
   const allowInlineImage = options.allowInlineImages ?? true
