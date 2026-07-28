@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Sparkles, Loader2, Flame, Trophy, Gauge } from 'lucide-react'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
-import { t } from '@/i18n'
+import { t, tList } from '@/i18n'
 import { aggregateHabitDayStatus, avoidanceState, type AwayScope, type DayStatus } from '@/lib/progress-compute'
 import { heatCellLabel, prettyDate, type HeatDaySummary } from '@/lib/progress-format'
 import {
@@ -299,8 +299,33 @@ export default function HabitsTab({
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
           <Flame className="h-7 w-7 text-primary" />
         </div>
-        <h2 className="text-base font-semibold">{t('progress.habits.title')}</h2>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">{t('progress.habits.empty')}</p>
+        <h2 className="text-base font-semibold">{t('progress.habits.emptyTitle')}</h2>
+        <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+          {t('progress.habits.emptyExplain')}
+        </p>
+
+        <div className="mt-4 w-full max-w-md space-y-2 text-left">
+          <div className="flex items-start gap-2.5 rounded-lg border border-border bg-background/40 px-3.5 py-2.5">
+            <span className="mt-0.5 shrink-0 rounded bg-loss/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-loss">
+              {t('progress.mode.name.avoidance')}
+            </span>
+            <span className="text-pretty text-sm leading-relaxed text-muted-foreground">
+              {t('progress.habits.emptyExplain2')}
+            </span>
+          </div>
+          <div className="flex items-start gap-2.5 rounded-lg border border-border bg-background/40 px-3.5 py-2.5">
+            <span className="mt-0.5 shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+              {t('progress.mode.name.building')}
+            </span>
+            <span className="text-pretty text-sm leading-relaxed text-muted-foreground">
+              {t('progress.habits.emptyExplain3')}
+            </span>
+          </div>
+        </div>
+
+        <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
+          {t('progress.habits.emptyExplain4')}
+        </p>
         <div className="mt-6 flex flex-col items-center gap-2.5 sm:flex-row">
           <button
             onClick={addStarter}
@@ -317,6 +342,9 @@ export default function HabitsTab({
             {t('progress.habits.addOwn')}
           </button>
         </div>
+        <p className="mt-2.5 text-xs text-muted-foreground">
+          {t('progress.habits.addStarterHint', { count: tList('progress.habits.starter').length })}
+        </p>
         {showNew && <RuleDialog mode="new" category="habit" onClose={() => setShowNew(false)} onSaved={bump} />}
       </div>
     )

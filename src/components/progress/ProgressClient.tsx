@@ -538,13 +538,17 @@ function EmptyState({
           <span className="mt-0.5 shrink-0 rounded bg-loss/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-loss">
             {t('progress.mode.kind.constraint')}
           </span>
-          <span className="text-sm leading-relaxed text-muted-foreground">{t('progress.stats.noRulesExplain2')}</span>
+          <span className="text-pretty text-sm leading-relaxed text-muted-foreground">
+            {t('progress.stats.noRulesExplain2')}
+          </span>
         </div>
         <div className="flex items-start gap-2.5 rounded-lg border border-border bg-background/40 px-3.5 py-2.5">
           <span className="mt-0.5 shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
             {t('progress.mode.kind.task')}
           </span>
-          <span className="text-sm leading-relaxed text-muted-foreground">{t('progress.stats.noRulesExplain3')}</span>
+          <span className="text-pretty text-sm leading-relaxed text-muted-foreground">
+            {t('progress.stats.noRulesExplain3')}
+          </span>
         </div>
       </div>
 

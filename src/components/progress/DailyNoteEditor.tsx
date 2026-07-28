@@ -44,7 +44,10 @@ export default function DailyNoteEditor({
     }
   })
 
+  const loadedDate = useRef(date)
   useEffect(() => {
+    if (loadedDate.current === date) return
+    loadedDate.current = date
     reviewedRef.current = false
     reset(initialNote)
   }, [date, initialNote, reset])

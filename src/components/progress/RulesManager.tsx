@@ -23,8 +23,14 @@ interface Dialog {
   category?: 'trading' | 'habit'
 }
 
-// The three manageable groups: trading hard, trading soft, general habits.
-type Group = 'hard' | 'soft' | 'habit'
+// The four manageable groups. Habits split by tier exactly the way trading rules do —
+// an avoidance habit and a building habit are as different from each other as a
+// constraint is from a task, and lumping them in one list meant the Daily tab could
+// only ever show ONE empty state, never "you have no avoidance habits yet".
+type Group = 'hard' | 'soft' | 'habitHard' | 'habitSoft'
+
+// Section order, shared by the rendering and by the persisted sort order.
+const GROUPS: Group[] = ['hard', 'soft', 'habitHard', 'habitSoft']
 
 // `scope` selects which domain this manager governs: 'trading' shows the hard + soft
 // tiers (Rules tab), 'habit' shows only general habits (Habits tab). Keeping one
@@ -85,17 +91,20 @@ export default function RulesManager({
     }
   }
 
-  const inGroup = (r: ProgressRule, g: Group) =>
-    g === 'habit' ? r.category === 'habit' : r.category !== 'habit' && r.type === g
+  const inGroup = (r: ProgressRule, g: Group) => {
+    const habit = r.category === 'habit'
+    if (g === 'habitHard') return habit && r.type === 'hard'
+    if (g === 'habitSoft') return habit && r.type === 'soft'
+    return !habit && r.type === g
+  }
 
-  // Reorder within one group (trading-hard, trading-soft, or habits). The three
-  // sections keep a stable combined sort order — hard, then soft, then habits —
-  // mirrored everywhere the rules are shown. We persist the whole order at once.
+  // Reorder within one group. The sections keep a stable combined sort order — see
+  // GROUPS — mirrored everywhere the rules are shown. We persist the whole order at once.
   const reorderGroup = (orderedIds: string[], group: Group) => {
     const map = new Map(items.map((r) => [r.id, r]))
     const reordered = orderedIds.map((id) => map.get(id)).filter((r): r is ProgressRule => Boolean(r))
     const groupOf = (g: Group) => (group === g ? reordered : items.filter((r) => inGroup(r, g)))
-    const combined = [...groupOf('hard'), ...groupOf('soft'), ...groupOf('habit')]
+    const combined = GROUPS.flatMap(groupOf)
     setItems(combined)
     reorderRules(combined.map((r) => r.id))
       .then((res) => {
@@ -108,9 +117,7 @@ export default function RulesManager({
       })
   }
 
-  const hardRules = items.filter((r) => inGroup(r, 'hard'))
-  const softRules = items.filter((r) => inGroup(r, 'soft'))
-  const habitRules = items.filter((r) => inGroup(r, 'habit'))
+  const rulesIn = (g: Group) => items.filter((r) => inGroup(r, g))
 
   const renderRule = (
     rule: ProgressRule,
@@ -201,7 +208,9 @@ export default function RulesManager({
   )
 
   // Group badges use the shared kind vocabulary (Constraint / Task) so the Manage tab
-  // frames the two trading tiers the same way the dialog and the day rows do.
+  // frames the two trading tiers the same way the dialog and the day rows do. The habit
+  // groups mirror it one-for-one — same colours, same two-tier shape — using the habit
+  // wording (Avoidance / Building) the day rows and stats already speak.
   const groupMeta: Record<Group, { badgeClass: string; badge: string; title: string; empty: string }> = {
     hard: {
       badgeClass: 'bg-loss/15 text-loss',
@@ -215,18 +224,25 @@ export default function RulesManager({
       title: t('progress.day.softTitle'),
       empty: t('progress.rules.softEmpty'),
     },
-    habit: {
-      badgeClass: 'bg-muted text-muted-foreground',
-      badge: t('progress.habits.category.habit'),
-      title: '',
-      empty: t('progress.habits.empty'),
+    habitHard: {
+      badgeClass: 'bg-loss/15 text-loss',
+      badge: t('progress.mode.name.avoidance'),
+      title: t('progress.habits.stats.avoidTitle'),
+      empty: t('progress.habits.avoidEmpty'),
+    },
+    habitSoft: {
+      badgeClass: 'bg-primary/15 text-primary',
+      badge: t('progress.mode.name.building'),
+      title: t('progress.habits.stats.buildingTitle'),
+      empty: t('progress.habits.buildEmpty'),
     },
   }
 
-  const section = (group: Group, groupRules: ProgressRule[]) => {
+  const section = (group: Group) => {
     const meta = groupMeta[group]
+    const groupRules = rulesIn(group)
     return (
-      <div>
+      <div key={group}>
         <div className="mb-2 flex items-center gap-2 px-1">
           <span
             className={cn('rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide', meta.badgeClass)}
@@ -274,14 +290,7 @@ export default function RulesManager({
       </div>
 
       <div className="space-y-5 p-3 sm:p-4">
-        {isHabit ? (
-          section('habit', habitRules)
-        ) : (
-          <>
-            {section('hard', hardRules)}
-            {section('soft', softRules)}
-          </>
-        )}
+        {(isHabit ? (['habitHard', 'habitSoft'] as const) : (['hard', 'soft'] as const)).map(section)}
       </div>
 
       {dialog && (
