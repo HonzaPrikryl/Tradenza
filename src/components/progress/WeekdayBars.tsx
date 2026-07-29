@@ -49,7 +49,7 @@ export default function WeekdayBars({
         <WidgetInfo text={info} className="translate-x-[-100%]" />
       </div>
       <p className="mb-3 text-xs text-muted-foreground">{sub}</p>
-      <div className="flex h-60 flex-col">
+      <div className="flex h-44 flex-col">
         <div className="flex flex-1 items-end gap-2">
           {weekday.map((w) => {
             const pct = Math.round(w.ratio * 100)

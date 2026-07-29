@@ -397,7 +397,7 @@ export default function ProgressClient({
             starterBusy={starterPending}
           />
         ) : (
-          <div className="space-y-5">
+          <div>
             {/* A failed background refresh used to be swallowed, leaving the cards and
                 heatmap quietly showing numbers that no longer matched what the user had
                 just logged. Say it, and offer the one-click fix.
@@ -418,52 +418,54 @@ export default function ProgressClient({
                 </button>
               </div>
             </Collapse>
-            <ProgressStatsView
-              stats={stats}
-              currency={currency}
-              section="cards"
-              year={year}
-              currentYear={currentYear}
-              yearStats={yearStats}
-              onExcuseStreakBlockers={excuseStreakBlockers}
-              onFillIn={fillInStreakGap}
-              excusing={excusePending}
-            />
+            <div className="space-y-5">
+              <ProgressStatsView
+                stats={stats}
+                currency={currency}
+                section="cards"
+                year={year}
+                currentYear={currentYear}
+                yearStats={yearStats}
+                onExcuseStreakBlockers={excuseStreakBlockers}
+                onFillIn={fillInStreakGap}
+                excusing={excusePending}
+              />
 
-            <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-              <div className="flex min-w-0 flex-col gap-5">
-                <ProgressYearHeatmap
-                  data={yearData}
-                  years={years}
-                  year={year}
-                  selectedDate={selectedDate}
-                  todayKey={today}
-                  pending={yearPending}
-                  onSelect={selectDay}
-                  onYearChange={changeYear}
-                />
-                <ProgressStatsView stats={stats} currency={currency} section="trend" />
-              </div>
-              <div className="relative min-w-0" ref={dayPanelRef}>
-                <div className="xl:absolute xl:inset-0">
-                  <DaySummaryPanel
-                    day={day}
-                    loading={dayPending}
-                    onViewDay={viewDay}
-                    editable={selectedDate <= today}
-                    busy={togglePending}
-                    onToggleRule={toggleRule}
-                    onToggleCheckIn={toggleCheckIn}
-                    onToggleAway={toggleAway}
-                    onSetAwayScope={setAwayScope}
-                    onExcuseRange={() => setShowAwayRange(true)}
-                    onMarkAllSoft={markAllSoft}
+              <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                <div className="flex min-w-0 flex-col gap-5">
+                  <ProgressYearHeatmap
+                    data={yearData}
+                    years={years}
+                    year={year}
+                    selectedDate={selectedDate}
+                    todayKey={today}
+                    pending={yearPending}
+                    onSelect={selectDay}
+                    onYearChange={changeYear}
                   />
+                  <ProgressStatsView stats={stats} currency={currency} section="trend" />
+                </div>
+                <div className="relative min-w-0" ref={dayPanelRef}>
+                  <div className="xl:absolute xl:inset-0">
+                    <DaySummaryPanel
+                      day={day}
+                      loading={dayPending}
+                      onViewDay={viewDay}
+                      editable={selectedDate <= today}
+                      busy={togglePending}
+                      onToggleRule={toggleRule}
+                      onToggleCheckIn={toggleCheckIn}
+                      onToggleAway={toggleAway}
+                      onSetAwayScope={setAwayScope}
+                      onExcuseRange={() => setShowAwayRange(true)}
+                      onMarkAllSoft={markAllSoft}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <ProgressStatsView stats={stats} currency={currency} section="breakdown" />
+              <ProgressStatsView stats={stats} currency={currency} section="breakdown" />
+            </div>
           </div>
         )}
       </div>

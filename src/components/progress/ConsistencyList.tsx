@@ -131,7 +131,7 @@ export default function ConsistencyList({
   taskTitle,
   taskSub,
   noDataLabel,
-  limit = 4,
+  limit = 3,
 }: {
   items: ConsistencyItem[]
   /** Heading + scale caption for the constraint group ("Hard rules" / "Respect rate"). */

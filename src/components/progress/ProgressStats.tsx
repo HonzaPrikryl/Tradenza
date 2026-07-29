@@ -190,68 +190,72 @@ export default function ProgressStats({
 
           `=== false`, not `!dismissed`: `null` means "we haven't read the user's answer
           yet" and must render nothing, or a dismissed prompt flashes on every load. */}
-      <Collapse open={streakPromptOpen}>
-        {/* Guarded, because JSX children are BUILT on every parent render whether or not
-            the collapse shows them — reading `blockers[0]` off an empty array threw while
-            the element was merely being constructed. Collapse replays the last open subtree
-            during the exit, so returning null here doesn't blank the closing card. */}
-        {blockers.length === 0 ? null : (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
-            {/* `streakBlockers` is newest-first, so the run reads [to … from]. A single day
-                gets its own phrasing — "(21 Jul – 21 Jul)" is not a range. */}
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {t(`progress.stats.streakBlocked.${blockers.length === 1 ? 'one' : 'other'}`, {
-                days: blockers.length,
-                from: prettyDayMonth(blockers[blockers.length - 1]),
-                to: prettyDayMonth(blockers[0]),
-              })}
-            </p>
-            {/* THREE paths, because there are three — and the card used to admit only one.
-                Back-filling has no deadline (any past day is editable), yet the prompt never
-                said so, which left "excuse it" looking like the only way out of a gap.
+      {showCards && (
+        <Collapse open={streakPromptOpen}>
+          {/* Guarded, because JSX children are BUILT on every parent render whether or not
+              the collapse shows them — reading `blockers[0]` off an empty array threw while
+              the element was merely being constructed. Collapse replays the last open subtree
+              during the exit, so returning null here doesn't blank the closing card. */}
+          {blockers.length === 0 ? null : (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+              {/* `streakBlockers` is newest-first, so the run reads [to … from]. A single day
+                  gets its own phrasing — "(21 Jul – 21 Jul)" is not a range. */}
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                {t(`progress.stats.streakBlocked.${blockers.length === 1 ? 'one' : 'other'}`, {
+                  days: blockers.length,
+                  from: prettyDayMonth(blockers[blockers.length - 1]),
+                  to: prettyDayMonth(blockers[0]),
+                })}
+              </p>
+              {/* THREE paths, because there are three — and the card used to admit only one.
+                  Back-filling has no deadline (any past day is editable), yet the prompt never
+                  said so, which left "excuse it" looking like the only way out of a gap.
 
-                Order runs from most to least honest: record what actually happened, excuse
-                it if you genuinely weren't there, or accept the gap. Only "Fill in" is
-                emphasised, and deliberately so — it is the option that produces DATA, and it
-                is not the flattering one (an honest back-fill may well turn the day red).
-                The other two are weighted identically, because nothing here can verify
-                whether you were away and the app must not lean on an answer it can't
-                check. */}
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {onFillIn && (
+                  Order runs from most to least honest: record what actually happened, excuse
+                  it if you genuinely weren't there, or accept the gap. Only "Fill in" is
+                  emphasised, and deliberately so — it is the option that produces DATA, and it
+                  is not the flattering one (an honest back-fill may well turn the day red).
+                  The other two are weighted identically, because nothing here can verify
+                  whether you were away and the app must not lean on an answer it can't
+                  check. */}
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {onFillIn && (
+                  <button
+                    type="button"
+                    onClick={onFillIn}
+                    disabled={excusing}
+                    className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+                  >
+                    <PenLine className="h-3.5 w-3.5" />
+                    {t(
+                      blockers.length === 1
+                        ? 'progress.stats.streakBlockedFillOne'
+                        : 'progress.stats.streakBlockedFill',
+                    )}
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={onFillIn}
+                  onClick={onExcuseStreakBlockers}
                   disabled={excusing}
-                  className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+                  className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
                 >
-                  <PenLine className="h-3.5 w-3.5" />
-                  {t(
-                    blockers.length === 1 ? 'progress.stats.streakBlockedFillOne' : 'progress.stats.streakBlockedFill',
-                  )}
+                  {excusing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plane className="h-3.5 w-3.5" />}
+                  {t(`progress.stats.streakBlockedAction.${blockers.length === 1 ? 'one' : 'other'}`)}
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={onExcuseStreakBlockers}
-                disabled={excusing}
-                className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
-              >
-                {excusing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plane className="h-3.5 w-3.5" />}
-                {t(`progress.stats.streakBlockedAction.${blockers.length === 1 ? 'one' : 'other'}`)}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStreakPromptDismissed(true)}
-                disabled={excusing}
-                className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
-              >
-                {t('progress.stats.streakBlockedKeep')}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setStreakPromptDismissed(true)}
+                  disabled={excusing}
+                  className="rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+                >
+                  {t('progress.stats.streakBlockedKeep')}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </Collapse>
+          )}
+        </Collapse>
+      )}
 
       {/* Trend */}
       {showTrend && (
@@ -323,7 +327,7 @@ export default function ProgressStats({
             {stats.performance.green.days + stats.performance.yellow.days + stats.performance.red.days === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">{t('progress.stats.perfNoData')}</p>
             ) : (
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {(
                   [
                     {
@@ -349,14 +353,14 @@ export default function ProgressStats({
                   const lowSample = b.days > 0 && b.days < DAY_PERF_MIN_SAMPLE
                   const indicative = b.days >= DAY_PERF_MIN_SAMPLE && b.days < DAY_PERF_SOLID_SAMPLE
                   return (
-                    <div key={key} className="rounded-lg border border-border bg-background/40 p-3">
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                    <div key={key} className="min-w-0 rounded-lg border border-border bg-background/40 p-2 sm:p-3">
+                      <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-muted-foreground">
                         <span className={cn('h-2 w-2 shrink-0 rounded-full', dot)} />
-                        <span className="truncate">{label}</span>
+                        <span className="min-w-0 truncate">{label}</span>
                       </div>
                       <div
                         className={cn(
-                          'mt-1 flex items-baseline gap-1.5 text-lg font-bold tabular',
+                          'mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-base font-bold tabular sm:text-lg',
                           b.days === 0 || lowSample
                             ? 'text-muted-foreground'
                             : b.avgPnl >= 0
