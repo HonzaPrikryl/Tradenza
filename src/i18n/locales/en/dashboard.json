@@ -121,71 +121,71 @@
   "widgets": {
     "net-pnl": {
       "label": "Net P&L",
-      "description": "Celkový čistý zisk/ztráta"
+      "description": "Total net profit / loss"
     },
     "trade-win-rate": {
       "label": "Trade win %",
-      "description": "Podíl výherních tradů"
+      "description": "Share of winning trades"
     },
     "profit-factor": {
       "label": "Profit factor",
-      "description": "Hrubý zisk / hrubá ztráta"
+      "description": "Gross profit / gross loss"
     },
     "day-win-rate": {
       "label": "Day win %",
-      "description": "Podíl výherních dní"
+      "description": "Share of winning days"
     },
     "avg-win-loss": {
       "label": "Avg win/loss",
-      "description": "Poměr průměrné výhry a ztráty"
+      "description": "Average win vs. average loss"
     },
     "total-trades": {
       "label": "Total trades",
-      "description": "Počet tradů"
+      "description": "Number of trades"
     },
     "avg-rr": {
       "label": "Avg RR",
-      "description": "Průměrný risk/reward"
+      "description": "Average risk / reward"
     },
     "max-drawdown": {
       "label": "Max drawdown",
-      "description": "Maximální propad"
+      "description": "Largest peak-to-trough drop"
     },
     "expectancy": {
       "label": "Expectancy",
-      "description": "Průměrný P&L na trade"
+      "description": "Average P&L per trade"
     },
     "current-streak": {
       "label": "Streak",
-      "description": "Aktuální série"
+      "description": "Current win / loss streak"
     },
     "zella-score": {
       "label": "Trade score",
-      "description": "Trade score – pavučinový graf"
+      "description": "Trade score – radar chart"
     },
     "cumulative-pnl": {
       "label": "Daily net cumulative P&L",
-      "description": "Kumulativní křivka P&L"
+      "description": "Cumulative P&L curve"
     },
     "net-daily-pnl": {
       "label": "Net daily P&L",
-      "description": "Denní čistý P&L (sloupce)"
+      "description": "Net P&L per day (bars)"
     },
     "time-performance": {
       "label": "Trade time performance",
-      "description": "Výkon dle času vstupu"
+      "description": "Performance by entry time"
     },
     "duration-performance": {
       "label": "Trade duration performance",
-      "description": "Výkon dle délky tradu"
+      "description": "Performance by trade duration"
     },
     "calendar": {
       "label": "Calendar",
-      "description": "Robustní kalendář obchodních dní"
+      "description": "Trading-day P&L calendar"
     },
     "top-symbols": {
       "label": "Top symbols",
-      "description": "Nejlepší symboly"
+      "description": "Best performing symbols"
     }
   }
 }

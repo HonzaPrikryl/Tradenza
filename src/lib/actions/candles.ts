@@ -15,11 +15,16 @@ export type { Candle }
 
 export type CandlesResult =
   | { status: 'ok'; intervalSec: number; candles: Candle[] }
-  | { status: 'noKey' | 'unsupported' | 'noData' | 'error' | 'rateLimited' | 'today' }
+  | { status: 'noKey' | 'unsupported' | 'noData' | 'error' | 'rateLimited' | 'noAccess' | 'today' }
 
-// A soft failure a fetcher can raise to distinguish a transient rate-limit
-// (HTTP 429) from a generic error, so the UI can show a fitting message.
-type SoftError = 'error' | 'rateLimited'
+// A soft failure a fetcher can raise so the UI can show a fitting message
+// instead of one generic error:
+//   rateLimited → transient (HTTP 429), worth retrying shortly
+//   noAccess    → permanent for this deployment (HTTP 401/403): bad key, missing
+//                 dataset entitlement, exhausted credit or a plan that doesn't
+//                 cover the endpoint. "Try again later" would be a lie here.
+//   error       → anything else
+type SoftError = 'error' | 'rateLimited' | 'noAccess'
 class FetchError extends Error {
   constructor(public readonly soft: SoftError) {
     super(soft)
@@ -117,6 +122,10 @@ async function fetchDatabento(
     cache: 'no-store',
   })
   if (res.status === 429) throw new FetchError('rateLimited')
+  if (res.status === 401 || res.status === 403) {
+    console.error('[candles] Databento not entitled', res.status, spec.dataset, await res.text().catch(() => ''))
+    throw new FetchError('noAccess')
+  }
   if (!res.ok) {
     console.error('[candles] Databento error', res.status, await res.text().catch(() => ''))
     throw new FetchError('error')
@@ -171,6 +180,10 @@ async function fetchPolygon(
 
   const res = await fetch(url, { cache: 'no-store' })
   if (res.status === 429) throw new FetchError('rateLimited')
+  if (res.status === 401 || res.status === 403) {
+    console.error('[candles] Polygon not entitled', res.status, await res.text().catch(() => ''))
+    throw new FetchError('noAccess')
+  }
   if (!res.ok) {
     console.error('[candles] Polygon error', res.status, await res.text().catch(() => ''))
     throw new FetchError('error')
@@ -201,6 +214,12 @@ async function fetchBinance(symbol: string, startSec: number, endSec: number, in
     const url = `${BINANCE_BASE}/api/v3/klines?symbol=${symbol}&interval=${interval}&startTime=${cursor}&endTime=${endMs}&limit=1000`
     const res = await fetch(url, { cache: 'no-store' })
     if (res.status === 429 || res.status === 418) throw new FetchError('rateLimited')
+    // Binance needs no key, but a region-blocked or proxied BINANCE_API_BASE
+    // answers 401/403 — permanent for this deployment, not a transient blip.
+    if (res.status === 401 || res.status === 403) {
+      console.error('[candles] Binance not accessible', res.status, await res.text().catch(() => ''))
+      throw new FetchError('noAccess')
+    }
     if (!res.ok) {
       console.error('[candles] Binance error', res.status, await res.text().catch(() => ''))
       throw new FetchError('error')

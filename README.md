@@ -28,15 +28,15 @@ It is designed for traders who want to improve through data rather than feelings
 
 ## Highlights
 
-- **Customizable dashboard** — drag-and-drop widget grid (powered by dnd-kit) with savable layout templates. KPI tiles (net P&L, win rate, profit factor, expectancy, average R:R, max drawdown, current streak…) plus larger widgets: a Zella-style score, cumulative P&L curve, net daily P&L, a P&L calendar, top symbols, and a performance breakdown.
-- **Rich trade journal** — per-trade detail with an interactive price chart, multi-execution / multi-leg editor, running P&L, star rating, and structured notes (setup, emotions before/after, mistakes, lessons). The detail sidebar is fully customizable — show, hide and drag-to-reorder every panel and stat row to build your own review layout, saved to your account.
+- **Customizable dashboard** — drag-and-drop widget grid (powered by dnd-kit) with savable layout templates. KPI tiles (net P&L, trade/day win rate, profit factor, expectancy, average R:R, average win/loss, max drawdown, current streak…) plus larger widgets: a trade score radar, cumulative P&L curve, net daily P&L, a P&L calendar, top symbols, and performance broken down by entry time and trade duration.
+- **Rich trade journal** — per-trade detail with an interactive price chart marking your entries and exits (futures, stocks, forex and crypto — see [Market data & charts](#market-data--charts) for setup and the options/CFD limitation), multi-execution / multi-leg editor, running P&L, star rating, and structured notes (setup, emotions before/after, mistakes, lessons). The detail sidebar is fully customizable — show, hide and drag-to-reorder every panel and stat row to build your own review layout, saved to your account.
 - **Strategies & playbooks** — define each setup you trade as a reusable strategy with its own entry and exit checklists, reference screenshots, and color. Assign a strategy to a trade, tick off the checklist you actually followed, and review per-strategy statistics alongside how closely your executions matched the plan. Retired setups can be archived without losing their trade history.
-- **Deep statistics** — win rate (overall, longs, shorts), profit factor, expectancy, planned vs. realized R-multiples, hold-time analysis, consecutive win/loss streaks, day-level stats, fees/commissions breakdown, and more.
+- **Deep statistics** — win rate (overall, longs, shorts), profit factor, expectancy, planned vs. realized R-multiples, MAE/MFE excursions, net ROI, breakeven levels, hold-time analysis, consecutive win/loss streaks, day-level stats, fees/commissions breakdown, and more.
 - **Discipline tracking** — hold yourself to your own rules, separate from P&L, across two tabs: **Trading** rules and **Daily** habits. Every rule is either a _task_ you tick off (scored by how many you keep) or a _constraint_ you must not break — and a breach costs what it should: a trading limit reddens the day on the first breach, a daily habit follows _never miss twice_. Each rule runs on its own weekday schedule. Every day is graded green / amber / red on a year-long heatmap, with clean-day streaks, a 30-day trend, per-rule and per-weekday consistency, daily reviews you can back-fill without a deadline, days you mark as not counted (holiday, illness — per domain or the whole day), and a "does discipline pay off?" breakdown of average daily P&L and R-multiple by day type. Every change is **forward-only**: pausing, archiving or moving a rule's schedule applies from today and never re-scores a day you already lived through.
 - **Trading accounts** — built around the prop-firm workflow (firm, phase, account size, starting balance, currency). Assign trades to accounts and filter everything by account.
-- **Flexible import** — guided import wizard for CSV exports (large catalog of broker formats), with automatic de-duplication and a full import history.
+- **Universal CSV import & export** — a guided wizard imports any CSV/TXT export: it auto-detects the columns from your file's headers and shows you the mapping so you can correct any of it before importing, which means a broker doesn't need a bespoke parser to work. A picker of 25 known brokers, prop firms and platforms (Interactive Brokers, MetaTrader 4/5, Tradovate, TopstepX, Thinkorswim, cTrader, Rithmic, DeepCharts, …) pre-sets the right asset class and defaults, with a generic template and manual entry for anything not on the list. Imports are de-duplicated automatically, resolve fills into trades (partials summed, sign-encoded direction handled), and land in a rolling 31-day import history where a whole import — and every trade it created — can be rolled back in one action. Trades export back out to CSV from the trades table, all of them or just the rows you select.
 - **Tags & categories** — tags grouped into categories (e.g. _Setup type_, _Mistake_), assignable to trades and usable as filters.
-- **Futures-aware P&L** — built-in contract multipliers for common futures (ES, NQ, GC, CL, …) so P&L and R are computed correctly per instrument.
+- **Instrument-aware P&L across asset classes** — every trade carries an asset class (stocks, futures, forex, crypto, options, CFDs, other) and a value multiplier, so P&L and R are computed correctly per instrument. Pre-fill and built-in contract multiplier and tick size. The multiplier stays editable per execution.
 - **Global filters** — app-wide header to switch accounts, pick a date range (with presets), toggle the unit between **$** and **R**, and apply filters across the P&L screens (dashboard, trades, statistics, strategies). Discipline is intentionally exempt — it tracks your process over the full calendar, not a filtered slice of trades.
 - **Polished UX** — dark-first design with a light theme, responsive layout with a mobile navigation sheet, installable as a PWA, and consistent skeleton loading states throughout.
 
@@ -44,25 +44,25 @@ See [`docs/UX_UI.md`](docs/UX_UI.md) for a full UX/UI walkthrough of the screens
 
 ## Tech stack
 
-| Area                          | Technology                                                                                                                       |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Framework                     | [Next.js 15](https://nextjs.org) (App Router, Server Actions) + React 19                                                         |
-| Language                      | TypeScript                                                                                                                       |
-| Styling                       | Tailwind CSS with custom HSL design tokens; MUI + Radix UI primitives; Emotion                                                   |
-| Database                      | [PostgreSQL](https://www.postgresql.org) — any standard Postgres (node-postgres) or [Neon](https://neon.tech) (serverless HTTP)  |
-| ORM                           | [Drizzle ORM](https://orm.drizzle.team) + drizzle-kit                                                                            |
-| Auth                          | [Clerk](https://clerk.com)                                                                                                       |
-| Charts                        | [Recharts](https://recharts.org) (analytics) + [Lightweight Charts](https://tradingview.github.io/lightweight-charts/) (candles) |
-| Forms & validation            | Type-safe Server Actions with schema validation via [Zod](https://zod.dev)                                                       |
-| CSV                           | [PapaParse](https://www.papaparse.com)                                                                                           |
-| Drag & drop                   | [dnd-kit](https://dndkit.com)                                                                                                    |
-| Notifications                 | [Sonner](https://sonner.emilkowal.ski)                                                                                           |
-| Market data _(optional)_      | [Databento](https://databento.com) for historical OHLC candles                                                                   |
-| Screenshots _(optional)_      | Cloudflare R2                                                                                                                    |
-| Error monitoring _(optional)_ | [Sentry](https://sentry.io)                                                                                                      |
-| Rate limiting _(optional)_    | [Upstash Redis](https://upstash.com) via `@upstash/ratelimit`                                                                    |
-| Analytics _(optional)_        | [PostHog](https://posthog.com)                                                                                                   |
-| Quality                       | Vitest, ESLint, Prettier, Husky + lint-staged, GitHub Actions CI                                                                 |
+| Area                          | Technology                                                                                                                                                                                    |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework                     | [Next.js 15](https://nextjs.org) (App Router, Server Actions) + React 19                                                                                                                      |
+| Language                      | TypeScript                                                                                                                                                                                    |
+| Styling                       | Tailwind CSS with custom HSL design tokens; MUI + Radix UI primitives; Emotion                                                                                                                |
+| Database                      | [PostgreSQL](https://www.postgresql.org) — any standard Postgres (node-postgres) or [Neon](https://neon.tech) (serverless HTTP)                                                               |
+| ORM                           | [Drizzle ORM](https://orm.drizzle.team) + drizzle-kit                                                                                                                                         |
+| Auth                          | [Clerk](https://clerk.com)                                                                                                                                                                    |
+| Charts                        | [Recharts](https://recharts.org) (analytics) + [Lightweight Charts](https://tradingview.github.io/lightweight-charts/) (candles)                                                              |
+| Forms & validation            | Type-safe Server Actions with schema validation via [Zod](https://zod.dev)                                                                                                                    |
+| CSV                           | [PapaParse](https://www.papaparse.com)                                                                                                                                                        |
+| Drag & drop                   | [dnd-kit](https://dndkit.com)                                                                                                                                                                 |
+| Notifications                 | [Sonner](https://sonner.emilkowal.ski)                                                                                                                                                        |
+| Market data _(optional)_      | [Databento](https://databento.com) (futures + stocks), [Polygon.io](https://polygon.io) (forex), Binance (crypto) — historical OHLC candles, see [Market data & charts](#market-data--charts) |
+| Screenshots _(optional)_      | Cloudflare R2                                                                                                                                                                                 |
+| Error monitoring _(optional)_ | [Sentry](https://sentry.io)                                                                                                                                                                   |
+| Rate limiting _(optional)_    | [Upstash Redis](https://upstash.com) via `@upstash/ratelimit`                                                                                                                                 |
+| Analytics _(optional)_        | [PostHog](https://posthog.com)                                                                                                                                                                |
+| Quality                       | Vitest, ESLint, Prettier, Husky + lint-staged, GitHub Actions CI                                                                                                                              |
 
 ## Self-hosting (Docker)
 
@@ -140,7 +140,10 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 | `CLERK_WEBHOOK_SIGNING_SECRET`                            |    ▫️    | Verifies the Clerk `user.deleted` webhook that erases a deleted user's data (see below)      |
 | `NEXT_PUBLIC_APP_URL`                                     |    ▫️    | Production app host (post-login). Enables host-based routing + Server Actions behind a proxy |
 | `NEXT_PUBLIC_MARKETING_URL`                               |    ▫️    | Production marketing/landing host. Pairs with `NEXT_PUBLIC_APP_URL` for the domain split     |
-| `DATABENTO_API_KEY`                                       |    ▫️    | Enables historical candle charts on the trade detail page                                    |
+| `DATABENTO_API_KEY`                                       |    ▫️    | Candle charts for **futures + stocks** (see [Market data & charts](#market-data--charts))    |
+| `DATABENTO_EQUITIES_DATASET`                              |    ▫️    | US equities dataset. Default `XNAS.ITCH` is **Nasdaq-only** — set e.g. `EQUS.MINI` for NYSE  |
+| `POLYGON_API_KEY`                                         |    ▫️    | Candle charts for **forex** (Polygon.io currency aggregates)                                 |
+| `BINANCE_API_BASE`                                        |    ▫️    | Crypto charts need **no key**; override only if the default host is blocked in your region   |
 | `R2_*`                                                    |    ▫️    | Cloudflare R2 credentials for trade screenshots                                              |
 | `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_*`                      |    ▫️    | Error monitoring & source maps                                                               |
 | `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`     |    ▫️    | Per-user rate limiting (both required together; omit to disable — see below)                 |
@@ -149,6 +152,35 @@ Open [http://localhost:3000](http://localhost:3000), sign up, and you're in.
 | `RESEND_API_KEY` / `FEEDBACK_*`                           |    ▫️    | Feedback e-mail notifications (Resend). Omit to disable.                                     |
 
 ✅ required · ▫️ optional. See [`.env.example`](.env.example) for the full annotated list.
+
+## Market data & charts
+
+The candle chart on the trade detail page — the one that plots your entries and exits against real price — is **optional and asset-class dependent**. Everything else in the app works without it; a trade with no chart still journals, scores and reports normally.
+
+Which historical source a trade is routed to is decided by its asset class in [`src/lib/market-data.ts`](src/lib/market-data.ts):
+
+| Asset class | Chart | Source                                                   | Key required           |
+| ----------- | :---: | -------------------------------------------------------- | ---------------------- |
+| **Futures** |  ✅   | Databento `GLBX.MDP3`, continuous front month (`ES.v.0`) | `DATABENTO_API_KEY`    |
+| **Stocks**  |  ✅   | Databento equities (`DATABENTO_EQUITIES_DATASET`)        | `DATABENTO_API_KEY`    |
+| **Forex**   |  ✅   | Polygon.io currency aggregates (`C:EURUSD`)              | `POLYGON_API_KEY`      |
+| **Crypto**  |  ✅   | Binance spot klines (`BTCUSD` → `BTCUSDT`)               | **none** — works as-is |
+| **Options** |  ❌   | No wired source                                          | —                      |
+| **CFDs**    |  ❌   | No wired source                                          | —                      |
+| **Other**   |  ❌   | No wired source                                          | —                      |
+
+**Options, CFDs and "other" have no chart at all** — no provider is wired up for them, and the app says so in place of the chart rather than failing silently. This is the single most common reason a chart is missing.
+
+Beyond asset class, a chart is also withheld when:
+
+- **The trade was entered today.** Historical feeds only cover completed days, so the chart appears the next day.
+- **The provider's key is missing** for that asset class — e.g. futures charts stay off until `DATABENTO_API_KEY` is set. Crypto is the exception and needs no key.
+- **The symbol doesn't resolve** — forex only charts when the symbol parses as a currency pair (`EURUSD`, `EUR/USD`); a stock outside your configured equities dataset returns no data. The default `XNAS.ITCH` is **Nasdaq-listed only**, so NYSE tickers need a consolidated feed such as `EQUS.MINI`.
+- **The per-user candle rate limit** (10/min · 100/day) is hit, when rate limiting is enabled.
+
+Two things on the detail page are **derived from candles** and therefore disappear together with the chart: the **MAE/MFE** excursion figures and the candle-based **running P&L** curve. Your entered prices, P&L, R-multiple and every statistic that builds on them are computed from the trade itself and are never affected.
+
+Candles are cached in the database and the cache is **shared across all users** — the same futures root and interval is identical for everyone, so a span fetched once serves every account. Futures chart against the **continuous front-month series**, not the exact expiry you traded, so a long-dated contract may not line up tick-for-tick with your fills.
 
 ## Rate limiting
 
@@ -214,13 +246,18 @@ src/
 ├── components/                 # Feature + UI components (dashboard, trades, stats, progress, settings, ui…)
 ├── lib/
 │   ├── db/                     # Drizzle schema + DB client (auto-selects pg / Neon driver)
-│   ├── actions/                # Server Actions (trades, stats, import, accounts, tags, progress, dashboard, candles, strategies, wizard, admin, feedback)
+│   ├── actions/                # Server Actions (trades, stats, accounts, tags, progress, dashboard, candles, strategies, wizard/import, export, admin, feedback)
 │   ├── dashboard/              # Widget compute + default templates
+│   ├── demo/                   # Sample-data detection for the empty (pre-first-trade) state
 │   ├── stats-compute.ts        # Pure statistics engine (unit-tested)
 │   ├── progress-compute.ts     # Discipline scoring, streaks & payoff math
 │   ├── progress-format.ts      # Shared discipline formatting (dates, heatmap cell copy)
-│   ├── futures.ts              # Futures contract multipliers
+│   ├── futures.ts              # Contract multipliers & tick sizes; per-asset-class multiplier resolution
+│   ├── forex.ts                # FX pair parsing, standard-lot contract size & pip sizing
 │   ├── trade-pnl.ts            # P&L calculations
+│   ├── mae-mfe.ts              # Maximum adverse / favorable excursion
+│   ├── r-multiple.ts           # Realized R (the single app-wide definition)
+│   ├── breakeven.ts            # Breakeven price incl. fees
 │   └── ...                     # csv-columns, brokers, global-filters, date-tz, utils…
 ├── i18n/                       # Locale dictionaries (English; structured for more languages)
 ├── hooks/                      # Reusable React hooks
@@ -268,11 +305,11 @@ Adopting migrations on an **existing** database (already has the tables but no m
 ## Importing trades
 
 1. Export a CSV from your broker.
-2. In Tradenza go to **Import / Export** (or **Add trade → Import**).
-3. Follow the wizard: pick the method, choose the target account and broker, then drop the CSV.
+2. In Tradenza go to **Add trade** and start the wizard with **Add new account**, or select an existing account to which you want to add trades.
+3. Follow the four steps — **Broker → Account → Method → Trades**: pick your broker, prop firm or platform, create the trading account the trades belong to, choose file upload or manual entry, then drop the CSV (picking its time zone).
 4. Confirm — duplicates are detected and skipped automatically, and the result is recorded in your import history.
 
-Manual single-trade entry is also available for trades you don't import.
+Manual single-trade entry is the same wizard with **Add manually** as the method, and is also the fallback for brokers without a file template yet. Imports from the last 31 days are listed under **Settings → Import history**, where a whole import (and every trade it created) can be rolled back in one action. Trades go back out as CSV from the **Trades** table — the whole table, or just the rows you tick.
 
 ## Deployment
 
@@ -305,7 +342,7 @@ npm run test:coverage  # coverage report
 npm run format         # Prettier --write
 ```
 
-Git hooks (Husky + lint-staged) format and lint staged files on commit, and CI re-runs Prettier, ESLint, TypeScript, and the unit tests on every push and pull request. The statistics, P&L, futures, breakeven, and date/timezone logic are covered by Vitest unit tests in `src/lib`.
+Git hooks (Husky + lint-staged) format and lint staged files on commit, and CI re-runs Prettier, ESLint, TypeScript, and the unit tests on every push and pull request. The pure domain logic is covered by Vitest unit tests living alongside the modules they cover (mostly in `src/lib`): statistics, P&L, futures & forex instrument sizing, MAE/MFE, R-multiple, breakeven, discipline scoring and rule schedules, CSV column mapping and broker templates, date/timezone handling, validation and rate limiting.
 
 ## Contributing
 

@@ -137,6 +137,7 @@
       "buy": "Buy",
       "sell": "Sell",
       "noKey": "Market data isn't configured for this market.",
+      "noAccess": "Market data for this instrument isn't available yet.",
       "unsupported": "Price charts aren't available for this market yet (options and CFDs are not supported).",
       "noData": "No market data available for this trade.",
       "today": "This chart only shows historical days. Market data for today's trades becomes available the next day.",

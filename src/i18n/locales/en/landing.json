@@ -34,11 +34,11 @@
     "subheading": "Beyond the dashboard, journal and discipline tracker — playbooks, daily reviews, analytics and the tooling that makes logging fast and keeps your data yours.",
     "strategies": {
       "title": "Strategies & playbooks",
-      "desc": "Define each setup you trade as a reusable strategy with entry and exit checklists and a reference screenshots. Assign it to trades, tick off what you actually followed, and review per-strategy stats and how closely you stuck to the plan."
+      "desc": "Define each setup you trade as a reusable strategy with entry and exit checklists and reference screenshots. Assign it to trades, tick off what you actually followed, and review per-strategy stats and how closely you stuck to the plan."
     },
     "import": {
       "title": "Flexible import",
-      "desc": "A guided wizard imports CSV exports from a broad catalog of brokers — with automatic de-duplication and a full import history."
+      "desc": "A guided wizard takes any broker CSV — it auto-detects the columns and lets you fix the mapping before importing, so your broker doesn't need to be on a list. De-duplicated automatically, rollback-able, and exportable back to CSV whenever you want your data elsewhere."
     },
     "accounts": {
       "title": "Trading accounts",
@@ -72,9 +72,9 @@
     },
     "trade": {
       "title": "Review every trade like a pro",
-      "desc": "Open any trade on a full price chart with your executions marked, watch the running P&L build, rate your execution and journal the setup, emotions, mistakes and lessons — then arrange the sidebar panels and stats exactly how you like.",
+      "desc": "Open a trade on a full price chart with your executions marked, watch the running P&L build, rate your execution and journal the setup, emotions, mistakes and lessons — then arrange the sidebar panels and stats exactly how you like.",
       "points": [
-        "Chart with entries, exits and running P&L",
+        "Chart with entries, exits and running P&L — futures, stocks, forex and crypto",
         "Multi-execution and multi-leg support",
         "MAE/MFE and R-multiple on every trade, expectancy across your history",
         "Structured notes, tags, screenshots, star rating and more",
@@ -145,7 +145,11 @@
       },
       {
         "q": "Which brokers and instruments are supported?",
-        "a": "Import works from a broad catalog of broker and platform CSV exports — Interactive Brokers, MetaTrader 4/5, Tradovate, Thinkorswim, cTrader, DeepCharts and many more — with automatic de-duplication. Stocks, futures, forex, crypto and options are supported, and futures P&L uses built-in contract multipliers so the numbers are correct per instrument."
+        "a": "Any of them, in practice. The importer reads your CSV's headers, auto-detects which column is which, and shows you the mapping to correct before anything is saved — so your broker doesn't need a purpose-built parser. There's a picker of 25 known brokers, prop firms and platforms (Interactive Brokers, MetaTrader 4/5, Tradovate, TopstepX, Thinkorswim, cTrader, Rithmic, DeepCharts and more) that pre-sets sensible defaults, plus a generic template and manual entry for everything else. Stocks, futures, forex, crypto, options and CFDs are all supported, each priced with the right value multiplier. You can override the multiplier per execution whenever an instrument is unusual."
+      },
+      {
+        "q": "Does every trade get a price chart?",
+        "a": "Most do, but not all — so it's worth knowing up front. The trade detail chart plots your entries and exits against real historical price for futures, stocks, forex and crypto. Options and CFDs have no market-data source wired up yet, so those trades show a short note instead of a chart. Charts also only cover completed days, so a trade you entered today gets its chart the next day. Everything else is unaffected: those trades still journal, score and report exactly like any other — only the chart itself, and the MAE/MFE figures derived from it, are missing."
       },
       {
         "q": "Can I contribute or request features?",
