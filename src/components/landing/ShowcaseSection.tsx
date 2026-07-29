@@ -4,9 +4,9 @@ import Blob from './Blob'
 import Reveal from './Reveal'
 
 const showcase = [
+  { key: 'discipline', light: '/screenshots/discipline-light.png', dark: '/screenshots/discipline-dark.png' },
   { key: 'dashboard', light: '/screenshots/dashboard-light.png', dark: '/screenshots/dashboard-dark.png' },
   { key: 'trade', light: '/screenshots/trade-detail-light.png', dark: '/screenshots/trade-detail-dark.png' },
-  { key: 'discipline', light: '/screenshots/discipline-light.png', dark: '/screenshots/discipline-dark.png' },
 ] as const
 
 export default function ShowcaseSection() {

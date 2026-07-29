@@ -80,10 +80,11 @@
   }
 }
 
-/* ─── Heatmap: "perfect" day accent ────────────────────────────────────────── */
-/* Perfect days are pushed further from near-perfect: lighter in dark mode,
-   darker in light mode, for a clearly stronger contrast. */
 @layer components {
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
   /* Dark mode (default :root): dim → bright, perfect brightest. */
   .heat-l1 {
     background-color: hsl(158 38% 24%);

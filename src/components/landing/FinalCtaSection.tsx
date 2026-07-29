@@ -18,7 +18,7 @@ export default function FinalCtaSection() {
             <p className="mx-auto mb-9 max-w-md text-muted-foreground">{t('landing.finalCta.subheading')}</p>
             <a
               href={appUrl('/sign-up')}
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-7 py-3.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-7 py-3.5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30 focus-ring"
             >
               {t('landing.finalCta.cta')}
             </a>

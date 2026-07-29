@@ -76,6 +76,7 @@
       "points": [
         "Chart with entries, exits and running P&L",
         "Multi-execution and multi-leg support",
+        "MAE/MFE and R-multiple on every trade, expectancy across your history",
         "Structured notes, tags, screenshots, star rating and more",
         "Customizable sidebar — show, hide and reorder every panel and stat"
       ]
@@ -115,7 +116,7 @@
   "oss": {
     "badge": "Open source",
     "heading": "Free, open, and yours to keep",
-    "desc": "Tradenza is free and open source. Use it however you like, self-host it on your own infrastructure, read every line, and contribute if you'd like. There's no paywall and no lock-in — your trading data is yours.",
+    "desc": "I built Tradenza for my own trading, then decided to open it up. Use it however you like, self-host it on your own infrastructure, read every line, and contribute if you'd like. There's no paywall and no lock-in — your trading data is yours.",
     "ctaStar": "Star on GitHub",
     "ctaContribute": "Contribute",
     "tipLead": "If it helps your trading, a voluntary tip keeps it going — entirely optional.",
@@ -159,7 +160,7 @@
   "finalCta": {
     "kicker": "Get started",
     "heading": "Start journaling today",
-    "subheading": "Build the habit that compounds. Your future self will thank you.",
+    "subheading": "No credit card. Free to use, free to self-host — see whether your discipline is actually paying off.",
     "cta": "Start free →"
   },
   "footer": {
@@ -168,6 +169,7 @@
     "features": "Features",
     "howItWorks": "How it works",
     "faq": "FAQ",
+    "signIn": "Sign in",
     "resources": "Resources",
     "docs": "Documentation",
     "license": "License",

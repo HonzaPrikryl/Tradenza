@@ -156,7 +156,7 @@ export default function DashboardPreview() {
   }, [])
 
   return (
-    <div className="relative mx-auto w-full max-w-md motion-safe:animate-float sm:max-w-lg lg:max-w-none">
+    <div aria-hidden className="relative mx-auto w-full max-w-md motion-safe:animate-float sm:max-w-lg lg:max-w-none">
       <div className="rounded-2xl border border-border bg-gradient-to-b from-card to-background p-2 shadow-2xl shadow-black/40">
         <div className="rounded-xl border border-border bg-background/80 p-3 backdrop-blur-sm sm:p-5">
           <div className="mb-4 flex items-center gap-1.5">

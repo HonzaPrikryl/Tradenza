@@ -1,7 +1,7 @@
 import { Github } from 'lucide-react'
 import Logo from '@/components/ui/Logo'
 import { t } from '@/i18n'
-import { COFFEE_URL, DOCS_URL, GITHUB_URL, LICENSE_URL, SPONSOR_URL } from './links'
+import { appUrl, COFFEE_URL, DOCS_URL, GITHUB_URL, LICENSE_URL, SPONSOR_URL } from './links'
 
 export default function LandingFooter() {
   return (
@@ -20,6 +20,7 @@ export default function LandingFooter() {
               <FooterLink href="#features">{t('landing.footer.features')}</FooterLink>
               <FooterLink href="#how">{t('landing.footer.howItWorks')}</FooterLink>
               <FooterLink href="#faq">{t('landing.footer.faq')}</FooterLink>
+              <FooterLink href={appUrl('/sign-in')}>{t('landing.footer.signIn')}</FooterLink>
             </FooterColumn>
 
             <FooterColumn title={t('landing.footer.resources')}>
@@ -56,7 +57,7 @@ export default function LandingFooter() {
             href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-muted-foreground transition-colors hover:text-foreground"
+            className="rounded-md text-muted-foreground transition-colors hover:text-foreground focus-ring"
             aria-label="GitHub"
           >
             <Github className="h-4 w-4" />
@@ -75,14 +76,14 @@ export default function LandingFooter() {
 function FooterColumn({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col items-start">
-      <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h4>
+      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
       <ul className="space-y-2 text-sm text-left">{children}</ul>
     </div>
   )
 }
 
 function FooterLink({ href, external, children }: { href: string; external?: boolean; children: React.ReactNode }) {
-  const className = 'text-muted-foreground transition-colors hover:text-foreground'
+  const className = 'rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-ring'
   if (external) {
     return (
       <li>

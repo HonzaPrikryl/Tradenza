@@ -27,7 +27,7 @@ export default function OpenSourceSection() {
                 href={GITHUB_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-ring"
               >
                 <Github className="h-4 w-4" />
                 {t('landing.oss.ctaStar')}
@@ -36,7 +36,7 @@ export default function OpenSourceSection() {
                 href={CONTRIBUTE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+                className="inline-flex items-center gap-2 rounded-md border border-border bg-background px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-ring"
               >
                 <Check className="h-4 w-4 text-primary" />
                 {t('landing.oss.ctaContribute')}
@@ -50,7 +50,7 @@ export default function OpenSourceSection() {
                   href={COFFEE_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
+                  className="inline-flex items-center gap-2 rounded-md text-sm font-medium text-foreground transition-colors hover:text-primary focus-ring"
                 >
                   <Coffee className="h-4 w-4 text-primary" />
                   {t('landing.oss.ctaCoffee')}
@@ -60,7 +60,7 @@ export default function OpenSourceSection() {
                   href={SPONSOR_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
+                  className="inline-flex items-center gap-2 rounded-md text-sm font-medium text-foreground transition-colors hover:text-primary focus-ring"
                 >
                   <Heart className="h-4 w-4 text-primary" />
                   {t('landing.oss.ctaSponsor')}

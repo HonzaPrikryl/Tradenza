@@ -22,7 +22,7 @@ export default function FaqSection({ faqs }: { faqs: FaqItem[] }) {
           {faqs.map((f, i) => (
             <Reveal key={f.q} delay={(i % 3) * 70}>
               <details className="group rounded-xl border border-border bg-card px-5 transition-colors hover:border-primary/40 open:border-primary/40">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 font-medium [&::-webkit-details-marker]:hidden">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-md py-4 font-medium [&::-webkit-details-marker]:hidden focus-ring">
                   {f.q}
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-open:rotate-180" />
                 </summary>

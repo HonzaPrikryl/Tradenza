@@ -38,3 +38,7 @@ yarn-error.log*
 # sentry
 .sentryclirc
 /coverage
+
+.claude/
+.impeccable/
+/PRODUCT.md

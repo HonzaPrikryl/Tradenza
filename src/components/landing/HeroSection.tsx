@@ -24,7 +24,7 @@ export default function HeroSection() {
                 href={GITHUB_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mb-6 inline-flex animate-enter items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary transition-colors hover:bg-primary/15"
+                className="mb-6 inline-flex animate-enter items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary transition-colors hover:bg-primary/15 focus-ring"
               >
                 <Sparkles className="h-3 w-3" />
                 {t('landing.hero.badge')}
@@ -53,7 +53,7 @@ export default function HeroSection() {
               >
                 <a
                   href={appUrl('/sign-up')}
-                  className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30"
+                  className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30 focus-ring"
                 >
                   {t('landing.hero.ctaPrimary')}
                   <ArrowRight className="h-4 w-4" />
@@ -62,7 +62,7 @@ export default function HeroSection() {
                   href={GITHUB_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-md border border-border bg-card/60 px-6 py-3 text-sm font-medium text-foreground backdrop-blur transition-colors hover:bg-accent"
+                  className="inline-flex items-center gap-2 rounded-md border border-border bg-card/60 px-6 py-3 text-sm font-medium text-foreground backdrop-blur transition-colors hover:bg-accent focus-ring"
                 >
                   <Github className="h-4 w-4" />
                   {t('landing.hero.ctaSecondary')}
@@ -87,12 +87,12 @@ export default function HeroSection() {
         {/* Scroll affordance, pinned to the bottom of the first screen. */}
         <a
           href="#features"
-          className="group inline-flex animate-enter flex-col items-center gap-1 self-center pt-6 text-muted-foreground transition-colors hover:text-foreground"
+          className="group inline-flex animate-enter flex-col items-center gap-1 self-center rounded-md pt-6 text-muted-foreground transition-colors hover:text-foreground focus-ring"
           style={{ animationDelay: '460ms' }}
           aria-label={t('landing.hero.scrollCue')}
         >
           <span className="text-[11px] font-medium uppercase tracking-widest">{t('landing.hero.scrollCue')}</span>
-          <ChevronDown className="h-5 w-5 motion-safe:animate-bounce" />
+          <ChevronDown className="h-5 w-5 motion-safe:animate-nudge" />
         </a>
       </div>
     </section>
