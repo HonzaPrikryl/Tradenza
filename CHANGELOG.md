@@ -12,6 +12,68 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+### Added
+
+- **Images get into a note the way you'd expect** — drag a picture in from your
+  desktop, drop several at once, or paste one straight from the clipboard. Each
+  upload says so while it runs. With object storage configured the image is
+  uploaded and the note stores a URL; without it the image is embedded inline,
+  so a self-hosted instance with no bucket behaves the same, only heavier.
+  Dragging an image that is already in the note moves it to wherever you drop
+  it, rather than duplicating it at the end.
+- **Links can be edited after you write them** — clicking an existing link
+  offers _Edit_, _Update_ and _Remove_ instead of making you delete the text and
+  write it again.
+- **A way past a floated image** — an image with text wrapping around it used to
+  swallow the caret, with no way to start the line beside or after it. The image
+  overlay now offers _Write next to the image_, and a note that ends on an image
+  always keeps an empty line under it.
+- **Habits are managed in two sections, not one list** — the Daily side of
+  _Manage_ now separates **Avoidance** from **Building** exactly the way trading
+  splits **Constraint** from **Task**: same colours, same two-tier shape, each
+  with its own empty state. One combined list could only ever say "no habits
+  yet", never "nothing you're trying to stop yet".
+- **The Daily tab explains itself when it's empty** — the first-run state now
+  describes the two kinds of habit and what tracking them buys you, mirroring
+  the trading empty state instead of showing a single flat sentence.
+
+### Changed
+
+- **The landing page is keyboard- and screen-reader-legible.** Every link and
+  button shows a visible focus ring, footer column headings sit at the right
+  level in the document outline, the decorative dashboard mock-up is hidden from
+  assistive tech, and the scroll-reveal animations respect
+  `prefers-reduced-motion` and no longer delay content that is already on screen
+  when the page loads. The footer also gained a direct _Sign in_ link.
+- The Discipline page's widgets were tightened up — a shorter by-weekday chart
+  and a shorter consistency list — so the year heatmap, the day panel and the
+  breakdown fit on one screen more often.
+
+### Fixed
+
+- **Pasted text no longer disappears in the other theme.** Content pasted from
+  Word, Notion or a web page carries hard-coded colours (`color: rgb(0, 0, 0)`),
+  which survived a theme switch and left notes rendering black on black. Colour,
+  background and font declarations are now stripped on the way in and ignored on
+  the way out, so note text always inherits the theme. Layout-related styling —
+  image size, float, alignment — is kept.
+- **A daily note no longer resets while you're writing it.** A background
+  refresh could replay the last saved value over unsaved edits.
+- **The unlogged-days prompt appears once.** The stats view renders in three
+  places on the Discipline page and the "these days broke your streak" card was
+  being built in each of them.
+- Day-performance cards no longer overflow their row on narrow screens.
+
+### Security
+
+- **Rich-text content is sanitized on both sides of storage.** Daily notes,
+  trade notes and strategy descriptions strip `<script>`, event-handler
+  attributes and `javascript:` URLs when saved, and the strategy description —
+  the one place the HTML is written back into the page with
+  `dangerouslySetInnerHTML` — is sanitized again at render time. Content already
+  in the database is therefore covered without a migration or any manual
+  cleanup.
+
 ## [0.3.0] - 2026-07-28
 
 Discipline grows a second half. Alongside your trading rules there is now a
