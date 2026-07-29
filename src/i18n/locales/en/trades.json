@@ -140,7 +140,8 @@
       "noAccess": "Market data for this instrument isn't available yet.",
       "unsupported": "Price charts aren't available for this market yet (options and CFDs are not supported).",
       "noData": "No market data available for this trade.",
-      "today": "This chart only shows historical days. Market data for today's trades becomes available the next day.",
+      "today": "Today's chart isn't ready yet",
+      "todayHint": "Market data covers completed days only, so this chart fills in tomorrow. Your executions, P&L and R-multiple are unaffected.",
       "rateLimited": "Waiting for market data. Please try again in a minute.",
       "error": "Failed to load market data. Try again later."
     },

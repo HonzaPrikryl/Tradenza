@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { Loader2, CandlestickChart } from 'lucide-react'
+import { Loader2, CandlestickChart, CalendarClock } from 'lucide-react'
 import {
   createChart,
   createSeriesMarkers,
@@ -150,6 +150,18 @@ export default function TradeChart({
       <div className="flex h-full w-full items-center justify-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         {t('trades.detail.chart.loading')}
+      </div>
+    )
+  }
+
+  if (result.status === 'today') {
+    return (
+      <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
+        <CalendarClock className="h-8 w-8 text-primary/70" />
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-foreground">{t('trades.detail.chart.today')}</p>
+          <p className="mx-auto max-w-sm text-xs text-muted-foreground">{t('trades.detail.chart.todayHint')}</p>
+        </div>
       </div>
     )
   }
