@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { t } from '@/i18n'
 import { uuid } from '@/lib/validation'
+import { runAtomic } from '@/lib/db/atomic'
+import { cleanupOrphanedImages, tradeImageKeys } from '@/lib/orphan-images'
 import { authedAction, mutationAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 
@@ -210,7 +212,9 @@ export const setAccountArchived = mutationAction([uuid, z.boolean()], async ({ u
 })
 
 export const clearAccountTrades = mutationAction([uuid], async ({ userId }, id) => {
+  const keys = await tradeImageKeys(userId, eq(trades.accountId, id))
   await db.delete(trades).where(and(eq(trades.userId, userId), eq(trades.accountId, id)))
+  await cleanupOrphanedImages(userId, keys)
   revalidatePath('/accounts')
   revalidatePath('/trades')
   revalidatePath('/dashboard')
@@ -241,8 +245,28 @@ export const transferTrades = mutationAction([uuid, uuid], async ({ userId }, fr
 })
 
 export const deleteAccount = mutationAction([uuid], async ({ userId }, id) => {
-  await db.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, userId)))
+  const account = await db.query.accounts.findFirst({
+    where: and(eq(accounts.id, id), eq(accounts.userId, userId)),
+    columns: { id: true },
+  })
+  if (!account) throw new NotFoundError(t('errors.account.notFound'))
+
+  const keys = await tradeImageKeys(userId, eq(trades.accountId, id))
+
+  const [removed] = await runAtomic((x) => [
+    x
+      .delete(trades)
+      .where(and(eq(trades.userId, userId), eq(trades.accountId, id)))
+      .returning({ id: trades.id }),
+    x.delete(accounts).where(and(eq(accounts.id, id), eq(accounts.userId, userId))),
+  ])
+
+  await cleanupOrphanedImages(userId, keys)
+
   revalidatePath('/accounts')
+  revalidatePath('/settings/accounts')
   revalidatePath('/trades')
-  return { success: true }
+  revalidatePath('/dashboard')
+  revalidatePath('/add-trade')
+  return { success: true, deletedTrades: removed.length }
 })

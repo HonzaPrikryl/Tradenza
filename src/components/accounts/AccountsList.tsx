@@ -194,7 +194,14 @@ export default function AccountsList({ accounts, title, subtitle }: AccountsList
           title: t('tradingAccounts.rowMenu.deleteAccount'),
           message: (
             <>
-              {tRich('accounts.confirmDelete', { name: a.name })}
+              {tRich(
+                a.tradeCount === 0
+                  ? 'accounts.confirmDeleteEmpty'
+                  : a.tradeCount === 1
+                    ? 'accounts.confirmDeleteOne'
+                    : 'accounts.confirmDelete',
+                { name: a.name, count: a.tradeCount },
+              )}
               {isLastActive(a) && <> {t('tradingAccounts.lastAccountNote')}</>}
             </>
           ),

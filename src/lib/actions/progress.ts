@@ -51,6 +51,8 @@ import {
   type HabitPerfSplit,
 } from '@/lib/progress-compute'
 import { sanitizeRichTextValue } from '@/lib/rich-text'
+import { cleanupOrphanedImages } from '@/lib/orphan-images'
+import { r2KeysFromHtml } from '@/lib/r2-keys'
 
 // NOTE — the global header filters (account, date range, $/R unit) are deliberately
 // NOT read here. Discipline records the trader's process, not a slice of trades:
@@ -968,6 +970,11 @@ export const getDailyNote = authedAction([dateKey], async ({ userId }, day): Pro
 const dayNoteSchema = z.string().max(NOTE_MAX, t('validation.noteTooLong')).transform(sanitizeRichTextValue)
 
 export const setDayNote = mutationAction([dateKey, dayNoteSchema], async ({ userId }, day, note) => {
+  const previous = await db.query.dailyCheckins.findFirst({
+    where: and(eq(dailyCheckins.userId, userId), eq(dailyCheckins.date, day)),
+    columns: { note: true },
+  })
+
   await db
     .insert(dailyCheckins)
     .values({ userId, date: day, note })
@@ -975,6 +982,9 @@ export const setDayNote = mutationAction([dateKey, dayNoteSchema], async ({ user
       target: [dailyCheckins.userId, dailyCheckins.date],
       set: { note, updatedAt: new Date() },
     })
+
+  await cleanupOrphanedImages(userId, r2KeysFromHtml(previous?.note))
+
   revalidatePath('/progress')
   revalidatePath(`/progress/${day}`)
   return { success: true }

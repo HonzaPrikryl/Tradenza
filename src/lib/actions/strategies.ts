@@ -20,6 +20,8 @@ import {
   type ChecklistTrade,
 } from '@/lib/strategy-checklist'
 import { sanitizeRichTextValue } from '@/lib/rich-text'
+import { cleanupOrphanedImages } from '@/lib/orphan-images'
+import { r2KeyFromUrl, r2KeysFromHtml } from '@/lib/r2-keys'
 
 // Columns needed to build a `TradeRow` for `computeBundle` (the shared, tested
 // P&L/stats engine). Kept in one place so per-strategy stats are computed exactly
@@ -163,6 +165,21 @@ export const updateStrategy = mutationAction(
   [uuid, strategySchema],
   async ({ userId }, id, { name, description, entryChecklist, exitChecklist, imageUrls, color }) => {
     const images = safeImageUrls(imageUrls)
+
+    const previous = await db.query.strategies.findFirst({
+      where: and(eq(strategies.id, id), eq(strategies.userId, userId)),
+      columns: { description: true, imageUrl: true, imageUrls: true },
+    })
+    const previousKeys = previous
+      ? [
+          ...r2KeysFromHtml(previous.description),
+          ...[previous.imageUrl, ...(previous.imageUrls ?? [])].flatMap((u) => {
+            const key = r2KeyFromUrl(u)
+            return key ? [key] : []
+          }),
+        ]
+      : []
+
     const [strategy] = await db
       .update(strategies)
       .set({
@@ -177,6 +194,9 @@ export const updateStrategy = mutationAction(
       })
       .where(and(eq(strategies.id, id), eq(strategies.userId, userId)))
       .returning()
+
+    await cleanupOrphanedImages(userId, previousKeys)
+
     revalidatePath('/strategies')
     return { success: true, strategy }
   },

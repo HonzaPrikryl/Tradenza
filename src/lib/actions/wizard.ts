@@ -19,6 +19,8 @@ import {
   type RoundTripLeg,
 } from './wizard-helpers'
 import { uuid } from '@/lib/validation'
+import { runAtomic } from '@/lib/db/atomic'
+import { cleanupOrphanedImages, tradeImageKeys } from '@/lib/orphan-images'
 import { authedAction, mutationAction, importAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 
@@ -404,15 +406,21 @@ export const deleteImport = mutationAction(
     const tradeIds = Array.isArray(log.tradeIds) ? (log.tradeIds as string[]) : []
 
     let deletedTrades = 0
-    if (tradeIds.length > 0) {
-      const deleted = await db
-        .delete(trades)
-        .where(and(eq(trades.userId, userId), inArray(trades.id, tradeIds)))
-        .returning({ id: trades.id })
-      deletedTrades = deleted.length
-    }
+    if (tradeIds.length === 0) {
+      await db.delete(importLogs).where(and(eq(importLogs.id, id), eq(importLogs.userId, userId)))
+    } else {
+      const keys = await tradeImageKeys(userId, inArray(trades.id, tradeIds))
+      const [removed] = await runAtomic((x) => [
+        x
+          .delete(trades)
+          .where(and(eq(trades.userId, userId), inArray(trades.id, tradeIds)))
+          .returning({ id: trades.id }),
+        x.delete(importLogs).where(and(eq(importLogs.id, id), eq(importLogs.userId, userId))),
+      ])
+      deletedTrades = removed.length
 
-    await db.delete(importLogs).where(and(eq(importLogs.id, id), eq(importLogs.userId, userId)))
+      await cleanupOrphanedImages(userId, keys)
+    }
 
     revalidateAll()
     revalidatePath('/settings/import-history')

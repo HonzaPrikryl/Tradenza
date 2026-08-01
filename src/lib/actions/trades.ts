@@ -20,6 +20,7 @@ import { authedAction, mutationAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 import { t } from '@/i18n'
 import { sanitizeRichTextValue } from '@/lib/rich-text'
+import { cleanupOrphanedImages, tradeImageKeys } from '@/lib/orphan-images'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -178,12 +179,16 @@ export const updateTradeJournal = mutationAction([uuid, journalSchema], async ({
   if (v.notes !== undefined) set.notes = v.notes
   if (v.rating !== undefined) set.rating = v.rating === 0 ? null : v.rating
 
+  const previousKeys = v.notes !== undefined ? await tradeImageKeys(userId, eq(trades.id, id)) : []
+
   const [updated] = await db
     .update(trades)
     .set(set)
     .where(and(eq(trades.id, id), eq(trades.userId, userId)))
     .returning({ id: trades.id })
   if (!updated) throw new NotFoundError(t('errors.trade.notFound'))
+
+  await cleanupOrphanedImages(userId, previousKeys)
 
   revalidatePath('/trades')
   return { success: true }
@@ -325,7 +330,9 @@ export const updateTradeExecutions = mutationAction([uuid, execUpdateSchema], as
 // ─── Delete trade ─────────────────────────────────────────────────────────────
 
 export const deleteTrade = mutationAction([uuid], async ({ userId }, id) => {
+  const keys = await tradeImageKeys(userId, eq(trades.id, id))
   await db.delete(trades).where(and(eq(trades.id, id), eq(trades.userId, userId)))
+  await cleanupOrphanedImages(userId, keys)
 
   revalidatePath('/dashboard')
   revalidatePath('/trades')
@@ -334,7 +341,9 @@ export const deleteTrade = mutationAction([uuid], async ({ userId }, id) => {
 
 export const deleteTrades = mutationAction([uuidArray], async ({ userId }, ids) => {
   if (ids.length === 0) return { success: true, count: 0 }
+  const keys = await tradeImageKeys(userId, inArray(trades.id, ids))
   await db.delete(trades).where(and(eq(trades.userId, userId), inArray(trades.id, ids)))
+  await cleanupOrphanedImages(userId, keys)
   revalidatePath('/dashboard')
   revalidatePath('/trades')
   revalidatePath('/accounts')

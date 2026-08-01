@@ -12,7 +12,9 @@
   "namePlaceholder": "Lucid 50k | Step1",
   "firmPlaceholder": "FTMO, Lucid…",
   "phasePlaceholder": "Step1, Funded…",
-  "confirmDelete": "Delete account {name}? This will also delete all associated trades.",
+  "confirmDelete": "Delete account {name}? This also permanently deletes its {count} trades.",
+  "confirmDeleteOne": "Delete account {name}? This also permanently deletes its 1 trade.",
+  "confirmDeleteEmpty": "Delete account {name}? It has no trades.",
   "toast": {
     "updated": "Account updated",
     "nameRequired": "Name is required",

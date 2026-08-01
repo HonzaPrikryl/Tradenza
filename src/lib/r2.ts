@@ -51,6 +51,27 @@ export async function uploadToR2(key: string, body: Uint8Array, contentType: str
 }
 
 /**
+ * Delete a specific set of objects by key. Used when only *some* of a user's
+ * images become unreachable (e.g. a trading account and its trades are deleted)
+ * — the flat `notes/{userId}/` prefix can't express that subset, so the caller
+ * works out the exact keys. Returns the number of objects removed.
+ */
+export async function deleteR2Objects(keys: string[]): Promise<number> {
+  if (keys.length === 0) return 0
+  const Bucket = process.env.R2_BUCKET_NAME
+  let deleted = 0
+
+  // DeleteObjects accepts at most 1000 keys per request.
+  for (let i = 0; i < keys.length; i += 1000) {
+    const batch = keys.slice(i, i + 1000).map((Key) => ({ Key }))
+    await client().send(new DeleteObjectsCommand({ Bucket, Delete: { Objects: batch, Quiet: true } }))
+    deleted += batch.length
+  }
+
+  return deleted
+}
+
+/**
  * Delete every object under a key prefix (paginated). Used to remove a user's
  * uploaded images when their account is deleted. Returns the number of objects
  * removed.
