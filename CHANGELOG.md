@@ -12,6 +12,22 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-01
+
+Notes learn to hold pictures, and deletion learns to finish the job. Images can
+now be dragged, dropped and pasted into any note — and with that came the
+uncomfortable discovery that the app was good at creating data and bad at
+removing it. Deleting a trading account kept its trades. Nothing ever removed an
+uploaded image. This release fixes both, audits every other deletion path in the
+codebase, and gives the admin area a way to erase a user completely.
+
+**Upgrading.** Existing deployments need no action — there is no schema change,
+no migration and no new environment variable. Two behaviours change on the way
+in, both intentionally: deleting a trading account now really does delete its
+trades (use _Transfer data_ first to keep them), and images that nothing
+references any more are removed from object storage when the rows that showed
+them are deleted or edited. Instances with no bucket configured are unaffected.
+
 ### Added
 
 - **Images get into a note the way you'd expect** — drag a picture in from your
@@ -36,9 +52,19 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 - **The Daily tab explains itself when it's empty** — the first-run state now
   describes the two kinds of habit and what tracking them buys you, mirroring
   the trading empty state instead of showing a single flat sentence.
+- **Admins can delete a user and all their data** — a row action in the admin
+  users table erases every trade, account, note and upload belonging to one
+  user, then removes their login. Because it is irreversible and aimed at
+  someone else's account, it asks the admin to type the target's e-mail, and it
+  refuses two cases outright: your own account (account settings does that) and
+  anyone on the `ADMIN_EMAILS` allow-list, so one admin session can never lock
+  the others out. To remove an admin, take their address out of the variable
+  first.
 
 ### Changed
 
+- **Deleting a trading account now says how many trades go with it**, instead of
+  a generic "and all associated trades".
 - **The landing page is keyboard- and screen-reader-legible.** Every link and
   button shows a visible focus ring, footer column headings sit at the right
   level in the document outline, the decorative dashboard mock-up is hidden from
@@ -51,6 +77,22 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ### Fixed
 
+- **Deleting a trading account no longer leaves its trades behind.** The delete
+  confirmation had always promised to remove the account's trades, but only the
+  account was deleted — the trades survived with no account attached, and the
+  next visit to the accounts page quietly adopted them into a _different_
+  account, where they went on counting toward that account's P&L. The trades are
+  now deleted with the account, as one operation. **If you want to keep them,
+  use _Transfer data_ to move them to another account first.**
+- **Uploaded images are cleaned up when nothing shows them any more.** Deleting
+  a trade, an account, an import — or simply removing a picture from a note —
+  left the file in object storage forever, so a bucket only ever grew. Images
+  are now removed once nothing references them; one still used somewhere else
+  (the same picture pasted into a second note, a strategy, a daily note) is kept.
+- **Undoing an import can no longer half-finish.** The imported trades and the
+  import record were deleted separately, so an interruption between them could
+  leave an import listing trades that no longer existed, or trades that no
+  import could undo.
 - **Pasted text no longer disappears in the other theme.** Content pasted from
   Word, Notion or a web page carries hard-coded colours (`color: rgb(0, 0, 0)`),
   which survived a theme switch and left notes rendering black on black. Colour,
@@ -238,7 +280,8 @@ dashboard, statistics, strategies & playbooks, discipline tracking, tags,
 prop-firm trading accounts, candle charts, PWA — running on Next.js 15,
 Drizzle ORM, PostgreSQL (Neon) and Clerk.
 
-[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.3.0...HEAD
+[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.4.0
 [0.3.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.3.0
 [0.2.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.2.0
 [0.1.0]: https://github.com/HonzaPrikryl/tradenza/commits/main
