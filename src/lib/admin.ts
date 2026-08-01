@@ -23,3 +23,16 @@ export async function isAdmin(): Promise<boolean> {
     return false
   }
 }
+
+export function isAdminEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return adminEmails().includes(email.trim().toLowerCase())
+}
+
+export async function currentUserId(): Promise<string | null> {
+  try {
+    return (await currentUser())?.id ?? null
+  } catch {
+    return null
+  }
+}

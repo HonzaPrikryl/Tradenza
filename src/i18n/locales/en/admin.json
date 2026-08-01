@@ -50,6 +50,24 @@
       "lastActive": "Last active"
     }
   },
+  "deleteUser": {
+    "button": "Delete user",
+    "title": "Delete this user?",
+    "warning": "This permanently deletes the user and all of their data. It cannot be undone.",
+    "prompt": "Type {email} to confirm",
+    "confirm": "Delete permanently",
+    "deleting": "Deleting…",
+    "done": "Deleted {email} and all their data",
+    "clerkSkipped": "Data erased, but the login could not be removed — run Sync to check.",
+    "error": {
+      "forbidden": "Not allowed",
+      "self": "You can't delete your own account here — use account settings",
+      "protected": "This user is an admin.",
+      "notFound": "User not found",
+      "mismatch": "The e-mail didn't match",
+      "error": "Deletion failed"
+    }
+  },
   "user": {
     "back": "Back to users",
     "joined": "Joined {date}",

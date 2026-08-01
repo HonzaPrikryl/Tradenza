@@ -1,8 +1,8 @@
 import { clerkClient } from '@clerk/nextjs/server'
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { db, users } from '@/lib/db'
 import { purgeUserData } from '@/lib/db/purge-user'
-import { isAdmin } from '@/lib/admin'
+import { isAdmin, isAdminEmail, currentUserId } from '@/lib/admin'
 
 export interface UserOverviewRow {
   id: string
@@ -96,6 +96,44 @@ export async function reconcileUsersWithClerk(): Promise<ReconcileResult> {
       await purgeUserData(g.id)
     }
     return { ok: true, removed: ghosts.length, checked: dbRows.length }
+  } catch {
+    return { ok: false, reason: 'error' }
+  }
+}
+
+// ─── Delete a user ──────────────────────────────────────────────────────────
+
+export type DeleteUserResult =
+  | { ok: true; email: string | null; clerkDeleted: boolean }
+  | { ok: false; reason: 'forbidden' | 'self' | 'protected' | 'notFound' | 'mismatch' | 'error' }
+
+export async function deleteUserCompletely(userId: string, confirmEmail: string): Promise<DeleteUserResult> {
+  if (!(await isAdmin())) return { ok: false, reason: 'forbidden' }
+
+  const callerId = await currentUserId()
+  if (!callerId) return { ok: false, reason: 'forbidden' }
+  if (callerId === userId) return { ok: false, reason: 'self' }
+
+  try {
+    const [row] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, userId))
+    if (!row) return { ok: false, reason: 'notFound' }
+    if (isAdminEmail(row.email)) return { ok: false, reason: 'protected' }
+
+    const typed = confirmEmail.trim().toLowerCase()
+    if (!typed || typed !== (row.email ?? '').trim().toLowerCase()) return { ok: false, reason: 'mismatch' }
+
+    await purgeUserData(userId)
+
+    let clerkDeleted = false
+    try {
+      const client = await clerkClient()
+      await client.users.deleteUser(userId)
+      clerkDeleted = true
+    } catch {
+      clerkDeleted = false
+    }
+
+    return { ok: true, email: row.email, clerkDeleted }
   } catch {
     return { ok: false, reason: 'error' }
   }

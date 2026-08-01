@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search } from 'lucide-react'
 import DataTable, { type DataTableColumn } from '@/components/ui/DataTable'
+import AdminDeleteUserButton from '@/components/admin/AdminDeleteUserButton'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import type { UserOverviewRow } from '@/lib/actions/admin'
@@ -95,6 +96,13 @@ const columns: DataTableColumn<UserOverviewRow>[] = [
     cellClassName: 'truncate text-muted-foreground',
     cell: (u) => formatDate(u.lastActiveAt),
   },
+  {
+    key: 'actions',
+    header: '',
+    align: 'right',
+    width: 'w-[56px]',
+    cell: (u) => <AdminDeleteUserButton userId={u.id} email={u.email} />,
+  },
 ]
 
 export default function AdminUsersTable({ users }: { users: UserOverviewRow[] }) {
@@ -131,7 +139,7 @@ export default function AdminUsersTable({ users }: { users: UserOverviewRow[] })
         sortStorageKey={STORAGE_KEY}
         defaultSort={{ by: 'createdAt', order: 'desc' }}
         onRowClick={(u) => router.push(`/admin/${u.id}`)}
-        tableClassName="min-w-[1185px] table-fixed"
+        tableClassName="min-w-[1241px] table-fixed"
       />
     </div>
   )
