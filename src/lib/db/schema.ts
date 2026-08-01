@@ -11,6 +11,7 @@ import {
   index,
   uniqueIndex,
   jsonb,
+  primaryKey,
 } from 'drizzle-orm/pg-core'
 import { relations, sql } from 'drizzle-orm'
 import type { SidebarPrefs } from '../trade-sidebar'
@@ -210,23 +211,29 @@ export const candleCache = pgTable('candle_cache', {
 })
 
 // ─── Global market candle cache ───────────────────────────────────────────────
-// Shared across ALL users (not per trade): candles for a continuous contract root
-// at a given interval are identical for everyone, so one fetched range serves any
-// user's trade in that window. `fromSec`/`toSec` track the time span already
-// requested from the data provider; the candle list is the merged, deduped result.
-export const marketCandles = pgTable(
-  'market_candles',
+// Shared across ALL users (not per trade): candles for an instrument at a given
+// interval are identical for everyone, so a chunk fetched once serves every
+// user's trade in that window.
+//
+// Storage is one row per fixed, epoch-aligned time chunk (see lib/candle-cache):
+// a row holds exactly what the provider returned for `[chunk_start,
+// chunk_start + span)` and nothing claims coverage it does not have. `complete`
+// marks a chunk whose span is final and non-empty — those are served forever;
+// everything else carries a TTL off `fetched_at`, so an empty or still-forming
+// chunk heals itself instead of turning into a permanent "no market data".
+export const marketCandleChunks = pgTable(
+  'market_candle_chunks',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
-    symbolRoot: text('symbol_root').notNull(), // continuous root, e.g. "ES", "NQ"
+    feedKey: text('feed_key').notNull(), // provider-namespaced instrument, e.g. "databento:GLBX.MDP3:NQ.v.0"
     intervalSec: integer('interval_sec').notNull(),
-    fromSec: integer('from_sec').notNull(), // covered span start (unix s)
-    toSec: integer('to_sec').notNull(), // covered span end (unix s)
-    candles: jsonb('candles').notNull(), // sorted, deduped [{ t, o, h, l, c, v }]
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    chunkStart: integer('chunk_start').notNull(), // unix s, aligned to the interval's chunk span
+    candles: jsonb('candles').notNull(), // sorted, deduped [{ t, o, h, l, c, v }] inside this chunk
+    complete: boolean('complete').notNull().default(false),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => ({
-    rootIntervalUniq: uniqueIndex('market_candles_root_interval_uniq').on(t.symbolRoot, t.intervalSec),
+    pk: primaryKey({ columns: [t.feedKey, t.intervalSec, t.chunkStart] }),
+    fetchedAtIdx: index('market_candle_chunks_fetched_at_idx').on(t.fetchedAt),
   }),
 )
 
@@ -521,7 +528,7 @@ export type ProgressRule = typeof progressRules.$inferSelect
 export type NewProgressRule = typeof progressRules.$inferInsert
 export type RuleCompletion = typeof ruleCompletions.$inferSelect
 export type DailyCheckin = typeof dailyCheckins.$inferSelect
-export type MarketCandles = typeof marketCandles.$inferSelect
+export type MarketCandleChunk = typeof marketCandleChunks.$inferSelect
 export type Feedback = typeof feedback.$inferSelect
 export type NewFeedback = typeof feedback.$inferInsert
 export type Strategy = typeof strategies.$inferSelect

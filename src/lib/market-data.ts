@@ -23,6 +23,8 @@ export interface Candle {
 
 export type Provider = 'databento' | 'polygon' | 'binance'
 
+export type DatabentoSchema = 'ohlcv-1m' | 'ohlcv-1h' | 'ohlcv-1d'
+
 export interface DatabentoSpec {
   dataset: string
   symbols: string
@@ -31,7 +33,11 @@ export interface DatabentoSpec {
 
 export interface Feed {
   provider: Provider
-  /** Namespaces the shared candle cache so keys never collide across providers. */
+  /**
+   * Identifies the instrument in the shared candle cache. Provider- and
+   * dataset-namespaced so keys can never collide across feeds (a futures root
+   * and an equity ticker may well be the same string).
+   */
   cacheKey: string
   databento?: DatabentoSpec
   polygonTicker?: string
@@ -67,10 +73,11 @@ export function resolveFeed(assetClass: string, symbol: string): Feed | null {
 
   if (assetClass === 'futures') {
     const root = sym.replace(MONTH_CODE, '')
+    const symbols = `${root}.v.0`
     return {
       provider: 'databento',
-      cacheKey: root,
-      databento: { dataset: 'GLBX.MDP3', symbols: `${root}.v.0`, stypeIn: 'continuous' },
+      cacheKey: `databento:GLBX.MDP3:${symbols}`,
+      databento: { dataset: 'GLBX.MDP3', symbols, stypeIn: 'continuous' },
     }
   }
 
@@ -78,7 +85,7 @@ export function resolveFeed(assetClass: string, symbol: string): Feed | null {
     const dataset = process.env.DATABENTO_EQUITIES_DATASET || 'XNAS.ITCH'
     return {
       provider: 'databento',
-      cacheKey: `${dataset}:${sym}`,
+      cacheKey: `databento:${dataset}:${sym}`,
       databento: { dataset, symbols: sym, stypeIn: 'raw_symbol' },
     }
   }
@@ -99,15 +106,28 @@ export function resolveFeed(assetClass: string, symbol: string): Feed | null {
 }
 
 // Polygon aggregate granularity for a target interval.
-export function intervalToPolygon(intervalSec: number): { multiplier: number; timespan: 'minute' | 'hour' } {
+export function intervalToPolygon(intervalSec: number): { multiplier: number; timespan: 'minute' | 'hour' | 'day' } {
+  if (intervalSec >= 86400) return { multiplier: 1, timespan: 'day' }
   if (intervalSec >= 3600) return { multiplier: 1, timespan: 'hour' }
   if (intervalSec >= 1800) return { multiplier: 30, timespan: 'minute' }
   return { multiplier: 1, timespan: 'minute' }
 }
 
 // Binance kline interval string for a target interval.
-export function intervalToBinance(intervalSec: number): '1m' | '30m' | '1h' {
+export function intervalToBinance(intervalSec: number): '1m' | '30m' | '1h' | '1d' {
+  if (intervalSec >= 86400) return '1d'
   if (intervalSec >= 3600) return '1h'
   if (intervalSec >= 1800) return '30m'
   return '1m'
+}
+
+/**
+ * Databento schema for a target interval, plus the granularity that schema
+ * actually returns. Databento has no 30-minute schema, so 30m is fetched as 1m
+ * and aggregated locally — `nativeSec` says which one came back.
+ */
+export function intervalToDatabento(intervalSec: number): { schema: DatabentoSchema; nativeSec: number } {
+  if (intervalSec >= 86400) return { schema: 'ohlcv-1d', nativeSec: 86400 }
+  if (intervalSec >= 3600) return { schema: 'ohlcv-1h', nativeSec: 3600 }
+  return { schema: 'ohlcv-1m', nativeSec: 60 }
 }

@@ -125,7 +125,7 @@ Trades list → Trade detail [id]
 
 The trade detail screen is the journaling heart of the app:
 
-- **Price chart** (`TradeChart`, lightweight-charts) with the entry/exit marked. Candles are fetched on demand via Databento and cached (`market_candles`); if no market-data key is configured, the chart degrades gracefully.
+- **Price chart** (`TradeChart`, lightweight-charts) with the entry/exit marked. Candles are fetched on demand via Databento and cached in time chunks (`market_candle_chunks`); if no market-data key is configured, the chart degrades gracefully.
 - **Executions / legs editor** — multi-fill and multi-leg trades are supported, with a **running P&L** chart as the position is built and reduced.
 - **Stats panel** — per-trade metrics (R, hold time, fees, etc.).
 - **Notes tabs** — structured journaling split into setup, emotions (before / after), mistakes, and lessons, with a rich-text editor and **autosave** (`useAutosave`).

@@ -134,6 +134,20 @@
       "when": 1785186977564,
       "tag": "0018_rule_schedule_history",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785593527930,
+      "tag": "0019_market_candle_chunks",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785593539580,
+      "tag": "0020_drop_market_candles",
+      "breakpoints": true
     }
   ]
 }

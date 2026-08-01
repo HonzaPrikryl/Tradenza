@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { resolveFeed, polygonForexTicker, binanceSymbol, intervalToPolygon, intervalToBinance } from './market-data'
+import {
+  resolveFeed,
+  polygonForexTicker,
+  binanceSymbol,
+  intervalToPolygon,
+  intervalToBinance,
+  intervalToDatabento,
+} from './market-data'
 
 describe('polygonForexTicker', () => {
   it('builds a C: ticker from a pair', () => {
@@ -36,13 +43,17 @@ describe('resolveFeed', () => {
     const f = resolveFeed('futures', 'ESZ4')
     expect(f?.provider).toBe('databento')
     expect(f?.databento).toEqual({ dataset: 'GLBX.MDP3', symbols: 'ES.v.0', stypeIn: 'continuous' })
-    expect(f?.cacheKey).toBe('ES')
+    expect(f?.cacheKey).toBe('databento:GLBX.MDP3:ES.v.0')
   })
   it('routes stocks to a Databento equities dataset by raw ticker', () => {
     const f = resolveFeed('stocks', 'AAPL')
     expect(f?.provider).toBe('databento')
     expect(f?.databento?.stypeIn).toBe('raw_symbol')
     expect(f?.databento?.symbols).toBe('AAPL')
+    expect(f?.cacheKey).toBe('databento:XNAS.ITCH:AAPL')
+  })
+  it('namespaces the cache key so a futures root cannot collide with a ticker', () => {
+    expect(resolveFeed('futures', 'ES')?.cacheKey).not.toBe(resolveFeed('stocks', 'ES')?.cacheKey)
   })
   it('routes forex to Polygon', () => {
     const f = resolveFeed('forex', 'EURUSD')
@@ -68,10 +79,18 @@ describe('interval mapping', () => {
     expect(intervalToPolygon(60)).toEqual({ multiplier: 1, timespan: 'minute' })
     expect(intervalToPolygon(1800)).toEqual({ multiplier: 30, timespan: 'minute' })
     expect(intervalToPolygon(3600)).toEqual({ multiplier: 1, timespan: 'hour' })
+    expect(intervalToPolygon(86400)).toEqual({ multiplier: 1, timespan: 'day' })
   })
   it('maps seconds to Binance interval strings', () => {
     expect(intervalToBinance(60)).toBe('1m')
     expect(intervalToBinance(1800)).toBe('30m')
     expect(intervalToBinance(3600)).toBe('1h')
+    expect(intervalToBinance(86400)).toBe('1d')
+  })
+  it('maps seconds to a Databento schema, fetching 30m as aggregated 1m', () => {
+    expect(intervalToDatabento(60)).toEqual({ schema: 'ohlcv-1m', nativeSec: 60 })
+    expect(intervalToDatabento(1800)).toEqual({ schema: 'ohlcv-1m', nativeSec: 60 })
+    expect(intervalToDatabento(3600)).toEqual({ schema: 'ohlcv-1h', nativeSec: 3600 })
+    expect(intervalToDatabento(86400)).toEqual({ schema: 'ohlcv-1d', nativeSec: 86400 })
   })
 })

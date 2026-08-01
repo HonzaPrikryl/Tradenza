@@ -180,7 +180,9 @@ Beyond asset class, a chart is also withheld when:
 
 Two things on the detail page are **derived from candles** and therefore disappear together with the chart: the **MAE/MFE** excursion figures and the candle-based **running P&L** curve. Your entered prices, P&L, R-multiple and every statistic that builds on them are computed from the trade itself and are never affected.
 
-Candles are cached in the database and the cache is **shared across all users** — the same futures root and interval is identical for everyone, so a span fetched once serves every account. Futures chart against the **continuous front-month series**, not the exact expiry you traded, so a long-dated contract may not line up tick-for-tick with your fills.
+Candles are cached in the database and the cache is **shared across all users**: the same instrument and interval is identical for everyone, so a span fetched once serves every account. Storage is one row per fixed time chunk (`market_candle_chunks`, see [`src/lib/candle-cache.ts`](src/lib/candle-cache.ts)) rather than one "covered range" per instrument — a chunk row holds exactly what the provider returned for its span, so the cache can never claim coverage it doesn't have. Chunks whose span is finished and non-empty are kept forever; empty or still-forming ones carry a TTL and are re-fetched, so a weekend, a provider blip or a symbol that isn't listed yet heals itself instead of turning into a permanent "no market data". Provider responses are paged through to the end of the requested range, since every provider caps rows per response and a truncated answer is indistinguishable from a short one.
+
+Futures chart against the **continuous front-month series**, not the exact expiry you traded, so a long-dated contract may not line up tick-for-tick with your fills.
 
 ## Rate limiting
 
@@ -295,7 +297,7 @@ Adopting migrations on an **existing** database (already has the tables but no m
 | `strategies`                                 | Reusable playbooks: entry/exit checklists, reference images, color; linked to trades                                        |
 | `tag_groups` / `tags` / `trade_tags`         | Tags grouped into categories, linked to trades                                                                              |
 | `screenshots`                                | Trade screenshots (R2 URLs)                                                                                                 |
-| `market_candles` / `candle_cache`            | Cached OHLC data for the trade detail chart                                                                                 |
+| `market_candle_chunks` / `candle_cache`      | Cached OHLC data for the trade detail chart, one row per fixed time chunk                                                   |
 | `import_logs`                                | One row per import — counts, errors, created trade IDs                                                                      |
 | `dashboard_templates`                        | Saved dashboard layouts per user                                                                                            |
 | `progress_rules` / `progress_rule_schedules` | Discipline rules (trading + daily habits) and the superseded schedules that keep a schedule change from re-scoring the past |
