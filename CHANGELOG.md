@@ -12,6 +12,36 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-08-01
+
+A chart that once failed for a trade kept failing forever. The shared candle
+cache tracked one covered time range per instrument and trusted it blindly, so
+any hole inside it — a provider response silently capped at its row limit, an
+outage, an empty answer — was remembered as "already fetched" and became a
+permanent _No market data available for this trade_.
+
+**Upgrading.** No action, no new environment variable. The migration drops the
+old `market_candles` table on container start; it held nothing but cached market
+data, so the cache simply rebuilds as charts are opened again.
+
+### Fixed
+
+- **Charts no longer disappear permanently for a trade.** Market data is cached
+  in fixed time chunks, each holding exactly what the provider returned for its
+  span, so the cache can't claim coverage it doesn't have. Empty or still-forming
+  chunks expire and are re-fetched — a weekend, an unlisted contract or a one-off
+  provider failure now heals itself.
+- **Provider responses are read to the end.** Every source caps the bars one
+  response may carry, and a truncated answer looks just like a short one.
+  Requests are now paged through the whole range they asked for.
+- **A failed fetch says what went wrong** — rate limit, entitlement, transport —
+  instead of blaming the instrument for missing data.
+
+### Changed
+
+- Positions held past three months chart on daily bars, so a long-dated trade no
+  longer asks for tens of thousands of them.
+
 ## [0.4.0] - 2026-08-01
 
 Notes learn to hold pictures, and deletion learns to finish the job. Images can
@@ -280,7 +310,8 @@ dashboard, statistics, strategies & playbooks, discipline tracking, tags,
 prop-firm trading accounts, candle charts, PWA — running on Next.js 15,
 Drizzle ORM, PostgreSQL (Neon) and Clerk.
 
-[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.4.0...HEAD
+[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.4.1
 [0.4.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.4.0
 [0.3.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.3.0
 [0.2.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.2.0
