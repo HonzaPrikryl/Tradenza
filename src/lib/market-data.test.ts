@@ -6,6 +6,9 @@ import {
   intervalToPolygon,
   intervalToBinance,
   intervalToDatabento,
+  futuresDataset,
+  futuresParentFeed,
+  futuresInstrumentFeed,
 } from './market-data'
 
 describe('polygonForexTicker', () => {
@@ -39,11 +42,37 @@ describe('binanceSymbol', () => {
 })
 
 describe('resolveFeed', () => {
-  it('routes futures to Databento GLBX continuous', () => {
-    const f = resolveFeed('futures', 'ESZ4')
+  it('routes a bare futures root to the Databento GLBX continuous front month', () => {
+    const f = resolveFeed('futures', 'ES')
     expect(f?.provider).toBe('databento')
     expect(f?.databento).toEqual({ dataset: 'GLBX.MDP3', symbols: 'ES.v.0', stypeIn: 'continuous' })
     expect(f?.cacheKey).toBe('databento:GLBX.MDP3:ES.v.0')
+    expect(f?.contractRank).toBe(0)
+  })
+  it('charts the exact contract when the symbol names its expiry', () => {
+    const f = resolveFeed('futures', 'NQU6')
+    expect(f?.databento).toEqual({ dataset: 'GLBX.MDP3', symbols: 'NQU6', stypeIn: 'raw_symbol' })
+    expect(f?.contractRank).toBeUndefined() // nothing to guess, so no other rank to try
+  })
+  it('falls back to the continuous series for an expiry Databento cannot be asked for', () => {
+    expect(resolveFeed('futures', 'NQU26')?.databento?.symbols).toBe('NQ.v.0')
+  })
+  it('routes roots that are not on Globex to the venue that carries them', () => {
+    expect(resolveFeed('futures', 'KC')?.databento?.dataset).toBe('IFUS.IMPACT') // ICE softs
+    expect(resolveFeed('futures', 'VX')?.databento?.dataset).toBe('XCBF.PITCH') // Cboe volatility
+    expect(resolveFeed('futures', 'CTZ6')?.cacheKey).toBe('databento:IFUS.IMPACT:CTZ6')
+    expect(futuresDataset('NQ')).toBe('GLBX.MDP3')
+  })
+  it('can ask for every expiry of a root at once, and for one exact contract', () => {
+    expect(futuresParentFeed('NQ', 'GLBX.MDP3').databento).toEqual({
+      dataset: 'GLBX.MDP3',
+      symbols: 'NQ.FUT',
+      stypeIn: 'parent',
+    })
+    const exact = futuresInstrumentFeed(42004177, 'GLBX.MDP3')
+    expect(exact.databento).toEqual({ dataset: 'GLBX.MDP3', symbols: '42004177', stypeIn: 'instrument_id' })
+    expect(exact.cacheKey).toBe('databento:GLBX.MDP3:id:42004177')
+    expect(exact.contractRank).toBeUndefined() // an exact contract is not a guess
   })
   it('routes stocks to a Databento equities dataset by raw ticker', () => {
     const f = resolveFeed('stocks', 'AAPL')

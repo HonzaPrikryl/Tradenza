@@ -9,6 +9,8 @@ import {
   intervalToPolygon,
   intervalToBinance,
   intervalToDatabento,
+  futuresParentFeed,
+  futuresInstrumentFeed,
   type Candle,
   type Feed,
   type DatabentoSpec,
@@ -17,6 +19,8 @@ import {
 import {
   AVAILABILITY_LAG_SEC,
   aggregate,
+  bracketsPrice,
+  pickContract,
   chunkIsFinal,
   chunkStartsFor,
   dedupeSorted,
@@ -106,7 +110,7 @@ function tsToSec(v: string | number | undefined): number {
 const DATABENTO_PAGE_LIMIT = 10000
 
 interface DbnRow {
-  hd?: { ts_event?: string | number }
+  hd?: { ts_event?: string | number; instrument_id?: number }
   ts_event?: string | number
   open?: string | number
   high?: string | number
@@ -160,6 +164,7 @@ async function fetchDatabentoPage(
     } catch {
       continue
     }
+    const id = row.hd?.instrument_id
     const t = tsToSec(row.hd?.ts_event ?? row.ts_event)
     const o = num(row.open)
     const h = num(row.high)
@@ -167,7 +172,19 @@ async function fetchDatabentoPage(
     const c = num(row.close)
     const v = num(row.volume)
     if (![t, o, h, l, c].every(Number.isFinite)) continue
-    candles.push({ t, o, h, l, c, v: Number.isFinite(v) ? v : 0 })
+    // Some venues publish a priceless bar for off-book activity (ICE reports
+    // block trades that way). Charted as-is it would drag the axis to zero.
+    if (o === 0 && h === 0 && l === 0 && c === 0) continue
+    candles.push({
+      t,
+      o,
+      h,
+      l,
+      c,
+      v: Number.isFinite(v) ? v : 0,
+      // Only a parent request mixes contracts, and only then does the id matter.
+      ...(spec.stypeIn === 'parent' && typeof id === 'number' ? { id } : {}),
+    })
   }
   candles.sort((a, b) => a.t - b.t)
   return candles
@@ -308,6 +325,160 @@ async function fetchFromProvider(
   )
 }
 
+// ─── Window loading ──────────────────────────────────────────────────────────────
+
+interface Window {
+  start: number
+  end: number
+  intervalSec: number
+  chunkSpanSec: number
+  /** The trade's own span — a fetch failure over it is fatal, one over the padding is not. */
+  entrySec: number
+  closeSec: number
+  nowSec: number
+  availableUntil: number
+}
+
+interface WindowResult {
+  candles: Candle[]
+  softError: SoftError | null
+  failedInsideTrade: boolean
+}
+
+/** Serve one feed's window: cached chunks where possible, provider calls for the rest. */
+async function loadWindow(feed: Feed, apiKey: string | undefined, w: Window): Promise<WindowResult> {
+  const { start, end, intervalSec, chunkSpanSec, entrySec, closeSec, nowSec, availableUntil } = w
+  const starts = chunkStartsFor(start, end, chunkSpanSec)
+
+  // ── Read whatever the shared cache already holds for these chunks ──────────
+  const rows = await db
+    .select()
+    .from(marketCandleChunks)
+    .where(
+      and(
+        eq(marketCandleChunks.feedKey, feed.cacheKey),
+        eq(marketCandleChunks.intervalSec, intervalSec),
+        inArray(marketCandleChunks.chunkStart, starts),
+      ),
+    )
+
+  const byStart = new Map<number, Candle[]>()
+  const missing: number[] = []
+  const cached = new Map(rows.map((r) => [r.chunkStart, r]))
+  for (const s of starts) {
+    const row = cached.get(s)
+    if (!row) {
+      missing.push(s)
+      continue
+    }
+    const candles = row.candles as Candle[]
+    const fresh = isChunkFresh(
+      {
+        chunkStart: s,
+        complete: row.complete,
+        empty: candles.length === 0,
+        fetchedAtSec: Math.floor(row.fetchedAt.getTime() / 1000),
+      },
+      chunkSpanSec,
+      nowSec,
+    )
+    if (fresh) byStart.set(s, candles)
+    else missing.push(s)
+  }
+
+  // ── Fill the gaps, one provider call per run of adjacent chunks ────────────
+  let softError: SoftError | null = null
+  let failedInsideTrade = false
+
+  for (const group of groupConsecutive(missing, chunkSpanSec, maxChunksPerRequest(chunkSpanSec, intervalSec))) {
+    // Never ask beyond what the provider can have published yet — the tail of
+    // the range is stored as an incomplete chunk and re-fetched later.
+    const reqTo = Math.min(group.toSec, availableUntil)
+    if (reqTo <= group.fromSec) continue
+
+    let fetched: Candle[]
+    try {
+      fetched = await fetchFromProvider(feed, apiKey, group.fromSec, reqTo, intervalSec)
+    } catch (e) {
+      if (e instanceof FetchError) softError = e.soft
+      else {
+        console.error('[candles] fetch failed', e)
+        softError = 'error'
+      }
+      // A gap in the padding only shortens the chart; a gap over the trade
+      // itself would misplace the execution markers, so that one is fatal.
+      if (overlaps(group.fromSec, reqTo, entrySec, closeSec + 1)) failedInsideTrade = true
+      continue
+    }
+
+    const split = splitIntoChunks(fetched, group.starts, chunkSpanSec)
+    const values = group.starts.map((s) => ({
+      feedKey: feed.cacheKey,
+      intervalSec,
+      chunkStart: s,
+      candles: split.get(s) ?? [],
+      // Only a final, non-empty chunk is settled for good. Empty ones keep a
+      // TTL so a weekend, a not-yet-listed contract or a provider blip is
+      // retried instead of poisoning this window forever.
+      complete: chunkIsFinal(s, chunkSpanSec, nowSec) && (split.get(s)?.length ?? 0) > 0,
+      fetchedAt: new Date(),
+    }))
+
+    for (const [s, list] of split) byStart.set(s, list)
+
+    // Per-chunk upsert: concurrent readers of the same instrument write
+    // disjoint rows, so nobody can clobber another writer's range.
+    await db
+      .insert(marketCandleChunks)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [marketCandleChunks.feedKey, marketCandleChunks.intervalSec, marketCandleChunks.chunkStart],
+        set: {
+          candles: sql`excluded.candles`,
+          complete: sql`excluded.complete`,
+          fetchedAt: sql`excluded.fetched_at`,
+        },
+      })
+  }
+
+  const merged = starts.flatMap((s) => byStart.get(s) ?? [])
+  return { candles: sliceCandles(merged, start, end), softError, failedInsideTrade }
+}
+
+// ─── Contract identification ─────────────────────────────────────────────────────
+
+/** One day of daily bars is enough to tell which expiry traded through a price. */
+const PROBE_INTERVAL_SEC = 86400
+
+/**
+ * Find the exact contract a futures trade was executed in, by asking for one
+ * day of daily bars across every listed expiry of the root and keeping the one
+ * that traded through the fill price. The probe goes through the same chunk
+ * cache as everything else, so a trade costs it once, globally.
+ */
+async function resolveExactContract(
+  feed: Feed,
+  apiKey: string | undefined,
+  w: Window,
+  entryPrice: number,
+): Promise<Feed | null> {
+  const spec = feed.databento
+  if (!spec) return null
+  const root = spec.symbols.split('.')[0]
+
+  const dayStart = Math.floor(w.entrySec / PROBE_INTERVAL_SEC) * PROBE_INTERVAL_SEC
+  const probe = await loadWindow(futuresParentFeed(root, spec.dataset), apiKey, {
+    ...w,
+    start: dayStart,
+    end: Math.min(dayStart + PROBE_INTERVAL_SEC, w.availableUntil),
+    intervalSec: PROBE_INTERVAL_SEC,
+    chunkSpanSec: PROBE_INTERVAL_SEC,
+  })
+
+  const id = pickContract(probe.candles, entryPrice)
+  return id === null ? null : futuresInstrumentFeed(id, spec.dataset)
+}
+
 // ─── Orchestration ───────────────────────────────────────────────────────────────
 
 export const getTradeCandles = authedAction(
@@ -351,107 +522,41 @@ export const getTradeCandles = authedAction(
     // The whole window still sits inside the provider's publishing lag.
     if (end <= start) return { status: 'today' }
 
-    const starts = chunkStartsFor(start, end, chunkSpanSec)
+    const window: Window = { start, end, intervalSec, chunkSpanSec, entrySec, closeSec, nowSec, availableUntil }
+    const entryPrice = Number(trade.entryPrice)
+    const canMatchFill = Number.isFinite(entryPrice) && entryPrice > 0
 
-    // ── Read whatever the shared cache already holds for these chunks ──────────
-    const rows = await db
-      .select()
-      .from(marketCandleChunks)
-      .where(
-        and(
-          eq(marketCandleChunks.feedKey, feed.cacheKey),
-          eq(marketCandleChunks.intervalSec, intervalSec),
-          inArray(marketCandleChunks.chunkStart, starts),
-        ),
-      )
+    // ── Pick the contract the trade was actually executed in ──────────────────
+    // For a bare futures root the expiry is a guess, and the front month is the
+    // wrong guess whenever the trade was executed elsewhere — around a roll,
+    // where volume moves days before the provider's continuous series does, or
+    // because the trader deliberately chose a far-dated contract. The fills
+    // settle it: a contract the trade could not have filled in is not the one
+    // to chart. Neither a transport failure nor a root the provider doesn't
+    // know gets any better by looking further, so those stop at the front month.
+    const front = await loadWindow(feed, apiKey, window)
+    let loaded = front
 
-    const byStart = new Map<number, Candle[]>()
-    const missing: number[] = []
-    const cached = new Map(rows.map((r) => [r.chunkStart, r]))
-    for (const s of starts) {
-      const row = cached.get(s)
-      if (!row) {
-        missing.push(s)
-        continue
-      }
-      const candles = row.candles as Candle[]
-      const fresh = isChunkFresh(
-        {
-          chunkStart: s,
-          complete: row.complete,
-          empty: candles.length === 0,
-          fetchedAtSec: Math.floor(row.fetchedAt.getTime() / 1000),
-        },
-        chunkSpanSec,
-        nowSec,
-      )
-      if (fresh) byStart.set(s, candles)
-      else missing.push(s)
+    const guessedExpiry = feed.contractRank !== undefined
+    const mismatched =
+      guessedExpiry &&
+      canMatchFill &&
+      !front.softError &&
+      front.candles.length > 0 &&
+      !bracketsPrice(front.candles, entryPrice)
+
+    if (mismatched) {
+      const exact = await resolveExactContract(feed, apiKey, window, entryPrice)
+      // No contract of this root traded at that price: keep the front month —
+      // an approximate chart still beats an empty one.
+      if (exact) loaded = await loadWindow(exact, apiKey, window)
     }
 
-    // ── Fill the gaps, one provider call per run of adjacent chunks ────────────
-    let softError: SoftError | null = null
-    let failedInsideTrade = false
-
-    for (const group of groupConsecutive(missing, chunkSpanSec, maxChunksPerRequest(chunkSpanSec, intervalSec))) {
-      // Never ask beyond what the provider can have published yet — the tail of
-      // the range is stored as an incomplete chunk and re-fetched later.
-      const reqTo = Math.min(group.toSec, availableUntil)
-      if (reqTo <= group.fromSec) continue
-
-      let fetched: Candle[]
-      try {
-        fetched = await fetchFromProvider(feed, apiKey, group.fromSec, reqTo, intervalSec)
-      } catch (e) {
-        if (e instanceof FetchError) softError = e.soft
-        else {
-          console.error('[candles] fetch failed', e)
-          softError = 'error'
-        }
-        // A gap in the padding only shortens the chart; a gap over the trade
-        // itself would misplace the execution markers, so that one is fatal.
-        if (overlaps(group.fromSec, reqTo, entrySec, closeSec + 1)) failedInsideTrade = true
-        continue
-      }
-
-      const split = splitIntoChunks(fetched, group.starts, chunkSpanSec)
-      const values = group.starts.map((s) => ({
-        feedKey: feed.cacheKey,
-        intervalSec,
-        chunkStart: s,
-        candles: split.get(s) ?? [],
-        // Only a final, non-empty chunk is settled for good. Empty ones keep a
-        // TTL so a weekend, a not-yet-listed contract or a provider blip is
-        // retried instead of poisoning this window forever.
-        complete: chunkIsFinal(s, chunkSpanSec, nowSec) && (split.get(s)?.length ?? 0) > 0,
-        fetchedAt: new Date(),
-      }))
-
-      for (const [s, list] of split) byStart.set(s, list)
-
-      // Per-chunk upsert: concurrent readers of the same instrument write
-      // disjoint rows, so nobody can clobber another writer's range.
-      await db
-        .insert(marketCandleChunks)
-        .values(values)
-        .onConflictDoUpdate({
-          target: [marketCandleChunks.feedKey, marketCandleChunks.intervalSec, marketCandleChunks.chunkStart],
-          set: {
-            candles: sql`excluded.candles`,
-            complete: sql`excluded.complete`,
-            fetchedAt: sql`excluded.fetched_at`,
-          },
-        })
-    }
-
-    if (failedInsideTrade && softError) return { status: softError }
-
-    const merged = starts.flatMap((s) => byStart.get(s) ?? [])
-    const out = sliceCandles(merged, start, end)
-    if (out.length > 0) return { status: 'ok', intervalSec, candles: out }
+    if (loaded.failedInsideTrade && loaded.softError) return { status: loaded.softError }
+    if (loaded.candles.length > 0) return { status: 'ok', intervalSec, candles: loaded.candles }
     // Nothing at all: report the provider failure if there was one, since
     // "no market data" would blame the instrument for a transport problem.
-    return { status: softError ?? 'noData' }
+    return { status: loaded.softError ?? 'noData' }
   },
   { limit: ['candles', 'candlesDaily'] },
 )

@@ -6,6 +6,7 @@ import {
   MAX_ROWS_PER_REQUEST,
   RECENT_TTL_SEC,
   aggregate,
+  bracketsPrice,
   chunkIsFinal,
   chunkStartFor,
   chunkStartsFor,
@@ -14,6 +15,7 @@ import {
   isChunkFresh,
   maxChunksPerRequest,
   overlaps,
+  pickContract,
   pickResolution,
   sliceCandles,
   splitIntoChunks,
@@ -160,6 +162,13 @@ describe('dedupeSorted', () => {
     expect(out.map((c) => c.t)).toEqual([100, 200, 300])
     expect(out[2].c).toBe(9) // overlapping pages: the newer copy wins
   })
+
+  it('keeps the session bar when a venue also publishes a thin one for the same minute', () => {
+    const session = { t: 60, o: 78.5, h: 78.55, l: 78.42, c: 78.47, v: 33337 }
+    const block = { t: 60, o: 78.5, h: 78.5, l: 78.5, c: 78.5, v: 589 }
+    expect(dedupeSorted([session, block])).toEqual([session])
+    expect(dedupeSorted([block, session])).toEqual([session])
+  })
 })
 
 describe('aggregate', () => {
@@ -185,6 +194,62 @@ describe('sliceCandles', () => {
   it('keeps the inclusive window', () => {
     const src = [candle(100), candle(200), candle(300)]
     expect(sliceCandles(src, 200, 300).map((c) => c.t)).toEqual([200, 300])
+  })
+})
+
+describe('bracketsPrice', () => {
+  // The real NQ session of 2026-06-16: the June contract the provider still
+  // called the front month vs. the September one that actually traded.
+  const june = [{ t: 0, o: 30500, h: 30580.75, l: 30101, c: 30200, v: 1 }]
+  const september = [{ t: 0, o: 30800, h: 30889, l: 30407.75, c: 30700, v: 1 }]
+
+  it('rejects the contract the trade could not have filled in', () => {
+    expect(bracketsPrice(june, 30821.25)).toBe(false)
+  })
+
+  it('accepts the contract that traded at the fill price', () => {
+    expect(bracketsPrice(september, 30821.25)).toBe(true)
+  })
+
+  it('tolerates a fill just outside the window extremes', () => {
+    expect(bracketsPrice(september, 30889 + 30)).toBe(true)
+    expect(bracketsPrice(september, 30889 + 500)).toBe(false)
+  })
+
+  it('cannot judge without candles or a usable price', () => {
+    expect(bracketsPrice([], 30821.25)).toBe(false)
+    expect(bracketsPrice(september, NaN)).toBe(false)
+    expect(bracketsPrice(september, 0)).toBe(false)
+  })
+})
+
+describe('pickContract', () => {
+  // One day of daily bars across NQ's listed expiries, 2026-06-16: the June
+  // contract the provider still called the front month, the September one the
+  // volume had already moved to, and a thin far-dated month.
+  const day = [
+    { t: 0, o: 30500, h: 30580.75, l: 30101, c: 30200, v: 73893, id: 42004058 },
+    { t: 0, o: 30800, h: 30889, l: 30407.75, c: 30700, v: 480762, id: 42004177 },
+    { t: 0, o: 31000, h: 31190, l: 30750, c: 31100, v: 181, id: 261401 },
+  ]
+
+  it('picks the contract that traded through the fill price', () => {
+    expect(pickContract(day, 30821.25)).toBe(42004177)
+  })
+
+  it('prefers the liquid contract when a thin one also spans the price', () => {
+    // 261401 brackets 30821.25 too, on 181 lots against 480 762.
+    expect(pickContract(day, 30821.25)).not.toBe(261401)
+  })
+
+  it('still finds a deliberately far-dated contract', () => {
+    expect(pickContract(day, 31150)).toBe(261401)
+  })
+
+  it('is null when no contract traded there, or without a usable price', () => {
+    expect(pickContract(day, 12000)).toBeNull()
+    expect(pickContract(day, NaN)).toBeNull()
+    expect(pickContract([{ t: 0, o: 1, h: 2, l: 1, c: 1, v: 5 }], 1.5)).toBeNull() // no ids
   })
 })
 

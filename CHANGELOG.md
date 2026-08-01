@@ -12,6 +12,42 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+### Added
+
+- **More contracts are priced correctly out of the box** — short-term rates
+  (SOFR, Fed Funds), yield futures, livestock, rough rice, aluminium, e-mini
+  natural gas, the micro FX contracts (AUD, GBP, JPY, CHF) and CME's Solana and
+  XRP futures. Every contract size and tick in the table was checked against the
+  exchange's own instrument definitions.
+- **`scripts/check-market-feeds.mjs`** smoke-tests every market-data provider
+  against the live APIs, one instrument per asset class.
+
+### Fixed
+
+- **Futures charts plot the contract you actually traded.** A bare root like
+  `NQ` was always charted against the provider's continuous front month, which
+  around a roll is no longer where the volume is — a trade executed in the new
+  expiry was drawn against the old one, leaving the entry and exit lines
+  hundreds of points off candles whose timestamps still matched perfectly. The
+  fill price now settles it: a single daily-bar request across every listed
+  expiry finds the contract that traded there, however far from the front month
+  it sits. A symbol that names its expiry (`NQU6`) is charted directly, with no
+  guessing at all.
+- **Four tick sizes and one that mattered twice.** Palladium moves in half
+  dollars, not dimes; the 2-year note trades in quarter-32nds; and the
+  Australian, Swiss and New Zealand dollar contracts tick in half pips. Each was
+  wrong in the built-in table, so tick-based risk figures for those instruments
+  were off by a factor of two to five.
+- **Futures that don't trade on Globex can be charted at all.** The ICE softs
+  (cotton, sugar, coffee, cocoa, orange juice) and Cboe's VIX contracts are
+  instruments the app already knows how to value, but their candles were always
+  requested from CME Globex, which returns nothing for them. Each root now goes
+  to the venue that carries it.
+- **A venue publishing the same minute twice no longer flattens the chart.** ICE
+  reports off-book activity as a separate, priceless bar for a minute that
+  already has a session bar; whichever arrived last used to win, so a zero-priced
+  bar could drag the whole price axis to zero.
+
 ## [0.4.1] - 2026-08-01
 
 A chart that once failed for a trade kept failing forever. The shared candle

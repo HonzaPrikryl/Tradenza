@@ -19,6 +19,12 @@ export interface Candle {
   l: number
   c: number
   v: number
+  /**
+   * Provider instrument id. Only carried by a parent feed, where one request
+   * answers for every contract of a root and the bars have to stay
+   * distinguishable; single-instrument feeds leave it unset.
+   */
+  id?: number
 }
 
 export type Provider = 'databento' | 'polygon' | 'binance'
@@ -28,7 +34,7 @@ export type DatabentoSchema = 'ohlcv-1m' | 'ohlcv-1h' | 'ohlcv-1d'
 export interface DatabentoSpec {
   dataset: string
   symbols: string
-  stypeIn: 'continuous' | 'raw_symbol'
+  stypeIn: 'continuous' | 'raw_symbol' | 'parent' | 'instrument_id'
 }
 
 export interface Feed {
@@ -42,10 +48,63 @@ export interface Feed {
   databento?: DatabentoSpec
   polygonTicker?: string
   binanceSymbol?: string
+  /**
+   * Set only for a continuous futures series, where the instrument is a guess:
+   * the rank this feed asks for (0 = front month). A caller that can tell the
+   * guess was wrong — because the trade filled at a price this series never
+   * traded at — can ask for the next rank.
+   */
+  contractRank?: number
 }
 
 // Trailing month code on a futures symbol, e.g. the "Z4" in "ESZ4".
 export const MONTH_CODE = /[FGHJKMNQUVXZ]\d{1,2}$/
+
+// The same, restricted to CME's single-digit year, which is a symbol Databento
+// can be queried with directly ("NQU6"). "NQU26" names a real contract too, but
+// not in a form the raw-symbol lookup accepts.
+const TRADABLE_MONTH_CODE = /[FGHJKMNQUVXZ]\d$/
+
+/**
+ * Every listed contract of a futures root, as one daily-bar request. Used to
+ * identify which expiry a trade was executed in when the front month turns out
+ * not to be it — daily granularity keeps this to a few hundred rows even for a
+ * root with a hundred listed months.
+ */
+export function futuresParentFeed(root: string, dataset: string): Feed {
+  return {
+    provider: 'databento',
+    cacheKey: `databento:${dataset}:${root}.FUT`,
+    databento: { dataset, symbols: `${root}.FUT`, stypeIn: 'parent' },
+  }
+}
+
+/** One exact contract, addressed by the instrument id a parent probe returned. */
+export function futuresInstrumentFeed(instrumentId: number, dataset: string): Feed {
+  return {
+    provider: 'databento',
+    cacheKey: `databento:${dataset}:id:${instrumentId}`,
+    databento: { dataset, symbols: String(instrumentId), stypeIn: 'instrument_id' },
+  }
+}
+
+// Most listed futures the app knows how to value trade on CME Globex, but not
+// all of them: the ICE softs and the Cboe volatility contracts live on their own
+// venues and return nothing at all from GLBX. Roots not listed here default to
+// Globex.
+const FUTURES_DATASETS: Record<string, string> = {
+  CT: 'IFUS.IMPACT', // Cotton #2
+  SB: 'IFUS.IMPACT', // Sugar #11
+  KC: 'IFUS.IMPACT', // Coffee C
+  CC: 'IFUS.IMPACT', // Cocoa
+  OJ: 'IFUS.IMPACT', // Orange Juice
+  VX: 'XCBF.PITCH', // VIX
+}
+
+/** The Databento dataset carrying a futures root. */
+export function futuresDataset(root: string): string {
+  return FUTURES_DATASETS[root] ?? 'GLBX.MDP3'
+}
 
 // Polygon forex ticker, e.g. "EUR/USD" → "C:EURUSD". Null when not a pair.
 export function polygonForexTicker(symbol: string): string | null {
@@ -66,18 +125,38 @@ export function binanceSymbol(symbol: string): string | null {
   return s
 }
 
-// Resolve the historical feed for a trade, or null when unsupported.
-export function resolveFeed(assetClass: string, symbol: string): Feed | null {
+/**
+ * Resolve the historical feed for a trade, or null when unsupported.
+ *
+ * `rank` only means anything for a bare futures root, where the exact contract
+ * is unknown: 0 is the provider's front month, 1 the one behind it, and so on.
+ * The front month is a guess that goes wrong around a roll — the liquidity
+ * moves to the next expiry days before the provider's continuous series does,
+ * so a trade executed in the new contract would be charted against the old one,
+ * hundreds of points away from its own fills.
+ */
+export function resolveFeed(assetClass: string, symbol: string, rank = 0): Feed | null {
   const sym = (symbol || '').toUpperCase().trim()
   if (!sym) return null
 
   if (assetClass === 'futures') {
     const root = sym.replace(MONTH_CODE, '')
-    const symbols = `${root}.v.0`
+    const dataset = futuresDataset(root)
+
+    // The symbol names its own expiry ("NQU6") — no guessing needed.
+    if (TRADABLE_MONTH_CODE.test(sym)) {
+      return {
+        provider: 'databento',
+        cacheKey: `databento:${dataset}:${sym}`,
+        databento: { dataset, symbols: sym, stypeIn: 'raw_symbol' },
+      }
+    }
+    const symbols = `${root}.v.${Math.max(0, Math.trunc(rank))}`
     return {
       provider: 'databento',
-      cacheKey: `databento:GLBX.MDP3:${symbols}`,
-      databento: { dataset: 'GLBX.MDP3', symbols, stypeIn: 'continuous' },
+      cacheKey: `databento:${dataset}:${symbols}`,
+      databento: { dataset, symbols, stypeIn: 'continuous' },
+      contractRank: Math.max(0, Math.trunc(rank)),
     }
   }
 

@@ -16,7 +16,8 @@ export const FUTURES_MULTIPLIERS: Record<string, number> = {
   // ── Energy (NYMEX) ──────────────────────────────────────────────────
   CL: 1000,
   MCL: 100, // Crude Oil / Micro
-  NG: 10000, // Natural Gas
+  NG: 10000,
+  QG: 2500, // Natural Gas / E-mini
   QM: 500, // E-mini Crude
   RB: 42000, // RBOB Gasoline
   HO: 42000, // Heating Oil
@@ -31,6 +32,7 @@ export const FUTURES_MULTIPLIERS: Record<string, number> = {
   MHG: 2500, // Copper / Micro
   PL: 50, // Platinum
   PA: 100, // Palladium
+  ALI: 25, // Aluminum
 
   ZT: 2000, // 2Y T-Note
   ZF: 1000, // 5Y T-Note
@@ -38,6 +40,13 @@ export const FUTURES_MULTIPLIERS: Record<string, number> = {
   TN: 1000, // Ultra 10Y
   ZB: 1000, // 30Y T-Bond
   UB: 1000, // Ultra T-Bond
+  '2YY': 1000, // 2Y Yield
+  '10Y': 1000, // 10Y Yield
+
+  // ── Short-term rates (CME) ──────────────────────────────────────────
+  SR3: 2500, // 3-Month SOFR
+  SR1: 4167, // 1-Month SOFR
+  ZQ: 4167, // 30-Day Fed Funds
 
   // ── Agriculture (CBOT) ──────────────────────────────────────────────
   ZC: 50, // Corn
@@ -47,6 +56,12 @@ export const FUTURES_MULTIPLIERS: Record<string, number> = {
   ZL: 600, // Soybean Oil
   ZM: 100, // Soybean Meal
   ZO: 50, // Oats
+  ZR: 2000, // Rough Rice
+
+  // ── Livestock (CME) ─────────────────────────────────────────────────
+  LE: 400, // Live Cattle
+  HE: 400, // Lean Hogs
+  GF: 500, // Feeder Cattle
 
   // ── Softs (ICE) ─────────────────────────────────────────────────────
   CT: 500, // Cotton
@@ -58,11 +73,15 @@ export const FUTURES_MULTIPLIERS: Record<string, number> = {
   // ── FX (CME) ────────────────────────────────────────────────────────
   '6E': 125000,
   M6E: 12500, // Euro / Micro
-  '6B': 62500, // British Pound
-  '6J': 12500000, // Japanese Yen
-  '6A': 100000, // Australian Dollar
+  '6B': 62500,
+  M6B: 6250, // British Pound / Micro
+  '6J': 12500000,
+  MJY: 1250000, // Japanese Yen / Micro
+  '6A': 100000,
+  M6A: 10000, // Australian Dollar / Micro
   '6C': 100000, // Canadian Dollar
-  '6S': 125000, // Swiss Franc
+  '6S': 125000,
+  MSF: 12500, // Swiss Franc / Micro
   '6N': 100000, // New Zealand Dollar
   '6M': 500000, // Mexican Peso
 
@@ -71,6 +90,8 @@ export const FUTURES_MULTIPLIERS: Record<string, number> = {
   MBT: 0.1, // Bitcoin / Micro
   ETH: 50,
   MET: 0.1, // Ether / Micro
+  SOL: 500, // Solana
+  XRP: 50000, // XRP
 
   // ── Volatility ──────────────────────────────────────────────────────
   VX: 1000, // VIX
@@ -93,6 +114,7 @@ export const FUTURES_TICK_SIZE: Record<string, number> = {
   CL: 0.01,
   MCL: 0.01,
   NG: 0.001,
+  QG: 0.005,
   QM: 0.025,
   RB: 0.0001,
   HO: 0.0001,
@@ -106,14 +128,22 @@ export const FUTURES_TICK_SIZE: Record<string, number> = {
   HG: 0.0005,
   MHG: 0.0005,
   PL: 0.1,
-  PA: 0.1,
+  PA: 0.5, // $50/tick — palladium moves in half-dollars, not dimes
+  ALI: 0.25,
 
-  ZT: 0.0078125, // 1/128
+  ZT: 0.00390625, // 1/256 — the 2Y trades in quarter-32nds
   ZF: 0.0078125, // 1/128
   ZN: 0.015625, // 1/64
   TN: 0.015625,
   ZB: 0.03125, // 1/32
   UB: 0.03125,
+  '2YY': 0.001,
+  '10Y': 0.001,
+
+  // Short-term rates
+  SR3: 0.005,
+  SR1: 0.005,
+  ZQ: 0.005,
 
   // Agriculture
   ZC: 0.25,
@@ -123,6 +153,12 @@ export const FUTURES_TICK_SIZE: Record<string, number> = {
   ZO: 0.25,
   ZL: 0.01,
   ZM: 0.1,
+  ZR: 0.005,
+
+  // Livestock
+  LE: 0.025,
+  HE: 0.025,
+  GF: 0.025,
 
   // Softs
   CT: 0.01,
@@ -135,11 +171,15 @@ export const FUTURES_TICK_SIZE: Record<string, number> = {
   '6E': 0.00005,
   M6E: 0.0001,
   '6B': 0.0001,
+  M6B: 0.0001,
   '6J': 0.0000005,
-  '6A': 0.0001,
+  MJY: 0.000001,
+  '6A': 0.00005,
+  M6A: 0.0001,
   '6C': 0.00005,
-  '6S': 0.0001,
-  '6N': 0.0001,
+  '6S': 0.00005,
+  MSF: 0.0001,
+  '6N': 0.00005,
   '6M': 0.00001,
 
   // Crypto
@@ -147,6 +187,8 @@ export const FUTURES_TICK_SIZE: Record<string, number> = {
   MBT: 5,
   ETH: 0.5,
   MET: 0.5,
+  SOL: 0.05,
+  XRP: 0.0005,
 
   // Volatility
   VX: 0.05,

@@ -144,11 +144,48 @@ export function splitIntoChunks(candles: Candle[], starts: number[], spanSec: nu
   return out
 }
 
-/** Sort ascending and drop duplicate timestamps (last write wins), as providers may overlap pages. */
+/**
+ * Sort ascending and collapse duplicate timestamps, which arrive both from
+ * overlapping pages and from venues that publish the same minute more than once
+ * (ICE ships a thin block-trade bar alongside the session bar). The busiest bar
+ * for a timestamp is the one the market actually traded, so it wins.
+ */
 export function dedupeSorted(candles: Candle[]): Candle[] {
-  const byT = new Map<number, Candle>()
-  for (const c of candles) byT.set(c.t, c)
-  return Array.from(byT.values()).sort((a, b) => a.t - b.t)
+  const seen = new Map<string, Candle>()
+  for (const c of candles) {
+    // A parent feed carries every contract of a root, so bars of different
+    // instruments legitimately share a timestamp and must not collapse.
+    const key = c.id === undefined ? String(c.t) : `${c.id}:${c.t}`
+    const prev = seen.get(key)
+    if (!prev || c.v >= prev.v) seen.set(key, c)
+  }
+  return Array.from(seen.values()).sort((a, b) => a.t - b.t)
+}
+
+/**
+ * Identify which contract a fill belongs to, out of a parent feed's bars for
+ * every listed expiry of a root. Only contracts that actually traded through
+ * the price qualify; among those the busiest one wins, since a thin far-dated
+ * contract can span a price by sheer spread while the liquid one is the market.
+ */
+export function pickContract(candles: Candle[], price: number, tolerance = 0.002): number | null {
+  if (!Number.isFinite(price) || price <= 0) return null
+  const volume = new Map<number, number>()
+  for (const c of candles) {
+    if (c.id === undefined) continue
+    const pad = price * tolerance
+    if (price < c.l - pad || price > c.h + pad) continue
+    volume.set(c.id, (volume.get(c.id) ?? 0) + c.v)
+  }
+  let best: number | null = null
+  let bestVolume = -1
+  for (const [id, v] of volume) {
+    if (v > bestVolume) {
+      best = id
+      bestVolume = v
+    }
+  }
+  return best
 }
 
 /** Roll `fromSec` bars up into `toSec` bars (e.g. 1m → 30m). */
@@ -175,6 +212,26 @@ export function aggregate(candles: Candle[], fromSec: number, toSec: number): Ca
 /** Narrow a chunk-aligned superset down to the window a trade actually asked for. */
 export function sliceCandles(candles: Candle[], startSec: number, endSec: number): Candle[] {
   return candles.filter((c) => c.t >= startSec && c.t <= endSec)
+}
+
+/**
+ * Whether a fill at `price` could have happened in this candle set.
+ *
+ * Used to catch a chart plotted against the wrong futures contract: an expiry
+ * the trade was not executed in never traded anywhere near its fills, so the
+ * price lines float far off the candles even though every timestamp lines up.
+ * The tolerance only absorbs a fill just outside the window's extremes.
+ */
+export function bracketsPrice(candles: Candle[], price: number, tolerance = 0.002): boolean {
+  if (candles.length === 0 || !Number.isFinite(price) || price <= 0) return false
+  let lo = Infinity
+  let hi = -Infinity
+  for (const c of candles) {
+    if (c.l < lo) lo = c.l
+    if (c.h > hi) hi = c.h
+  }
+  const pad = price * tolerance
+  return price >= lo - pad && price <= hi + pad
 }
 
 /** Whether two half-open ranges share any time at all. */

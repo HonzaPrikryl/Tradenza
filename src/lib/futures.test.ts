@@ -7,6 +7,7 @@ import {
   editorDefaultMultiplier,
   instrumentTickSize,
   instrumentTickValue,
+  FUTURES_MULTIPLIERS,
 } from './futures'
 
 describe('contractMultiplier', () => {
@@ -21,6 +22,32 @@ describe('contractMultiplier', () => {
   it('returns 0 for unknown or empty symbols', () => {
     expect(contractMultiplier('ZZZ')).toBe(0)
     expect(contractMultiplier('')).toBe(0)
+  })
+
+  // Point values below are the contract size the exchange publishes, expressed
+  // per 1.00 of the price a platform quotes: cent-quoted livestock and grains
+  // are the contract size divided by 100, everything else quotes in dollars.
+  it('covers rates, livestock, micro FX and the newer crypto contracts', () => {
+    expect(contractMultiplier('SR3')).toBe(2500) // 3-Month SOFR
+    expect(contractMultiplier('ZQ')).toBe(4167) // 30-Day Fed Funds
+    expect(contractMultiplier('LE')).toBe(400) // Live Cattle, 40 000 lb quoted in cents
+    expect(contractMultiplier('GF')).toBe(500) // Feeder Cattle, 50 000 lb
+    expect(contractMultiplier('M6A')).toBe(10000) // Micro AUD
+    expect(contractMultiplier('MJY')).toBe(1250000) // Micro JPY
+    expect(contractMultiplier('SOL')).toBe(500)
+    expect(contractMultiplier('XRP')).toBe(50000)
+    expect(contractMultiplier('ALI')).toBe(25) // Aluminum, 25 t
+  })
+
+  it('keeps a tick worth a sane dollar amount for every root it knows', () => {
+    // tickValue = tick × multiplier; a typo in either table shows up here as a
+    // tick worth cents or thousands.
+    for (const root of Object.keys(FUTURES_MULTIPLIERS)) {
+      const value = tickValue(root)
+      if (tickSize(root) === 0) continue // multiplier known, tick not published
+      expect(value, `${root} tick value`).toBeGreaterThanOrEqual(0.05) // micro ether, the smallest listed
+      expect(value, `${root} tick value`).toBeLessThanOrEqual(50) // palladium, the largest
+    }
   })
 })
 

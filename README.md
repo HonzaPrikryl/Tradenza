@@ -159,15 +159,15 @@ The candle chart on the trade detail page — the one that plots your entries an
 
 Which historical source a trade is routed to is decided by its asset class in [`src/lib/market-data.ts`](src/lib/market-data.ts):
 
-| Asset class | Chart | Source                                                   | Key required           |
-| ----------- | :---: | -------------------------------------------------------- | ---------------------- |
-| **Futures** |  ✅   | Databento `GLBX.MDP3`, continuous front month (`ES.v.0`) | `DATABENTO_API_KEY`    |
-| **Stocks**  |  ✅   | Databento equities (`DATABENTO_EQUITIES_DATASET`)        | `DATABENTO_API_KEY`    |
-| **Forex**   |  ✅   | Polygon.io currency aggregates (`C:EURUSD`)              | `POLYGON_API_KEY`      |
-| **Crypto**  |  ✅   | Binance spot klines (`BTCUSD` → `BTCUSDT`)               | **none** — works as-is |
-| **Options** |  ❌   | No wired source                                          | —                      |
-| **CFDs**    |  ❌   | No wired source                                          | —                      |
-| **Other**   |  ❌   | No wired source                                          | —                      |
+| Asset class | Chart | Source                                            | Key required           |
+| ----------- | :---: | ------------------------------------------------- | ---------------------- |
+| **Futures** |  ✅   | Databento `GLBX.MDP3`, the contract you traded    | `DATABENTO_API_KEY`    |
+| **Stocks**  |  ✅   | Databento equities (`DATABENTO_EQUITIES_DATASET`) | `DATABENTO_API_KEY`    |
+| **Forex**   |  ✅   | Polygon.io currency aggregates (`C:EURUSD`)       | `POLYGON_API_KEY`      |
+| **Crypto**  |  ✅   | Binance spot klines (`BTCUSD` → `BTCUSDT`)        | **none** — works as-is |
+| **Options** |  ❌   | No wired source                                   | —                      |
+| **CFDs**    |  ❌   | No wired source                                   | —                      |
+| **Other**   |  ❌   | No wired source                                   | —                      |
 
 **Options, CFDs and "other" have no chart at all** — no provider is wired up for them, and the app says so in place of the chart rather than failing silently. This is the single most common reason a chart is missing.
 
@@ -175,14 +175,16 @@ Beyond asset class, a chart is also withheld when:
 
 - **The trade was entered today.** Historical feeds only cover completed days, so the chart appears the next day.
 - **The provider's key is missing** for that asset class — e.g. futures charts stay off until `DATABENTO_API_KEY` is set. Crypto is the exception and needs no key.
-- **The symbol doesn't resolve** — forex only charts when the symbol parses as a currency pair (`EURUSD`, `EUR/USD`); a stock outside your configured equities dataset returns no data. The default `XNAS.ITCH` is **Nasdaq-listed only**, so NYSE tickers need a consolidated feed such as `EQUS.MINI`.
+- **The symbol doesn't resolve** — forex only charts when the symbol parses as a currency pair (`EURUSD`, `EUR/USD`); a stock outside your configured equities dataset returns no data. The default `XNAS.ITCH` carries what executed **on Nasdaq**, which for a NYSE-listed ticker is a slice of the tape rather than nothing — prices track the consolidated ones, volume doesn't. Set `DATABENTO_EQUITIES_DATASET=EQUS.MINI` for consolidated US coverage.
 - **The per-user candle rate limit** (10/min · 100/day) is hit, when rate limiting is enabled.
 
 Two things on the detail page are **derived from candles** and therefore disappear together with the chart: the **MAE/MFE** excursion figures and the candle-based **running P&L** curve. Your entered prices, P&L, R-multiple and every statistic that builds on them are computed from the trade itself and are never affected.
 
 Candles are cached in the database and the cache is **shared across all users**: the same instrument and interval is identical for everyone, so a span fetched once serves every account. Storage is one row per fixed time chunk (`market_candle_chunks`, see [`src/lib/candle-cache.ts`](src/lib/candle-cache.ts)) rather than one "covered range" per instrument — a chunk row holds exactly what the provider returned for its span, so the cache can never claim coverage it doesn't have. Chunks whose span is finished and non-empty are kept forever; empty or still-forming ones carry a TTL and are re-fetched, so a weekend, a provider blip or a symbol that isn't listed yet heals itself instead of turning into a permanent "no market data". Provider responses are paged through to the end of the requested range, since every provider caps rows per response and a truncated answer is indistinguishable from a short one.
 
-Futures chart against the **continuous front-month series**, not the exact expiry you traded, so a long-dated contract may not line up tick-for-tick with your fills.
+**Futures pick the contract you actually traded.** A symbol that names its expiry (`NQU6`) charts that contract directly. A bare root (`NQ`) starts from the continuous front month; if the trade filled at a price that series never traded at, one daily-bar request across every listed expiry of the root identifies the contract that did trade there — the busiest one, since a thin far-dated month can span a price the market never met. That is what makes charts around a roll line up, because volume moves to the new expiry days before the continuous series does, and it works for a deliberately far-dated contract just as well. If no expiry traded at that price, the front month is charted rather than nothing.
+
+Roots are routed to the venue that lists them — CME Globex for most, ICE for the softs (cotton, sugar, coffee, cocoa, orange juice), Cboe for VIX. `node --env-file=.env.local scripts/check-market-feeds.mjs` smoke-tests every provider against the live APIs.
 
 ## Rate limiting
 
