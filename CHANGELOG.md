@@ -12,8 +12,33 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-02
+
+A pass over CSV import. Most of what follows is the same class of bug: the right
+column was found, but the value in it was read wrong — an afternoon stored as a
+morning, a European decimal comma multiplied by ten, a date a year out. None of
+it failed loudly, so the import looked like it had worked.
+
+**Upgrading.** Forex trades are now valued at the standard-lot contract size in
+every path, matching what manual entry and the trade editor already did. Trades
+imported from CSV before this release were valued at ×1 and keep that value —
+run `scripts/recalc-forex-multiplier.sql` to reprice them. It dry-runs first and
+leaves broker-supplied P&L alone. Deployments with no forex trades need no
+action. Migration `0021` adds `users.timezone` and applies itself on start.
+
 ### Added
 
+- **The mapping step shows what each column will become.** Detected columns are
+  listed with a sample value from the file and how the importer reads it —
+  `1,5 → 1.5`, `6/16/2026 4:13 PM → 2026-06-16, 16:13:00` — so a misread value is
+  visible before anything is saved. Only required fields that weren't detected
+  are presented as dropdowns; the full grid is one click away.
+- **Your timezone is detected once and remembered.** It lives on the account
+  rather than in a cookie, so it survives a new device, and the picker now lists
+  every zone instead of ten.
+- **Failed imports are reported.** The import funnel records the column names a
+  file used (headers only, never row values) and which fields had to be remapped
+  by hand, so unrecognised broker formats can be fixed rather than guessed at.
 - **More contracts are priced correctly out of the box** — short-term rates
   (SOFR, Fed Funds), yield futures, livestock, rough rice, aluminium, e-mini
   natural gas, the micro FX contracts (AUD, GBP, JPY, CHF) and CME's Solana and
@@ -22,7 +47,44 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 - **`scripts/check-market-feeds.mjs`** smoke-tests every market-data provider
   against the live APIs, one instrument per asset class.
 
+### Changed
+
+- **Forex is valued the same way everywhere.** The multiplier was derived in four
+  places that disagreed: one lot of EURUSD moving 50 pips was worth $500 entered
+  by hand and $0.005 imported from a CSV. There is now one rule, and it covers
+  forex. See **Upgrading** above.
+- **Column names are matched loosely.** `entry_price`, `entryPrice` and
+  `Entry Price (USD)` are all recognised, along with the names Bybit, Binance and
+  MetaTrader actually export. A precise match always wins over a generic one, so
+  `Exit Price` can't be claimed as the entry price.
+- Deduplication queries only the rows the file contains instead of reading the
+  whole account, and an import that dies halfway still leaves a history entry for
+  the rows that landed.
+
 ### Fixed
+
+- **Afternoon trades are no longer stored as mornings.** The timezone-abbreviation
+  stripper was eating `PM` along with `EST`.
+- **European exports are read with the right decimal separator.** `1,5` was
+  becoming 15 and `-12,75` becoming -1275. The convention is now inferred from
+  the whole file.
+- **Day-first dates are read as dates, not rolled over.** `16/06/2026` was stored
+  as 2027-04-06 and `31/12/2026` as 2028-07-12. Impossible dates are rejected
+  instead of silently wrapping.
+- **Times near a daylight-saving change land on the right hour.**
+- **Fill logs with fractional sizes pair correctly.** Crypto and forex positions
+  never summed back to exactly zero, so every fill for a symbol collapsed into
+  one enormous trade.
+- **A mismapped Side column is reported instead of turning the file into longs**,
+  negative commissions no longer increase net P&L, and a zero quantity is a
+  rejected row rather than a zero-P&L trade.
+- **Re-importing a file says "already imported"** rather than "nothing was
+  imported", which was indistinguishable from a mapping failure.
+- **The generic template accepts every asset type.** It was declared three times
+  across the wizard with three different asset lists, so picking "my broker isn't
+  listed" offered only futures — or nothing at all.
+- A trade whose partials are still open stays open, and two positions opened on
+  the same symbol in the same second stay two trades.
 
 - **Futures charts plot the contract you actually traded.** A bare root like
   `NQ` was always charted against the provider's continuous front month, which
@@ -346,7 +408,8 @@ dashboard, statistics, strategies & playbooks, discipline tracking, tags,
 prop-firm trading accounts, candle charts, PWA — running on Next.js 15,
 Drizzle ORM, PostgreSQL (Neon) and Clerk.
 
-[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.4.1...HEAD
+[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.5.0
 [0.4.1]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.4.1
 [0.4.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.4.0
 [0.3.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.3.0
