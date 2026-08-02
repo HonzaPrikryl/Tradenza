@@ -10,9 +10,8 @@ import { cn, formatCurrency } from '@/lib/utils'
 import { t } from '@/i18n'
 import { saveManualTrade } from '@/lib/actions/wizard'
 import { track } from '@/lib/analytics'
-import { contractMultiplier } from '@/lib/futures'
-import { forexContractSize } from '@/lib/forex'
-import { getBroker } from '@/lib/brokers'
+import { assetMultiplier, editorDefaultMultiplier } from '@/lib/futures'
+import { getBroker, GENERIC_BROKER, type AssetType } from '@/lib/brokers'
 import DateTimeField from '@/components/ui/DateTimeField'
 import DateField from '@/components/ui/DateField'
 import {
@@ -26,17 +25,17 @@ import {
   TableRow,
 } from '@/components/ui/Table'
 
-const ASSET_CLASSES = ['stocks', 'futures', 'options', 'forex', 'crypto', 'cfd', 'other'] as const
-type AssetClass = (typeof ASSET_CLASSES)[number]
+type AssetClass = AssetType | 'other'
 
 // Which asset classes the picker offers for a broker. A recognised broker is
 // constrained to the types it actually supports (plus "other" as an escape
-// hatch), mirroring the file-upload flow; unknown / generic brokers keep the
-// full freedom of every class. The first entry is the default selection.
+// hatch), mirroring the file-upload flow; unknown / generic brokers fall back to
+// GENERIC_BROKER so both paths offer the same list in the same order. The first
+// entry is the default selection.
 const assetChoicesFor = (brokerId: string): readonly AssetClass[] => {
   const broker = getBroker(brokerId)
-  if (!broker || broker.assets.length === 0) return ASSET_CLASSES
-  return [...broker.assets, 'other']
+  const assets = broker && broker.assets.length > 0 ? broker.assets : GENERIC_BROKER.assets
+  return [...assets, 'other']
 }
 
 // The quantity column means different things per market — contracts, shares, or
@@ -80,18 +79,12 @@ const num = (s: string) => {
   return isNaN(n) ? 0 : n
 }
 
-// Default per-execution multiplier for a market: futures pull the contract size
-// from the table (0 when unknown, so the user is prompted to fill it), options are
-// ×100 (one contract = 100 shares), everything else is 1. Stays editable per row.
-const rowMultiplier = (assetClass: AssetClass, symbol: string): string => {
-  if (assetClass === 'options') return '100'
-  if (assetClass === 'futures') {
-    const m = contractMultiplier(symbol)
-    return m ? String(m) : '0'
-  }
-  if (assetClass === 'forex') return String(forexContractSize(symbol))
-  return '1'
-}
+// Default per-execution multiplier for a market, from the one shared rule:
+// futures pull the contract size (0 when unknown, so the user is prompted to fill
+// it), options ×100, forex the standard-lot size, everything else 1. Stays
+// editable per row.
+const rowMultiplier = (assetClass: AssetClass, symbol: string): string =>
+  String(editorDefaultMultiplier(assetClass, symbol))
 
 export default function ManualEntry({
   brokerId,
@@ -161,8 +154,11 @@ export default function ManualEntry({
     const avgExit = exits.length > 0 ? avg(exits) : null
     const fees = sorted.reduce((s, e) => s + num(e.comm) + num(e.fee), 0)
     const matched = Math.min(entryQty, exitQty)
+    // Mirror the server's fallback exactly. The preview used to drop to ×1 when
+    // the field was cleared while the save fell back to the instrument's real
+    // multiplier, so the number shown was not the number stored.
     const rawMult = num(sorted[0].multiplier)
-    const mult = rawMult > 0 ? rawMult : 1
+    const mult = rawMult > 0 ? rawMult : assetMultiplier(assetClass, symbol.trim().toUpperCase())
     let netPnl: number | null = null
     if (avgExit !== null && matched > 0) {
       const gross = (direction === 'long' ? avgExit - avgEntry : avgEntry - avgExit) * matched * mult
@@ -170,7 +166,7 @@ export default function ManualEntry({
     }
     const open = exitQty < entryQty || exits.length === 0
     return { direction, entryQty, exitQty, avgEntry, avgExit, fees, netPnl, open }
-  }, [validExecs])
+  }, [validExecs, assetClass, symbol])
 
   const save = async (addNext: boolean) => {
     if (!canSave || saving) return
@@ -181,7 +177,7 @@ export default function ManualEntry({
         accountId,
         assetClass,
         symbol: trimmed,
-        contractMultiplier: num(execs[0]?.multiplier) || contractMultiplier(trimmed),
+        contractMultiplier: num(execs[0]?.multiplier) || assetMultiplier(assetClass, trimmed),
         expirationDate: execs[0]?.expDate || undefined,
         executions: execs.map((e) => ({
           datetime: new Date(e.dateTime).toISOString(),

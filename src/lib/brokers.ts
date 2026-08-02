@@ -185,6 +185,18 @@ export const BROKERS: Broker[] = [
   },
 ]
 
+// Stand-in for brokers that aren't on the list. It has to accept every asset
+// type: we know nothing about the file, so narrowing the picker would only block
+// valid imports. Futures leads because it is the default selection and matches
+// the historical behaviour of the generic path.
+export const GENERIC_BROKER: Broker = {
+  id: 'generic',
+  name: 'Generic Template',
+  short: 'T',
+  className: 'bg-primary/15 text-primary',
+  assets: ['futures', 'stocks', 'options', 'forex', 'crypto', 'cfd'],
+}
+
 export const POPULAR_BROKERS = BROKERS.filter((b) => b.popular)
 
 export function getBroker(id: string | null | undefined): Broker | undefined {

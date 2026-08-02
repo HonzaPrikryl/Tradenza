@@ -2,19 +2,13 @@ import { redirect } from 'next/navigation'
 import WizardChrome from '@/components/trade-import/WizardChrome'
 import UploadStep from '@/components/trade-import/UploadStep'
 import { getAccounts } from '@/lib/actions/accounts'
-import { getBroker, type Broker } from '@/lib/brokers'
+import { getBroker, GENERIC_BROKER } from '@/lib/brokers'
+import { readGlobalSettings } from '@/lib/global-settings'
+import { FALLBACK_TIMEZONE } from '@/lib/timezones'
 import { t } from '@/i18n'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: t('addTrades.upload.title') }
-
-const GENERIC: Broker = {
-  id: 'generic',
-  name: 'Generic Template',
-  short: 'T',
-  className: 'bg-primary/15 text-primary',
-  assets: ['futures'],
-}
 
 export default async function UploadPage({
   searchParams,
@@ -22,11 +16,11 @@ export default async function UploadPage({
   searchParams: Promise<{ broker?: string; account?: string }>
 }) {
   const { broker: brokerId = 'generic', account: accountId } = await searchParams
-  const broker = getBroker(brokerId) ?? GENERIC
+  const broker = getBroker(brokerId) ?? GENERIC_BROKER
 
   if (!accountId) redirect(`/trade-import/account?broker=${brokerId}`)
 
-  const accounts = await getAccounts(true)
+  const [accounts, settings] = await Promise.all([getAccounts(true), readGlobalSettings()])
   const account = accounts.find((a) => a.id === accountId)
   if (!account) redirect(`/trade-import/account?broker=${brokerId}`)
 
@@ -42,7 +36,11 @@ export default async function UploadPage({
           </p>
         </div>
         <div className="mt-10">
-          <UploadStep broker={broker} accountId={account.id} defaultTimezone={account.timezone ?? 'Europe/Prague'} />
+          <UploadStep
+            broker={broker}
+            accountId={account.id}
+            defaultTimezone={account.timezone || settings.timezone || FALLBACK_TIMEZONE}
+          />
         </div>
       </div>
     </div>

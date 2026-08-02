@@ -1,5 +1,27 @@
 import { describe, it, expect } from 'vitest'
-import { BROKERS, ALL_ASSETS, getBroker, defaultAssetClass, supportsUpload, type Broker } from './brokers'
+import {
+  BROKERS,
+  ALL_ASSETS,
+  GENERIC_BROKER,
+  getBroker,
+  defaultAssetClass,
+  supportsUpload,
+  type Broker,
+} from './brokers'
+
+describe('generic template', () => {
+  it('accepts every asset type — we know nothing about an unlisted broker file', () => {
+    expect([...GENERIC_BROKER.assets].sort()).toEqual([...ALL_ASSETS].sort())
+  })
+
+  it('defaults to futures', () => {
+    expect(defaultAssetClass(GENERIC_BROKER)).toBe('futures')
+  })
+
+  it('is not part of the pickable broker list', () => {
+    expect(getBroker('generic')).toBeUndefined()
+  })
+})
 
 describe('broker asset catalogue', () => {
   it('every broker declares at least one supported asset', () => {

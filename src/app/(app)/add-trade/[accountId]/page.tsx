@@ -3,19 +3,13 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import AddTradePanel, { type AddTradeMode } from '@/components/trade-import/AddTradePanel'
 import { getAccounts } from '@/lib/actions/accounts'
-import { getBroker, type Broker } from '@/lib/brokers'
+import { getBroker, GENERIC_BROKER } from '@/lib/brokers'
+import { readGlobalSettings } from '@/lib/global-settings'
+import { FALLBACK_TIMEZONE } from '@/lib/timezones'
 import { t } from '@/i18n'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: t('tradingAccounts.addTrade') }
-
-const GENERIC: Broker = {
-  id: 'generic',
-  name: 'Generic Template',
-  short: 'T',
-  className: 'bg-primary/15 text-primary',
-  assets: ['futures'],
-}
 
 export default async function AddTradeDetailPage({
   params,
@@ -27,11 +21,11 @@ export default async function AddTradeDetailPage({
   const { accountId } = await params
   const { mode } = await searchParams
 
-  const accounts = await getAccounts(true)
+  const [accounts, settings] = await Promise.all([getAccounts(true), readGlobalSettings()])
   const account = accounts.find((a) => a.id === accountId)
   if (!account) redirect('/add-trade')
 
-  const broker = getBroker(account.broker ?? undefined) ?? GENERIC
+  const broker = getBroker(account.broker ?? undefined) ?? GENERIC_BROKER
 
   const initialMode: AddTradeMode =
     mode === 'manual' || mode === 'upload' ? mode : account.importedCount > 0 ? 'upload' : 'manual'
@@ -55,7 +49,7 @@ export default async function AddTradeDetailPage({
       <AddTradePanel
         broker={broker}
         accountId={account.id}
-        defaultTimezone={account.timezone ?? 'Europe/Prague'}
+        defaultTimezone={account.timezone || settings.timezone || FALLBACK_TIMEZONE}
         initialMode={initialMode}
       />
     </div>

@@ -2,19 +2,11 @@ import Link from 'next/link'
 import WizardChrome from '@/components/trade-import/WizardChrome'
 import MethodSelect from '@/components/trade-import/MethodSelect'
 import { BrokerIcon } from '@/components/trade-import/shared'
-import { getBroker, supportsUpload, type Broker } from '@/lib/brokers'
+import { getBroker, supportsUpload, GENERIC_BROKER } from '@/lib/brokers'
 import { t } from '@/i18n'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: t('addTrades.method.title') }
-
-const GENERIC: Broker = {
-  id: 'generic',
-  name: '',
-  short: 'T',
-  className: 'bg-primary/15 text-primary',
-  assets: [],
-}
 
 export default async function MethodPage({
   searchParams,
@@ -24,7 +16,7 @@ export default async function MethodPage({
   const { broker: brokerId = 'generic', account: accountId = '' } = await searchParams
   const broker = getBroker(brokerId)
   const known = !!broker
-  const display = broker ?? GENERIC
+  const display = broker ?? GENERIC_BROKER
   const canUpload = supportsUpload(broker) || brokerId === 'generic'
 
   return (
