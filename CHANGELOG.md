@@ -12,6 +12,13 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+### Changed
+
+- Tags no longer appear under the symbol in the trades list. On an account with
+  a well-used tag vocabulary the badges pushed rows to two or three lines and
+  made the table hard to scan; tags are still shown, filterable and editable on
+  the trade detail page.
+
 ## [0.5.0] - 2026-08-02
 
 A pass over CSV import. Most of what follows is the same class of bug: the right

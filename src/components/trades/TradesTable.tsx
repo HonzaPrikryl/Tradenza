@@ -477,20 +477,6 @@ export default function TradesTable({
                     </TableCell>
                     <TableCell>
                       <span className="font-mono font-medium">{trade.symbol}</span>
-                      {trade.tradeTags && trade.tradeTags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {trade.tradeTags.map(({ tag }) => (
-                            <span
-                              key={tag.id}
-                              className="inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded-full"
-                              style={{ backgroundColor: `${tag.color}22`, color: tag.color }}
-                            >
-                              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: tag.color }} />
-                              {tag.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </TableCell>
                     <TableCell>
                       <span
