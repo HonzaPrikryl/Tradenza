@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { forexContractSize } from './forex'
 import {
   contractMultiplier,
   tickSize,
@@ -62,11 +63,17 @@ describe('assetMultiplier', () => {
   it('is 100 for options (one contract = 100 shares)', () => {
     expect(assetMultiplier('options', 'AAPL')).toBe(100)
   })
-  it('is 1 for stocks, crypto, forex and other', () => {
+  it('is 1 for stocks, crypto and other', () => {
     expect(assetMultiplier('stocks', 'AAPL')).toBe(1)
     expect(assetMultiplier('crypto', 'BTC')).toBe(1)
-    expect(assetMultiplier('forex', 'EURUSD')).toBe(1)
     expect(assetMultiplier('other', 'XYZ')).toBe(1)
+  })
+
+  it('is the standard-lot contract size for forex, because size is entered in lots', () => {
+    // It used to be 1 here while the trade editor used 100,000, so the same
+    // EURUSD trade was worth 100,000x more depending on how it entered the app.
+    expect(assetMultiplier('forex', 'EURUSD')).toBe(forexContractSize('EURUSD'))
+    expect(assetMultiplier('forex', 'USDJPY')).toBe(forexContractSize('USDJPY'))
   })
 })
 
@@ -80,9 +87,26 @@ describe('editorDefaultMultiplier', () => {
   it('is 100 for options', () => {
     expect(editorDefaultMultiplier('options', 'AAPL')).toBe(100)
   })
-  it('is 1 for stocks / forex / crypto', () => {
+  it('is 1 for stocks / crypto', () => {
     expect(editorDefaultMultiplier('stocks', 'AAPL')).toBe(1)
-    expect(editorDefaultMultiplier('forex', 'EURUSD')).toBe(1)
+    expect(editorDefaultMultiplier('crypto', 'BTC')).toBe(1)
+  })
+
+  it('agrees with assetMultiplier everywhere except an unknown futures symbol', () => {
+    // The only intended divergence: an unrecognised futures root seeds the field
+    // with 0 so the user is prompted, instead of silently pricing at 1.
+    for (const [ac, sym] of [
+      ['stocks', 'AAPL'],
+      ['crypto', 'BTC'],
+      ['options', 'AAPL'],
+      ['forex', 'EURUSD'],
+      ['futures', 'ES'],
+      ['other', 'XYZ'],
+    ] as [string, string][]) {
+      expect(editorDefaultMultiplier(ac, sym), `${ac}/${sym}`).toBe(assetMultiplier(ac, sym))
+    }
+    expect(editorDefaultMultiplier('futures', 'WHAT')).toBe(0)
+    expect(assetMultiplier('futures', 'WHAT')).toBe(1)
   })
 })
 

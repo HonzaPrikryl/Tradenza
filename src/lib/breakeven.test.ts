@@ -77,7 +77,7 @@ describe('multiplierFor', () => {
   it('uses the asset class when provided (options ×100)', () => {
     expect(multiplierFor(null, 'AAPL', 'options')).toBe(100)
     expect(multiplierFor(null, 'ES', 'futures')).toBe(50)
-    expect(multiplierFor(null, 'EURUSD', 'forex')).toBe(1)
+    expect(multiplierFor(null, 'EURUSD', 'forex')).toBe(100_000)
     expect(multiplierFor(null, 'AAPL', 'stocks')).toBe(1)
   })
   it('still prefers a stored multiplier over the asset class', () => {

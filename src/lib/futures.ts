@@ -1,4 +1,4 @@
-import { forexPipSize } from './forex'
+import { forexPipSize, forexContractSize } from './forex'
 
 export const FUTURES_MULTIPLIERS: Record<string, number> = {
   // ── Equity index (CME) ──────────────────────────────────────────────
@@ -215,30 +215,31 @@ export const OPTIONS_MULTIPLIER = 100
  * The value multiplier to apply to a per-point price move for a given asset class:
  *  - futures → the instrument's contract multiplier (falls back to 1 if unknown)
  *  - options → 100 (one contract = 100 shares)
- *  - stocks / crypto / forex / other → 1 (raw price × quantity is already correct;
- *    forex users can still set a custom multiplier per execution for pip/lot sizing)
+ *  - forex   → the standard-lot contract size, because size is entered in lots
+ *  - stocks / crypto / other → 1 (raw price × quantity is already correct)
  *
  * Centralises the rule so the manual entry form, CSV import and the trade editor
- * all price the same instrument identically.
+ * all price the same instrument identically. That is the whole point of this
+ * function: every caller must go through it rather than re-deriving the rule,
+ * otherwise the same trade is worth different amounts depending on how it
+ * entered the app.
  */
 export function assetMultiplier(assetClass: string, symbol: string): number {
   if (assetClass === 'futures') return contractMultiplier(symbol) || 1
   if (assetClass === 'options') return OPTIONS_MULTIPLIER
+  if (assetClass === 'forex') return forexContractSize(symbol)
   return 1
 }
 
 /**
- * Multiplier used to seed the executions editor's editable field. Like
- * `assetMultiplier` but returns 0 for an *unrecognised futures* symbol so the
- * field visibly prompts the user to supply the contract size, rather than
- * silently defaulting to 1.
+ * Multiplier used to seed an editable multiplier field. Like `assetMultiplier`
+ * but returns 0 for an *unrecognised futures* symbol so the field visibly
+ * prompts the user to supply the contract size, rather than silently
+ * defaulting to 1.
  */
 export function editorDefaultMultiplier(assetClass: string, symbol: string): number {
-  const bySymbol = contractMultiplier(symbol)
-  if (bySymbol > 0) return bySymbol
-  if (assetClass === 'options') return OPTIONS_MULTIPLIER
-  if (assetClass === 'futures') return 0
-  return 1
+  if (assetClass === 'futures') return contractMultiplier(symbol)
+  return assetMultiplier(assetClass, symbol)
 }
 
 export function tickSize(symbol: string): number {
