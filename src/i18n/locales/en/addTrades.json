@@ -60,7 +60,9 @@
     "importError": "Import failed",
     "resultTitle": "{count} trades imported",
     "resultTitleNone": "Nothing was imported",
+    "resultTitleDuplicates": "Already imported",
     "resultDetail": "{total} rows processed · {imported} imported · {skipped} skipped",
+    "resultDuplicates": "{count} rows match trades already in this account and were skipped. Import the same file twice and nothing is added.",
     "showErrors": "Show {count} issues",
     "importAnother": "Import another file",
     "viewTrades": "View trades",
@@ -77,9 +79,20 @@
     },
     "mapping": {
       "title": "Map columns",
-      "subtitle": "We auto-detected the columns from your file. Review and adjust if needed, then import. If date and time are in one column, map it to \"Entry/Exit date / time\" and leave the time field empty.",
+      "subtitle": "We auto-detected the columns from your file. Check the sample values below — if one looks wrong, adjust the mapping before importing.",
       "none": "— not mapped —",
-      "missing": "Map the required fields first: {cols}"
+      "missing": "Map the required fields first: {cols}",
+      "detectedCount": "{count} of {total} columns detected automatically",
+      "noneDetected": "We couldn't recognise any column in this file",
+      "needsAttention": "Pick the column for these required fields",
+      "colField": "Field",
+      "colSource": "Column in your file",
+      "colSample": "Sample value",
+      "adjust": "Adjust mapping",
+      "collapse": "Hide mapping",
+      "combinedHint": "If date and time share one column, map it to \"Entry/Exit date / time\" and leave the time field empty.",
+      "emptySample": "—",
+      "unparsable": "can't read"
     },
     "mode": {
       "label": "What's in this file?",
@@ -107,7 +120,8 @@
       "netPnl": "Net P&L",
       "setupName": "Setup",
       "notes": "Notes"
-    }
+    },
+    "tooManyRows": "This file has {count} rows — more than the {max} we can import at once. Split it and import the parts separately."
   },
   "manual": {
     "title": "Add manually",
