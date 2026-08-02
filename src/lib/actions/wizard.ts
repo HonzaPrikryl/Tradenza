@@ -16,6 +16,11 @@ import {
   parseBuySell,
   parseDateInTz,
   mergeRoundTripPartials,
+  detectDecimalSeparator,
+  detectDayFirst,
+  isFlat,
+  MAX_TRADE_ROWS,
+  MAX_FILL_ROWS,
   type RoundTripLeg,
 } from './wizard-helpers'
 import { uuid } from '@/lib/validation'
@@ -25,6 +30,122 @@ import { authedAction, mutationAction, importAction } from '@/lib/safe-action'
 import { NotFoundError, ValidationError } from '@/lib/action-errors'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// How many rows to sample when inferring a file-wide convention ("1,5" vs "1.5",
+// "16/06" vs "06/16"). A file uses one throughout, so the head is representative.
+const FORMAT_SAMPLE_ROWS = 200
+
+/** Every value the given fields contribute, pooled across their mapped columns. */
+function sampleColumnValues(
+  rows: Record<string, string>[],
+  mapping: Record<string, string>,
+  fields: readonly string[],
+): (string | undefined)[] {
+  const sample = rows.slice(0, FORMAT_SAMPLE_ROWS)
+  const values: (string | undefined)[] = []
+  for (const field of fields) {
+    const col = mapping[field]
+    if (!col) continue
+    for (const row of sample) values.push(row[col])
+  }
+  return values
+}
+
+/**
+ * The decimal separator for the whole file, pooled from every mapped numeric
+ * column. Per-file rather than per-column: one export never mixes conventions,
+ * and pooling the evidence settles a column of otherwise round numbers.
+ */
+function fileDecimalSeparator(
+  rows: Record<string, string>[],
+  mapping: Record<string, string>,
+  numericFields: readonly string[],
+) {
+  return detectDecimalSeparator(sampleColumnValues(rows, mapping, numericFields))
+}
+
+/** Whether slash dates in this file are day-first (16/06) or month-first (06/16). */
+function fileDayFirst(rows: Record<string, string>[], mapping: Record<string, string>, dateFields: readonly string[]) {
+  return detectDayFirst(sampleColumnValues(rows, mapping, dateFields))
+}
+
+/**
+ * Which of these external ids already exist in the account.
+ *
+ * Asks only about the ids the file actually produced, rather than reading every
+ * trade in the account on every import — a scalper with 50k trades paid for all
+ * of them to check a 200-row file. Hits `trades_external_id_idx`, chunked so the
+ * IN list stays inside the parameter limit.
+ */
+async function existingExternalIds(userId: string, accountId: string, candidates: string[]): Promise<Set<string>> {
+  const found = new Set<string>()
+  const unique = [...new Set(candidates)]
+  const CHUNK = 500
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    const rows = await db
+      .select({ externalId: trades.externalId })
+      .from(trades)
+      .where(
+        and(
+          eq(trades.userId, userId),
+          eq(trades.accountId, accountId),
+          inArray(trades.externalId, unique.slice(i, i + CHUNK)),
+        ),
+      )
+    for (const r of rows) if (r.externalId) found.add(r.externalId)
+  }
+  return found
+}
+
+/**
+ * Insert the parsed trades and record the import.
+ *
+ * The log is written in a `finally`, so a batch that dies halfway still leaves an
+ * import-history entry covering the rows that did land. Without it those trades
+ * existed with nothing pointing at them and could never be rolled back. Neither
+ * supported driver gives us a transaction spanning a variable number of
+ * statements, so this is the guarantee we can actually make.
+ */
+async function commitImport(args: {
+  userId: string
+  accountId: string
+  filename: string
+  toInsert: (typeof trades.$inferInsert)[]
+  totalRows: number
+  skippedRows: number
+  errors: string[]
+}): Promise<number> {
+  const insertedIds: string[] = []
+  const CHUNK = 100
+  try {
+    for (let i = 0; i < args.toInsert.length; i += CHUNK) {
+      const inserted = await db
+        .insert(trades)
+        .values(args.toInsert.slice(i, i + CHUNK))
+        .returning({ id: trades.id })
+      insertedIds.push(...inserted.map((r) => r.id))
+    }
+  } finally {
+    try {
+      await db.insert(importLogs).values({
+        userId: args.userId,
+        accountId: args.accountId,
+        filename: args.filename,
+        source: 'csv',
+        totalRows: args.totalRows,
+        importedRows: insertedIds.length,
+        skippedRows: args.skippedRows,
+        errorRows: args.errors.length,
+        errors: args.errors.length > 0 ? args.errors : null,
+        tradeIds: insertedIds.length > 0 ? insertedIds : null,
+      })
+      await db.update(accounts).set({ updatedAt: new Date() }).where(eq(accounts.id, args.accountId))
+    } catch {
+      // Never let bookkeeping mask the insert failure it is reporting on.
+    }
+  }
+  return insertedIds.length
+}
 
 async function assertAccountOwnership(userId: string, accountId: string) {
   const acc = await db.query.accounts.findFirst({
@@ -93,7 +214,11 @@ export const saveManualTrade = mutationAction([manualTradeSchema], async ({ user
   const entryDatetime = new Date(entries[0].datetime)
   const exitDatetime = exits.length > 0 ? new Date(exits[exits.length - 1].datetime) : null
 
-  const mult = v.contractMultiplier && v.contractMultiplier > 0 ? v.contractMultiplier : 1
+  // An explicit per-execution multiplier wins; otherwise fall back to the shared
+  // rule rather than to 1. Falling back to 1 priced a manually entered options or
+  // forex trade as if it were a stock whenever the field was cleared.
+  const mult =
+    v.contractMultiplier && v.contractMultiplier > 0 ? v.contractMultiplier : assetMultiplier(v.assetClass, v.symbol)
   let grossPnl: string | null = null
   let netPnl: string | null = null
   const matchedQty = Math.min(entryQuantity, exitQuantity)
@@ -145,7 +270,7 @@ const csvImportSchema = z.object({
   timezone: z.string().min(1).max(60),
   assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other']).default('futures'),
   mapping: z.record(z.string()),
-  rows: z.array(z.record(z.string())).min(1).max(10000),
+  rows: z.array(z.record(z.string())).min(1).max(MAX_TRADE_ROWS),
 })
 
 export type CsvImportInput = z.infer<typeof csvImportSchema>
@@ -153,7 +278,10 @@ export type CsvImportInput = z.infer<typeof csvImportSchema>
 export interface WizardImportResult {
   total: number
   imported: number
+  /** Rows we could not read — a real problem worth showing the user. */
   skipped: number
+  /** Rows that matched a trade already in the account. Expected, not a failure. */
+  duplicates: number
   errors: string[]
   unmappedRequired: string[]
 }
@@ -162,13 +290,14 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
   const account = await assertAccountOwnership(userId, v.accountId)
 
   const m = v.mapping
+  const dayFirst = fileDayFirst(v.rows, m, ['entryDate', 'exitDate'])
   const resolveDate = (row: Record<string, string>, dateField: string, timeField: string) => {
     const dateCol = m[dateField]
     if (!dateCol || !row[dateCol]?.trim()) return null
     const date = stripTzAbbrev(row[dateCol].trim())
     const timeCol = m[timeField]
     const time = timeCol ? stripTzAbbrev(row[timeCol] ?? '') : ''
-    return parseDateInTz(time ? `${date} ${time}` : date, v.timezone)
+    return parseDateInTz(time ? `${date} ${time}` : date, v.timezone, dayFirst)
   }
 
   const unmappedRequired = IMPORT_REQUIRED.filter((f) => !m[f])
@@ -177,19 +306,21 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
       total: v.rows.length,
       imported: 0,
       skipped: v.rows.length,
+      duplicates: 0,
       errors: [],
       unmappedRequired: [...unmappedRequired],
     }
   }
 
-  const existing = await db.query.trades.findMany({
-    where: and(eq(trades.userId, userId), eq(trades.accountId, v.accountId)),
-    columns: { externalId: true },
-  })
-  const existingIds = new Set(existing.map((t) => t.externalId).filter(Boolean))
+  const decimal = fileDecimalSeparator(v.rows, m, ['entryPrice', 'exitPrice', 'quantity', 'fees', 'grossPnl', 'netPnl'])
 
   const errors: string[] = []
   let skipped = 0
+  let duplicates = 0
+  // Rows where a side column was mapped but held something we don't understand
+  // (typically an "Order Type" column). Direction fell back to the quantity sign,
+  // which is a guess — worth telling the user rather than silently accepting.
+  let unreadableSide = 0
   const toInsert: (typeof trades.$inferInsert)[] = []
 
   // Phase 1 — parse each valid row into a normalized round-trip leg. One CSV row
@@ -208,7 +339,7 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
         continue
       }
 
-      const entryPrice = parseNumber(get('entryPrice'))
+      const entryPrice = parseNumber(get('entryPrice'), decimal)
       if (entryPrice === null) {
         errors.push(t('validation.import.invalidEntryPrice', { row: rowNum }))
         skipped++
@@ -225,8 +356,17 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
       // Direction + size. A mapped `side` column wins; otherwise the direction is
       // inferred from the sign of the quantity (e.g. DeepCharts encodes short as a
       // negative quantity and ships no side column). Quantity is always positive.
-      const { direction, quantity } = resolveSideAndQuantity(get('side'), parseNumber(get('quantity')))
-      const exitPrice = parseNumber(get('exitPrice'))
+      const { direction, quantity, sideUnreadable } = resolveSideAndQuantity(
+        get('side'),
+        parseNumber(get('quantity'), decimal),
+      )
+      if (sideUnreadable) unreadableSide++
+      if (quantity <= 0) {
+        errors.push(t('validation.import.invalidQuantity', { row: rowNum }))
+        skipped++
+        continue
+      }
+      const exitPrice = parseNumber(get('exitPrice'), decimal)
       const exitDatetime = resolveDate(row, 'exitDate', 'exitTime')
 
       legs.push({
@@ -237,9 +377,11 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
         exitDatetime: exitPrice !== null ? exitDatetime : null,
         exitPrice,
         quantity,
-        fees: parseNumber(get('fees')) ?? 0,
-        grossPnl: parseNumber(get('grossPnl')),
-        netPnl: parseNumber(get('netPnl')),
+        // Brokers disagree on the sign of a cost: some export commissions as
+        // negative. Taking it at face value would *increase* net P&L.
+        fees: Math.abs(parseNumber(get('fees'), decimal) ?? 0),
+        grossPnl: parseNumber(get('grossPnl'), decimal),
+        netPnl: parseNumber(get('netPnl'), decimal),
         notes: get('notes')?.trim() || null,
       })
     } catch (err) {
@@ -253,13 +395,19 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
     }
   }
 
+  if (unreadableSide > 0) errors.push(t('validation.import.sideUnreadable', { count: unreadableSide }))
+
   // Phase 2 — merge partials that share a position (same symbol/direction/entry)
   // into one trade, then build the insert rows. Non-partial rows merge to a group
   // of one, so single round-trip exports are unchanged.
-  for (const trade of mergeRoundTripPartials(legs)) {
-    const externalId = `${trade.symbol}_${trade.entryDatetime.toISOString()}_${trade.direction}`
+  const merged = mergeRoundTripPartials(legs)
+  const tradeExternalId = (x: (typeof merged)[number]) => `${x.symbol}_${x.entryDatetime.toISOString()}_${x.direction}`
+  const existingIds = await existingExternalIds(userId, v.accountId, merged.map(tradeExternalId))
+
+  for (const trade of merged) {
+    const externalId = tradeExternalId(trade)
     if (existingIds.has(externalId)) {
-      skipped += trade.legCount
+      duplicates += trade.legCount
       continue
     }
 
@@ -269,6 +417,15 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
     const resolvedAssetClass = contractMultiplier(trade.symbol) > 0 ? 'futures' : v.assetClass
     // Per-point value multiplier: futures → contract size, options → 100, else 1.
     const mult = assetMultiplier(resolvedAssetClass, trade.symbol)
+
+    // A row-per-exit export gives each leg both its entry and its exit size, so
+    // comparing the two totals is what tells a fully closed position from one
+    // that still has size on. Exports that ship no exit quantity at all fall back
+    // to "an exit price or a P&L means it's done".
+    const fullyExited =
+      trade.exitQuantity > 0
+        ? trade.exitQuantity >= trade.entryQuantity
+        : trade.exitPrice !== null || trade.netPnl !== null
 
     // Prefer the broker-provided P&L (summed across partials); only compute from
     // prices when none was supplied — applying the instrument multiplier so
@@ -301,7 +458,10 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
       accountId: v.accountId,
       symbol: trade.symbol,
       direction: trade.direction,
-      status: trade.exitPrice !== null || netPnl !== null ? 'closed' : 'open',
+      // Closed only once the exits cover the entries. A position whose partials
+      // are still open in the export used to be filed as closed just because one
+      // of its legs carried an exit price.
+      status: fullyExited ? 'closed' : 'open',
       assetClass: resolvedAssetClass,
       entryPrice: trade.entryPrice.toString(),
       entryQuantity: trade.entryQuantity.toString(),
@@ -320,37 +480,18 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
     existingIds.add(externalId)
   }
 
-  let imported = 0
-  const insertedIds: string[] = []
-  if (toInsert.length > 0) {
-    const chunkSize = 100
-    for (let i = 0; i < toInsert.length; i += chunkSize) {
-      const inserted = await db
-        .insert(trades)
-        .values(toInsert.slice(i, i + chunkSize))
-        .returning({ id: trades.id })
-      insertedIds.push(...inserted.map((r) => r.id))
-    }
-    imported = toInsert.length
-  }
-
-  await db.insert(importLogs).values({
+  const imported = await commitImport({
     userId,
-    accountId: v.accountId,
+    accountId: account.id,
     filename: v.filename,
-    source: 'csv',
+    toInsert,
     totalRows: v.rows.length,
-    importedRows: imported,
-    skippedRows: skipped,
-    errorRows: errors.length,
-    errors: errors.length > 0 ? errors : null,
-    tradeIds: insertedIds.length > 0 ? insertedIds : null,
+    skippedRows: skipped + duplicates,
+    errors,
   })
 
-  await db.update(accounts).set({ updatedAt: new Date() }).where(eq(accounts.id, account.id))
-
   revalidateAll()
-  return { total: v.rows.length, imported, skipped, errors, unmappedRequired: [] }
+  return { total: v.rows.length, imported, skipped, duplicates, errors, unmappedRequired: [] }
 })
 
 export interface ImportHistoryRow {
@@ -434,7 +575,7 @@ const fillImportSchema = z.object({
   timezone: z.string().min(1).max(60),
   assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other']).default('stocks'),
   mapping: z.record(z.string()),
-  rows: z.array(z.record(z.string())).min(1).max(20000),
+  rows: z.array(z.record(z.string())).min(1).max(MAX_FILL_ROWS),
 })
 export type FillImportInput = z.infer<typeof fillImportSchema>
 
@@ -456,23 +597,33 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
       total: v.rows.length,
       imported: 0,
       skipped: v.rows.length,
+      duplicates: 0,
       errors: [],
       unmappedRequired: [...unmappedRequired],
     }
   }
   const get = (row: Record<string, string>, field: string) => (m[field] ? row[m[field]] : undefined)
+  const decimal = fileDecimalSeparator(v.rows, m, ['price', 'quantity', 'commission'])
+  const dayFirst = fileDayFirst(v.rows, m, ['datetime'])
 
   const bySymbol = new Map<string, Fill[]>()
   let skipped = 0
+  let duplicates = 0
   for (const row of v.rows) {
     const status = get(row, 'status')
-    if (m.status && status && !status.toLowerCase().includes('fill')) continue
+    // Cancelled / rejected orders are not fills. They still have to land in a
+    // counter, or "N rows processed" stops adding up and the result looks like
+    // rows vanished.
+    if (m.status && status && !status.toLowerCase().includes('fill')) {
+      skipped++
+      continue
+    }
     const symbol = get(row, 'symbol')?.trim().toUpperCase()
     const side = parseBuySell(get(row, 'side'))
-    const qty = parseNumber(get(row, 'quantity')) ?? 0
-    const price = parseNumber(get(row, 'price')) ?? 0
-    const time = parseDateInTz(stripTzAbbrev(get(row, 'datetime') ?? ''), v.timezone)
-    const commission = parseNumber(get(row, 'commission')) ?? 0
+    const qty = parseNumber(get(row, 'quantity'), decimal) ?? 0
+    const price = parseNumber(get(row, 'price'), decimal) ?? 0
+    const time = parseDateInTz(stripTzAbbrev(get(row, 'datetime') ?? ''), v.timezone, dayFirst)
+    const commission = Math.abs(parseNumber(get(row, 'commission'), decimal) ?? 0)
     if (!symbol || !side || qty <= 0 || price <= 0 || !time) {
       skipped++
       continue
@@ -481,12 +632,36 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
     bySymbol.get(symbol)!.push({ side, qty, price, time, commission })
   }
 
-  // dedup
-  const existing = await db.query.trades.findMany({
-    where: and(eq(trades.userId, userId), eq(trades.accountId, v.accountId)),
-    columns: { externalId: true },
-  })
-  const existingIds = new Set(existing.map((t) => t.externalId).filter(Boolean))
+  // Walk each symbol's fills in time order, cutting a round trip every time the
+  // running position returns to flat. Grouping happens before the dedup query so
+  // we can ask the database only about the ids this file actually produces.
+  const groups: { symbol: string; fills: Fill[] }[] = []
+  for (const [symbol, list] of bySymbol) {
+    list.sort((a, b) => a.time.getTime() - b.time.getTime())
+    let pos = 0
+    let group: Fill[] = []
+    for (const f of list) {
+      group.push(f)
+      pos += f.side === 'buy' ? f.qty : -f.qty
+      // Tolerance, not equality: fractional crypto/forex sizes never sum back to
+      // an exact 0, which used to fold a whole symbol into a single trade.
+      if (isFlat(pos)) {
+        groups.push({ symbol, fills: group })
+        group = []
+        pos = 0
+      }
+    }
+    if (group.length > 0) groups.push({ symbol, fills: group })
+  }
+
+  const fillExternalId = ({ symbol, fills }: { symbol: string; fills: Fill[] }) => {
+    const direction = fills[0].side === 'buy' ? 'long' : 'short'
+    const exits = fills.filter((f) => f.side !== fills[0].side)
+    const exitDatetime = exits.length > 0 ? fills[fills.length - 1].time : null
+    return `${symbol}_${fills[0].time.toISOString()}_${exitDatetime?.toISOString() ?? 'open'}_${direction}`
+  }
+
+  const existingIds = await existingExternalIds(userId, v.accountId, groups.map(fillExternalId))
 
   const toInsert: (typeof trades.$inferInsert)[] = []
 
@@ -521,8 +696,11 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
       netPnl = roundMoney(gross - fees).toString()
     }
     const status: 'open' | 'closed' = exitQty >= entryQty && exits.length > 0 ? 'closed' : 'open'
-    const externalId = `${symbol}_${entryDatetime.toISOString()}_${exitDatetime?.toISOString() ?? 'open'}_${direction}`
-    if (existingIds.has(externalId)) return
+    const externalId = fillExternalId({ symbol, fills: group })
+    if (existingIds.has(externalId)) {
+      duplicates += group.length
+      return
+    }
     existingIds.add(externalId)
 
     toInsert.push({
@@ -557,49 +735,18 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
     })
   }
 
-  for (const [symbol, list] of bySymbol) {
-    list.sort((a, b) => a.time.getTime() - b.time.getTime())
-    let pos = 0
-    let group: Fill[] = []
-    for (const f of list) {
-      group.push(f)
-      pos += f.side === 'buy' ? f.qty : -f.qty
-      if (pos === 0) {
-        buildTrade(symbol, group)
-        group = []
-      }
-    }
-    if (group.length > 0) buildTrade(symbol, group)
-  }
+  for (const g of groups) buildTrade(g.symbol, g.fills)
 
-  let imported = 0
-  const insertedIds: string[] = []
-  if (toInsert.length > 0) {
-    const chunkSize = 100
-    for (let i = 0; i < toInsert.length; i += chunkSize) {
-      const inserted = await db
-        .insert(trades)
-        .values(toInsert.slice(i, i + chunkSize))
-        .returning({ id: trades.id })
-      insertedIds.push(...inserted.map((r) => r.id))
-    }
-    imported = toInsert.length
-  }
-
-  await db.insert(importLogs).values({
+  const imported = await commitImport({
     userId,
-    accountId: v.accountId,
+    accountId: account.id,
     filename: v.filename,
-    source: 'csv',
+    toInsert,
     totalRows: v.rows.length,
-    importedRows: imported,
-    skippedRows: skipped,
-    errorRows: 0,
-    errors: null,
-    tradeIds: insertedIds.length > 0 ? insertedIds : null,
+    skippedRows: skipped + duplicates,
+    errors: [],
   })
-  await db.update(accounts).set({ updatedAt: new Date() }).where(eq(accounts.id, account.id))
 
   revalidateAll()
-  return { total: v.rows.length, imported, skipped, errors: [], unmappedRequired: [] }
+  return { total: v.rows.length, imported, skipped, duplicates, errors: [], unmappedRequired: [] }
 })

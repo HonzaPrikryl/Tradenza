@@ -55,9 +55,9 @@ describe('DeepCharts CSV import', () => {
   it('derives direction from the quantity sign and stores a positive size', () => {
     const results = SAMPLE.map((r) => resolveSideAndQuantity(undefined, parseNumber(r.Quantity)))
     expect(results).toEqual([
-      { direction: 'long', quantity: 6 },
-      { direction: 'short', quantity: 4 },
-      { direction: 'short', quantity: 2 },
+      { direction: 'long', quantity: 6, sideUnreadable: false },
+      { direction: 'short', quantity: 4, sideUnreadable: false },
+      { direction: 'short', quantity: 2, sideUnreadable: false },
     ])
   })
 

@@ -16,6 +16,8 @@
     "missingSymbol": "Row {row}: missing Symbol",
     "invalidEntryPrice": "Row {row}: invalid Entry Price",
     "invalidEntryDate": "Row {row}: invalid entry date",
+    "invalidQuantity": "Row {row}: quantity must be greater than zero",
+    "sideUnreadable": "{count} rows had a Side column we couldn't read — direction was taken from the sign of the quantity instead. Check that Side is mapped to the right column.",
     "unknownError": "Row {row}: {error}",
     "unknownErrorShort": "unknown error",
     "logNotFound": "Import not found"
