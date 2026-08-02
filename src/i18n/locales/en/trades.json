@@ -168,7 +168,9 @@
     },
     "playbook": {
       "checklistTitle": "Setup checklist",
-      "progress": "{done}/{total}"
+      "progress": "{done}/{total}",
+      "checkAll": "Check all",
+      "uncheckAll": "Uncheck all"
     },
     "exec": {
       "title": "Executions",

@@ -93,6 +93,18 @@ function ChecklistCard({
     }
   }
 
+  function toggleAll(kind: 'entry' | 'exit', check: boolean) {
+    if (kind === 'entry') {
+      const next = check ? new Set(entryCriteria) : new Set<string>()
+      setEntry(next)
+      persist(next, exit)
+    } else {
+      const next = check ? new Set(exitCriteria) : new Set<string>()
+      setExit(next)
+      persist(entry, next)
+    }
+  }
+
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -109,6 +121,7 @@ function ChecklistCard({
           checked={entry}
           disabled={pending}
           onToggle={(c) => toggle('entry', c)}
+          onToggleAll={(check) => toggleAll('entry', check)}
         />
       )}
       {exitCriteria.length > 0 && (
@@ -119,6 +132,7 @@ function ChecklistCard({
             checked={exit}
             disabled={pending}
             onToggle={(c) => toggle('exit', c)}
+            onToggleAll={(check) => toggleAll('exit', check)}
           />
         </div>
       )}
@@ -132,16 +146,29 @@ function ChecklistGroup({
   checked,
   disabled,
   onToggle,
+  onToggleAll,
 }: {
   title: string
   items: string[]
   checked: Set<string>
   disabled: boolean
   onToggle: (criterion: string) => void
+  onToggleAll: (check: boolean) => void
 }) {
+  const allChecked = items.every((item) => checked.has(item))
   return (
     <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+        <button
+          type="button"
+          onClick={() => onToggleAll(!allChecked)}
+          disabled={disabled}
+          className="shrink-0 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+        >
+          {allChecked ? t('trades.detail.playbook.uncheckAll') : t('trades.detail.playbook.checkAll')}
+        </button>
+      </div>
       <ul className="space-y-1">
         {items.map((item, i) => {
           const isChecked = checked.has(item)
