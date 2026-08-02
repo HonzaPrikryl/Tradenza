@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { normalizeBreakevenConfig, type BreakevenConfig, type BreakevenMode } from '@/lib/breakeven'
+import { getUserTimezone } from '@/lib/user-timezone'
 
 const COOKIE = {
   timezone: 'tz_pref_timezone',
@@ -25,8 +26,9 @@ function numCookie(raw?: string): number | null {
 
 export async function readGlobalSettings(): Promise<GlobalSettings> {
   const c = await cookies()
+  const timezone = c.get(COOKIE.timezone)?.value || (await getUserTimezone())
   return {
-    timezone: c.get(COOKIE.timezone)?.value || null,
+    timezone: timezone || null,
     breakeven: normalizeBreakevenConfig(
       c.get(COOKIE.beMode)?.value ?? null,
       numCookie(c.get(COOKIE.beFrom)?.value),
@@ -35,11 +37,11 @@ export async function readGlobalSettings(): Promise<GlobalSettings> {
   }
 }
 
-export async function setTimezonePref(timezone: string) {
+export async function setTimezonePref(timezone: string, opts?: { revalidate?: boolean }) {
   const c = await cookies()
-  if (timezone) c.set(COOKIE.timezone, timezone, { path: '/' })
+  if (timezone) c.set(COOKIE.timezone, timezone, { path: '/', maxAge: 60 * 60 * 24 * 365 })
   else c.delete(COOKIE.timezone)
-  revalidatePath('/', 'layout')
+  if (opts?.revalidate !== false) revalidatePath('/', 'layout')
   return { success: true }
 }
 

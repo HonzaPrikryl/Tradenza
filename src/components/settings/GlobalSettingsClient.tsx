@@ -1,63 +1,29 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { t } from '@/i18n'
 import Select from '@/components/ui/Select'
-import { setTimezonePref, type GlobalSettings } from '@/lib/global-settings'
-
-const TIMEZONES = [
-  'UTC',
-  'Europe/Prague',
-  'Europe/London',
-  'Europe/Berlin',
-  'America/New_York',
-  'America/Chicago',
-  'America/Los_Angeles',
-  'Asia/Singapore',
-  'Asia/Tokyo',
-  'Australia/Sydney',
-]
+import { type GlobalSettings } from '@/lib/global-settings'
+import { saveUserTimezone } from '@/lib/actions/user-timezone'
+import { browserTimezone, timezoneOptions, FALLBACK_TIMEZONE } from '@/lib/timezones'
 
 export default function GlobalSettingsClient({ settings }: { settings: GlobalSettings }) {
   const router = useRouter()
   const [, start] = useTransition()
-
-  const browserTz = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC'
-  const initialTz = settings.timezone ?? (TIMEZONES.includes(browserTz) ? browserTz : 'UTC')
-
-  const [timezone, setTimezone] = useState(initialTz)
-
-  useEffect(() => {
-    if (!settings.timezone) start(() => setTimezonePref(initialTz).then(() => router.refresh()))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const [timezone, setTimezone] = useState(settings.timezone ?? browserTimezone() ?? FALLBACK_TIMEZONE)
 
   const onTimezone = (v: string) => {
     setTimezone(v)
     start(async () => {
-      await setTimezonePref(v)
+      await saveUserTimezone(v)
       toast.success(t('settings.global.saved'))
       router.refresh()
     })
   }
-  const gmtLabel = (tz: string): string => {
-    try {
-      const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'longOffset' }).formatToParts(
-        new Date(),
-      )
-      const off = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT'
-      return off === 'GMT' ? 'GMT+00:00' : off
-    } catch {
-      return 'GMT'
-    }
-  }
 
-  const tzOptions = (TIMEZONES.includes(timezone) ? TIMEZONES : [timezone, ...TIMEZONES]).map((z) => ({
-    value: z,
-    label: `(${gmtLabel(z)}) ${z}`,
-  }))
+  const tzOptions = useMemo(() => timezoneOptions(timezone), [timezone])
 
   return (
     <div className="rounded-xl border border-border bg-card">

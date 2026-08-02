@@ -53,6 +53,7 @@ export const users = pgTable('users', {
   firstName: text('first_name'),
   lastName: text('last_name'),
   username: text('username'),
+  timezone: text('timezone'),
   onboardingDismissedAt: timestamp('onboarding_dismissed_at', { withTimezone: true }),
   sidebarPrefs: jsonb('sidebar_prefs').$type<SidebarPrefs>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

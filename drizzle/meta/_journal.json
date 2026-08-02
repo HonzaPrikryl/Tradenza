@@ -148,6 +148,13 @@
       "when": 1785593539580,
       "tag": "0020_drop_market_candles",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785676177203,
+      "tag": "0021_user_timezone",
+      "breakpoints": true
     }
   ]
 }
