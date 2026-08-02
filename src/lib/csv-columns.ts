@@ -1,11 +1,140 @@
 export const CSV_REQUIRED_FIELDS = ['symbol', 'entryPrice', 'entryDatetime'] as const
 
+// ─── Header normalisation ─────────────────────────────────────────────────────
+//
+// Broker exports spell the same column a dozen ways: "Entry Price",
+// "entry_price", "entryPrice", "Entry Price (USD)", "Trade Time(UTC)". Matching
+// on the raw string only catches the first. Everything below compares headers
+// and candidates through the same normal form, so all of those collapse to the
+// same tokens.
+
+export type NormalizedHeader = { raw: string; tokens: string[]; norm: string; squashed: string }
+
+export function normalizeHeader(raw: string): NormalizedHeader {
+  const tokens = (raw ?? '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .replace(/[([{][^)\]}]*[)\]}]/g, ' ')
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+  return { raw, tokens, norm: tokens.join(' '), squashed: tokens.join('') }
+}
+
+function containsPhrase(haystack: string[], needle: string[]): boolean {
+  if (needle.length === 0 || needle.length > haystack.length) return false
+  for (let i = 0; i + needle.length <= haystack.length; i++) {
+    if (needle.every((tok, j) => haystack[i + j] === tok)) return true
+  }
+  return false
+}
+
+// Match tiers, strongest first. A tier is exhausted across every field before
+// the next one runs, so a precise match ("Exit Price" → exitPrice) always wins
+// over a generic one ("price" → entryPrice) no matter the column order.
+const TIERS = ['exact', 'squashed', 'phrase', 'token'] as const
+type Tier = (typeof TIERS)[number]
+
+function matches(tier: Tier, header: NormalizedHeader, candidate: NormalizedHeader): boolean {
+  switch (tier) {
+    case 'exact':
+      return header.norm === candidate.norm
+    case 'squashed':
+      return header.squashed === candidate.squashed
+    case 'phrase':
+      return candidate.tokens.length > 1 && containsPhrase(header.tokens, candidate.tokens)
+    case 'token':
+      return candidate.tokens.length === 1 && containsPhrase(header.tokens, candidate.tokens)
+  }
+}
+
+/**
+ * Assigns at most one source column to each field. Candidate order is priority;
+ * a column claimed by one field is never offered to another.
+ */
+export function resolveColumns<F extends string>(
+  headers: string[],
+  candidatesByField: Record<F, string[]>,
+): Partial<Record<F, string>> {
+  const cols = headers.map(normalizeHeader)
+  const fields = Object.entries(candidatesByField) as [F, string[]][]
+  const normCandidates = new Map(fields.map(([field, cands]) => [field, cands.map(normalizeHeader)]))
+
+  const result: Partial<Record<F, string>> = {}
+  const claimed = new Set<number>()
+
+  for (const tier of TIERS) {
+    for (const [field] of fields) {
+      if (result[field] !== undefined) continue
+      const cands = normCandidates.get(field) ?? []
+      outer: for (const cand of cands) {
+        for (let i = 0; i < cols.length; i++) {
+          if (claimed.has(i) || !matches(tier, cols[i], cand)) continue
+          result[field] = headers[i]
+          claimed.add(i)
+          break outer
+        }
+      }
+    }
+  }
+  return result
+}
+
+// ─── Trade exports ────────────────────────────────────────────────────────────
+
 export const COLUMN_CANDIDATES: Record<string, string[]> = {
-  symbol: ['symbol', 'ticker', 'instrument', 'contract', 'market'],
-  direction: ['side', 'direction', 'b/s', 'buy/sell', 'type', 'position'],
-  quantity: ['qty', 'quantity', 'size', 'filled qty', 'lots', 'volume', 'contracts'],
-  entryPrice: ['entry price', 'open price', 'avg. entry price', 'avg entry price', 'buy price', 'price'],
-  exitPrice: ['exit price', 'close price', 'avg. exit price', 'avg exit price', 'sell price'],
+  symbol: ['symbol', 'ticker', 'instrument', 'contract', 'trading pair', 'pair', 'market', 'asset', 'coin'],
+  direction: [
+    'buy/sell',
+    'order side',
+    'trade side',
+    'long/short',
+    'side',
+    'direction',
+    'b/s',
+    'type',
+    'position',
+    'trade type',
+    'order type',
+  ],
+  quantity: [
+    'filled quantity',
+    'filled qty',
+    'exec qty',
+    'position size',
+    'order quantity',
+    'qty',
+    'quantity',
+    'size',
+    'lots',
+    'volume',
+    'contracts',
+    'shares',
+    'units',
+    'amount',
+  ],
+  entryPrice: [
+    'avg. entry price',
+    'avg entry price',
+    'average entry price',
+    'entry price',
+    'open price',
+    'opening price',
+    'buy price',
+    'filled price',
+    'order price',
+    'avg price',
+    'average price',
+    'price',
+  ],
+  exitPrice: [
+    'avg. exit price',
+    'avg exit price',
+    'average exit price',
+    'exit price',
+    'close price',
+    'closing price',
+    'sell price',
+  ],
   entryDatetime: [
     'entry time',
     'open time',
@@ -13,32 +142,66 @@ export const COLUMN_CANDIDATES: Record<string, string[]> = {
     'entry date',
     'entry dt',
     'opened',
+    'entry datetime',
+    'open datetime',
+    'trade time',
+    'order time',
+    'create time',
+    'created time',
+    'transaction time',
+    'execution time',
+    'filled time',
     'date/time',
     'datetime',
-    'entry datetime',
+    'timestamp',
     'time',
     'date',
   ],
-  exitDatetime: ['exit time', 'close time', 'close date', 'exit date', 'exit dt', 'closed', 'exit datetime'],
-  fees: ['commission', 'commissions', 'comm', 'fees', 'fee', 'total fees'],
-  grossPnl: ['gross p&l', 'gross pnl'],
-  netPnl: ['net p&l', 'net pnl', 'pnl', 'p&l', 'profit', 'realized p&l', 'profit/loss', 'profitloss', 'realized pnl'],
+  exitDatetime: [
+    'exit time',
+    'close time',
+    'close date',
+    'exit date',
+    'exit dt',
+    'closed',
+    'exit datetime',
+    'close datetime',
+    'closing time',
+  ],
+  fees: [
+    'total fees',
+    'trading fee',
+    'trade fee',
+    'commission paid',
+    'fee paid',
+    'funding fee',
+    'commission',
+    'commissions',
+    'comm',
+    'fees',
+    'fee',
+  ],
+  grossPnl: ['gross p&l', 'gross pnl', 'gross p/l', 'gross profit'],
+  netPnl: [
+    'net p&l',
+    'net pnl',
+    'closed p&l',
+    'closed pnl',
+    'realized p&l',
+    'realized pnl',
+    'realized profit',
+    'net profit',
+    'profit/loss',
+    'profitloss',
+    'pnl',
+    'p&l',
+    'profit',
+  ],
   notes: ['notes', 'note', 'comment', 'comments'],
 }
 
 export function detectColumns(headers: string[]): Record<string, string> {
-  const mapping: Record<string, string> = {}
-  const norm = headers.map((h) => h.trim().toLowerCase())
-  for (const [field, candidates] of Object.entries(COLUMN_CANDIDATES)) {
-    for (const c of candidates) {
-      const idx = norm.indexOf(c)
-      if (idx !== -1 && !Object.values(mapping).includes(headers[idx])) {
-        mapping[field] = headers[idx]
-        break
-      }
-    }
-  }
-  return mapping
+  return resolveColumns(headers, COLUMN_CANDIDATES) as Record<string, string>
 }
 
 export const IMPORT_FIELDS = [
@@ -122,50 +285,70 @@ export const FILL_FIELDS = ['symbol', 'side', 'quantity', 'price', 'datetime', '
 export type FillField = (typeof FILL_FIELDS)[number]
 export const FILL_REQUIRED: FillField[] = ['symbol', 'side', 'quantity', 'price', 'datetime']
 
+const FILL_CANDIDATES: Record<FillField, string[]> = {
+  symbol: ['symbol', 'instrument', 'contract', 'ticker', 'trading pair', 'pair'],
+  side: ['buy/sell', 'order side', 'side', 'b/s', 'direction'],
+  quantity: ['qty filled', 'filled qty', 'filled quantity', 'exec qty', 'quantity', 'qty', 'amount', 'size'],
+  price: ['avg fill price', 'average fill price', 'fill price', 'filled price', 'exec price', 'avg price', 'price'],
+  datetime: [
+    'last fill time',
+    'fill time',
+    'update time',
+    'create time',
+    'transaction time',
+    'execution time',
+    'order time',
+    'trade time',
+    'date/time',
+    'datetime',
+    'timestamp',
+    'time',
+  ],
+  commission: ['trading fee', 'trade fee', 'commission', 'commissions', 'comm', 'fees', 'fee'],
+  status: ['order status', 'status'],
+}
+
+const SIDE_HINTS = ['buy/sell', 'side', 'b/s', 'order side'].map(normalizeHeader)
+const FILL_HINTS = ['qty filled', 'filled qty', 'avg fill price', 'fill price', 'filled price', 'exec qty'].map(
+  normalizeHeader,
+)
+
 export function looksLikeFills(headers: string[]): boolean {
-  const h = headers.map((x) => x.trim().toLowerCase())
-  const hasSide = h.some((x) => x.includes('buy/sell') || x === 'side' || x === 'b/s')
-  const hasFill = h.some((x) => x.includes('qty filled') || x.includes('avg fill price') || x.includes('fill price'))
-  return hasSide && hasFill
+  const cols = headers.map(normalizeHeader)
+  const has = (hints: NormalizedHeader[]) =>
+    cols.some((col) => hints.some((h) => col.norm === h.norm || containsPhrase(col.tokens, h.tokens)))
+  return has(SIDE_HINTS) && has(FILL_HINTS)
 }
 
 export function buildFillMapping(headers: string[]): Partial<Record<FillField, string>> {
-  const norm = headers.map((h) => h.trim().toLowerCase())
-  const find = (cands: string[]): string | undefined => {
-    for (const c of cands) {
-      const i = norm.findIndex((x) => x === c || x.includes(c))
-      if (i !== -1) return headers[i]
-    }
-    return undefined
-  }
-  const map: Partial<Record<FillField, string>> = {}
-  const symbol = find(['symbol', 'instrument', 'contract', 'ticker'])
-  const side = find(['buy/sell', 'side', 'b/s'])
-  const qty = find(['qty filled', 'quantity', 'qty'])
-  const price = find(['avg fill price', 'fill price', 'price'])
-  const datetime = find(['last fill time', 'fill time', 'update time', 'date/time', 'datetime', 'time', 'create time'])
-  const commission = find(['commission', 'comm', 'fee'])
-  const status = find(['status'])
-  if (symbol) map.symbol = symbol
-  if (side) map.side = side
-  if (qty) map.quantity = qty
-  if (price) map.price = price
-  if (datetime) map.datetime = datetime
-  if (commission) map.commission = commission
-  if (status) map.status = status
-  return map
+  return resolveColumns(headers, FILL_CANDIDATES)
+}
+
+const DATE_CANDIDATES: Record<'entryDate' | 'entryTime' | 'exitDate' | 'exitTime', string[]> = {
+  entryDate: [
+    'open date',
+    'entry date',
+    'entry dt',
+    'opened',
+    'entry datetime',
+    'open datetime',
+    'trade time',
+    'order time',
+    'create time',
+    'created time',
+    'transaction time',
+    'date/time',
+    'datetime',
+    'timestamp',
+  ],
+  entryTime: ['open time', 'entry time'],
+  exitDate: ['close date', 'exit date', 'exit dt', 'closed', 'exit datetime', 'close datetime'],
+  exitTime: ['close time', 'exit time'],
 }
 
 export function buildImportMapping(headers: string[]): Partial<Record<ImportField, string>> {
   const det = detectColumns(headers)
-  const norm = headers.map((h) => h.trim().toLowerCase())
-  const find = (cands: string[]): string | undefined => {
-    for (const c of cands) {
-      const i = norm.indexOf(c)
-      if (i !== -1) return headers[i]
-    }
-    return undefined
-  }
+  const dates = resolveColumns(headers, DATE_CANDIDATES)
 
   const map: Partial<Record<ImportField, string>> = {}
   if (det.symbol) map.symbol = det.symbol
@@ -178,16 +361,23 @@ export function buildImportMapping(headers: string[]): Partial<Record<ImportFiel
   if (det.netPnl) map.netPnl = det.netPnl
   if (det.notes) map.notes = det.notes
 
-  const entryDate =
-    find(['open date', 'entry date', 'entry dt', 'opened', 'date/time', 'datetime', 'entry datetime']) ||
-    det.entryDatetime
-  const entryTime = find(['open time', 'entry time'])
-  const exitDate = find(['close date', 'exit date', 'exit dt', 'closed', 'exit datetime']) || det.exitDatetime
-  const exitTime = find(['close time', 'exit time'])
+  const entryDate = dates.entryDate ?? det.entryDatetime
+  const exitDate = dates.exitDate ?? det.exitDatetime
   if (entryDate) map.entryDate = entryDate
-  if (entryTime && entryTime !== entryDate) map.entryTime = entryTime
-  if (exitDate) map.exitDate = exitDate
-  if (exitTime && exitTime !== exitDate) map.exitTime = exitTime
+  if (dates.entryTime && dates.entryTime !== entryDate) map.entryTime = dates.entryTime
+  if (exitDate && exitDate !== entryDate) map.exitDate = exitDate
+  if (dates.exitTime && dates.exitTime !== exitDate) map.exitTime = dates.exitTime
 
   return map
+}
+
+/**
+ * Fields that carry no source column after auto-mapping. Powers the funnel event
+ * that tells us which broker formats the smart mapper still fails on.
+ */
+export function unmappedRequiredFields(
+  mapping: Partial<Record<string, string>>,
+  required: readonly string[],
+): string[] {
+  return required.filter((f) => !mapping[f])
 }

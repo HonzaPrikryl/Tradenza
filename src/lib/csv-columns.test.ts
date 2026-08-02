@@ -1,5 +1,35 @@
 import { describe, it, expect } from 'vitest'
-import { detectColumns, extractTable, looksLikeFills, buildFillMapping, buildImportMapping } from './csv-columns'
+import {
+  detectColumns,
+  extractTable,
+  looksLikeFills,
+  buildFillMapping,
+  buildImportMapping,
+  normalizeHeader,
+  unmappedRequiredFields,
+  IMPORT_REQUIRED,
+} from './csv-columns'
+
+describe('normalizeHeader', () => {
+  it('strips unit and timezone suffixes', () => {
+    expect(normalizeHeader('Entry Price (USD)').norm).toBe('entry price')
+    expect(normalizeHeader('Trade Time(UTC)').norm).toBe('trade time')
+  })
+
+  it('treats separator styles as equivalent', () => {
+    const forms = ['Entry Price', 'entry_price', 'entry-price', 'ENTRY.PRICE', 'entryPrice']
+    expect(new Set(forms.map((f) => normalizeHeader(f).squashed)).size).toBe(1)
+  })
+
+  it('splits camelCase into tokens', () => {
+    expect(normalizeHeader('ProfitLoss').tokens).toEqual(['profit', 'loss'])
+  })
+
+  it('drops punctuation that varies between exports', () => {
+    expect(normalizeHeader('Net P&L').norm).toBe(normalizeHeader('net p/l').norm)
+    expect(normalizeHeader('B/S').norm).toBe('b s')
+  })
+})
 
 describe('detectColumns', () => {
   it('maps a standard broker header row to canonical fields', () => {
@@ -38,6 +68,78 @@ describe('detectColumns', () => {
   it('returns an empty mapping when nothing matches', () => {
     expect(detectColumns(['foo', 'bar'])).toEqual({})
   })
+
+  it('matches headers carrying unit or timezone suffixes', () => {
+    const m = detectColumns(['Symbol', 'Entry Price (USD)', 'Exit Price (USD)', 'Trade Time(UTC)'])
+    expect(m.entryPrice).toBe('Entry Price (USD)')
+    expect(m.exitPrice).toBe('Exit Price (USD)')
+    expect(m.entryDatetime).toBe('Trade Time(UTC)')
+  })
+
+  it('matches snake_case and camelCase headers', () => {
+    expect(detectColumns(['symbol', 'entry_price', 'exit_price', 'net_pnl'])).toMatchObject({
+      entryPrice: 'entry_price',
+      exitPrice: 'exit_price',
+      netPnl: 'net_pnl',
+    })
+    expect(detectColumns(['symbol', 'entryPrice', 'exitPrice', 'netPnl'])).toMatchObject({
+      entryPrice: 'entryPrice',
+      exitPrice: 'exitPrice',
+      netPnl: 'netPnl',
+    })
+  })
+
+  it('never lets a generic candidate steal a column an exact match owns', () => {
+    // "price" is a valid entryPrice fallback, but only once no field claims the
+    // column outright — otherwise a sell-only export maps its exit as an entry.
+    const m = detectColumns(['Ticker', 'Exit Price', 'Close Time'])
+    expect(m.exitPrice).toBe('Exit Price')
+    expect(m.entryPrice).toBeUndefined()
+  })
+
+  it('requires whole-token matches, so "comm" does not claim "Comments"', () => {
+    const m = detectColumns(['Symbol', 'Comments'])
+    expect(m.notes).toBe('Comments')
+    expect(m.fees).toBeUndefined()
+  })
+
+  it('maps a Binance-style export', () => {
+    expect(
+      detectColumns(['Pair', 'Side', 'Executed Qty', 'Filled Price', 'Realized Profit', 'Fee', 'Date(UTC)']),
+    ).toEqual({
+      symbol: 'Pair',
+      direction: 'Side',
+      quantity: 'Executed Qty',
+      entryPrice: 'Filled Price',
+      netPnl: 'Realized Profit',
+      fees: 'Fee',
+      entryDatetime: 'Date(UTC)',
+    })
+  })
+
+  it('maps a Bybit closed-P&L export', () => {
+    const m = detectColumns(['Closing Direction', 'Qty', 'Entry Price', 'Exit Price', 'Closed P&L', 'Trade Time(UTC)'])
+    expect(m).toMatchObject({
+      direction: 'Closing Direction',
+      quantity: 'Qty',
+      entryPrice: 'Entry Price',
+      exitPrice: 'Exit Price',
+      netPnl: 'Closed P&L',
+      entryDatetime: 'Trade Time(UTC)',
+    })
+  })
+})
+
+describe('unmappedRequiredFields', () => {
+  it('lists the required fields the auto-mapper could not fill', () => {
+    const m = buildImportMapping(['Instrument', 'Some Vendor Column'])
+    expect(unmappedRequiredFields(m, IMPORT_REQUIRED)).toEqual(['entryPrice', 'entryDate'])
+  })
+
+  it('returns nothing when every required field is mapped', () => {
+    const m = buildImportMapping(['Symbol', 'Entry Price', 'Entry Date'])
+    expect(unmappedRequiredFields(m, IMPORT_REQUIRED)).toEqual([])
+  })
 })
 
 describe('looksLikeFills', () => {
@@ -52,6 +154,10 @@ describe('looksLikeFills', () => {
   it('requires both a side and a fill column', () => {
     expect(looksLikeFills(['Buy/Sell', 'Quantity'])).toBe(false)
     expect(looksLikeFills(['Fill Price', 'Quantity'])).toBe(false)
+  })
+
+  it('detects fills through separator and suffix noise', () => {
+    expect(looksLikeFills(['symbol', 'order_side', 'filled_qty', 'avg_fill_price (USD)'])).toBe(true)
   })
 })
 
@@ -83,6 +189,17 @@ describe('buildFillMapping', () => {
     expect(m.symbol).toBe('Instrument')
     expect(m).not.toHaveProperty('commission')
     expect(m).not.toHaveProperty('status')
+  })
+
+  it('maps plural and suffixed fee headers', () => {
+    expect(buildFillMapping(['Symbol', 'Side', 'Qty', 'Price', 'Time', 'Fees (USD)']).commission).toBe('Fees (USD)')
+  })
+
+  it('assigns each source column to at most one field', () => {
+    const m = buildFillMapping(['Symbol', 'Side', 'Qty Filled', 'Fill Price', 'Fill Time', 'Order Status'])
+    const used = Object.values(m)
+    expect(new Set(used).size).toBe(used.length)
+    expect(m.status).toBe('Order Status')
   })
 })
 
