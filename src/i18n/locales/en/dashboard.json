@@ -116,7 +116,8 @@
       "netPnl": "Daily P/L",
       "trades": "Number of trades",
       "winRate": "Day winrate"
-    }
+    },
+    "hasNote": "Has a note"
   },
   "widgets": {
     "net-pnl": {

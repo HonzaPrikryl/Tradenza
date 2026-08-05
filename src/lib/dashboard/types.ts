@@ -173,6 +173,7 @@ export interface CalendarData {
   year: number
   month: number // 1–12
   days: CalendarDay[] // only days with trades
+  noteDays: string[]
   weeks: CalendarWeek[]
   monthNetPnl: number
   monthTrades: number

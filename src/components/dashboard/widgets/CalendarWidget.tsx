@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useEffect, useMemo, useRef, useState, useTransition } from 'react'
-import { ChevronLeft, ChevronRight, Settings2, Check, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings2, Check, Loader2, MessageSquareText } from 'lucide-react'
 import * as Popover from '@radix-ui/react-popover'
 import { getCalendarData, updateWidgetSettings } from '@/lib/actions/dashboard'
 import { cn, compactUnit, type DisplayUnit } from '@/lib/utils'
@@ -16,6 +16,7 @@ import {
 import { useDashboardData } from '../DashboardDataContext'
 import { useTheme } from '@/components/providers/ThemeProvider'
 import DayDetailDialog from './DayDetailDialog'
+import Tooltip from '@/components/ui/Tooltip'
 import { t, tList } from '@/i18n'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
 import { getUiLocale } from '@/i18n/config'
@@ -77,6 +78,7 @@ function CalendarWidget({ instance }: { instance: WidgetInstance }) {
   }, [JSON.stringify(initialStats)])
 
   const dayMap = useMemo(() => new Map(cal.days.map((d) => [d.date, d])), [cal.days])
+  const noteDays = useMemo(() => new Set(cal.noteDays ?? []), [cal.noteDays])
   const rows = useMemo(() => buildRows(cal.year, cal.month), [cal.year, cal.month])
   const todayKey = new Date().toLocaleDateString('en-CA')
   const rowsTemplate = { gridTemplateRows: `repeat(${rows.length}, minmax(0, 1fr))` }
@@ -146,6 +148,7 @@ function CalendarWidget({ instance }: { instance: WidgetInstance }) {
         currency={currency}
         unit={unit}
         isToday={key === todayKey}
+        hasNote={cell.inMonth && noteDays.has(key)}
         isLight={isLight}
         onClick={cell.inMonth ? () => handleDayClick(key, d) : undefined}
       />
@@ -366,6 +369,7 @@ function DayCell({
   currency,
   unit,
   isToday,
+  hasNote,
   isLight,
   onClick,
 }: {
@@ -375,6 +379,7 @@ function DayCell({
   currency: string
   unit: DisplayUnit
   isToday: boolean
+  hasNote: boolean
   isLight: boolean
   onClick?: () => void
 }) {
@@ -416,6 +421,17 @@ function DayCell({
           : undefined
       }
     >
+      {hasNote && (
+        <Tooltip label={t('dashboard.calendar.hasNote')}>
+          <span
+            role="img"
+            aria-label={t('dashboard.calendar.hasNote')}
+            className="absolute left-3.5 top-3.5 inline-flex text-foreground/45"
+          >
+            <MessageSquareText className="h-5 w-5" aria-hidden="true" />
+          </span>
+        </Tooltip>
+      )}
       <span
         className={cn(
           'self-end leading-none',
