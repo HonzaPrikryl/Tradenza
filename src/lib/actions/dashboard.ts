@@ -1,7 +1,7 @@
 'use server'
 
-import { db, trades, dashboardTemplates } from '@/lib/db'
-import { eq, and, asc } from 'drizzle-orm'
+import { db, trades, dashboardTemplates, dailyCheckins } from '@/lib/db'
+import { eq, and, asc, like, sql, type AnyColumn, type SQL } from 'drizzle-orm'
 import { calcProfitFactor, calcWinRate } from '@/lib/utils'
 import { readGlobalFilters } from '@/lib/global-filters'
 import { readGlobalSettings } from '@/lib/global-settings'
@@ -28,6 +28,18 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { uuid, dateKey, year as yearSchema, month as monthSchema } from '@/lib/validation'
 import { authedAction, mutationAction } from '@/lib/safe-action'
+
+/**
+ * Whether a rich-text column actually says something.
+ *
+ * The editors save `null` for an empty note, but a note emptied in an older
+ * build can be left as `<p></p>` — markup with no words. Stripping the tags in
+ * SQL keeps the check on the server, so a month of note HTML (which may embed
+ * images) never crosses the wire just to answer "is there a note?".
+ */
+function hasProse(column: AnyColumn): SQL<boolean> {
+  return sql<boolean>`(${column} is not null and btrim(regexp_replace(regexp_replace(${column}, '<[^>]*>', '', 'g'), '&nbsp;', ' ', 'g')) <> '')`
+}
 
 async function globalConditions() {
   const gf = await readGlobalFilters()
@@ -71,22 +83,37 @@ export const getCalendarData = authedAction(
     const { timezone, breakeven } = await readGlobalSettings()
     const unit = (await readGlobalFilters()).unit
 
-    const rows = (await userHasTrades(userId))
-      ? await db.query.trades.findMany({
-          where: and(eq(trades.userId, userId), eq(trades.status, 'closed'), ...(await globalConditions())),
-          columns: {
-            netPnl: true,
-            entryDatetime: true,
-            riskAmount: true,
-            symbol: true,
-            entryPrice: true,
-            entryQuantity: true,
-            extra: true,
-          },
-        })
-      : getDemoTrades()
-
     const prefix = `${year}-${String(month).padStart(2, '0')}`
+
+    const [rows, noteCheckins] = (await userHasTrades(userId))
+      ? await Promise.all([
+          db.query.trades.findMany({
+            where: and(eq(trades.userId, userId), eq(trades.status, 'closed'), ...(await globalConditions())),
+            columns: {
+              netPnl: true,
+              entryDatetime: true,
+              riskAmount: true,
+              symbol: true,
+              entryPrice: true,
+              entryQuantity: true,
+              extra: true,
+            },
+            extras: { hasNote: hasProse(trades.notes).as('has_note') },
+          }),
+          db
+            .select({ date: dailyCheckins.date })
+            .from(dailyCheckins)
+            .where(
+              and(
+                eq(dailyCheckins.userId, userId),
+                like(dailyCheckins.date, `${prefix}-%`),
+                hasProse(dailyCheckins.note),
+              ),
+            ),
+        ])
+      : [getDemoTrades().map((t) => ({ ...t, hasNote: false })), []]
+
+    const noteDays = new Set<string>(noteCheckins.map((c) => c.date))
     const byDay = new Map<
       string,
       { pnl: number; measure: number; trades: number; wins: number; losses: number; rMultiple: number }
@@ -94,6 +121,7 @@ export const getCalendarData = authedAction(
     for (const r of rows) {
       const key = dayKeyInTz(r.entryDatetime, timezone)
       if (!key.startsWith(prefix)) continue
+      if (r.hasNote) noteDays.add(key)
       const pnl = Number(r.netPnl ?? 0)
       const risk = Number(r.riskAmount ?? 0)
       if (unit === 'r' && !(risk > 0)) continue
@@ -160,6 +188,7 @@ export const getCalendarData = authedAction(
       month,
       days,
       weeks,
+      noteDays: [...noteDays].sort(),
       monthNetPnl: days.reduce((a, d) => a + d.netPnl, 0),
       monthTrades: days.reduce((a, d) => a + d.trades, 0),
       monthTradingDays: days.length,
@@ -252,24 +281,26 @@ function rowToDTO(r: {
   return { id: r.id, name: r.name, isDefault: r.isDefault, isPreset: r.isPreset, layout: r.layout as DashboardLayout }
 }
 
-export const listTemplates = authedAction([], async ({ userId }): Promise<DashboardTemplateDTO[]> => {
-  const rows = await db.query.dashboardTemplates.findMany({
-    where: eq(dashboardTemplates.userId, userId),
-    orderBy: [asc(dashboardTemplates.sortOrder), asc(dashboardTemplates.createdAt)],
-  })
-  return rows.map(rowToDTO)
-})
-
-export const getActiveLayout = authedAction(
+/**
+ * The user's templates and which one is active, from one read.
+ *
+ * These used to be two actions, and the dashboard called both side by side —
+ * the same `where`, the same `order by`, twice. Every query on the neon-http
+ * driver is its own connection attempt, so a duplicate read is not just wasted
+ * work but another slot in a burst Neon will eventually refuse.
+ */
+export const getDashboardTemplates = authedAction(
   [],
-  async ({ userId }): Promise<{ template: DashboardTemplateDTO | null; layout: DashboardLayout }> => {
+  async ({
+    userId,
+  }): Promise<{ templates: DashboardTemplateDTO[]; active: DashboardTemplateDTO | null; layout: DashboardLayout }> => {
     const rows = await db.query.dashboardTemplates.findMany({
       where: eq(dashboardTemplates.userId, userId),
       orderBy: [asc(dashboardTemplates.sortOrder), asc(dashboardTemplates.createdAt)],
     })
-    if (rows.length === 0) return { template: null, layout: DEFAULT_LAYOUT }
+    if (rows.length === 0) return { templates: [], active: null, layout: DEFAULT_LAYOUT }
     const active = rows.find((r) => r.isDefault) ?? rows[0]
-    return { template: rowToDTO(active), layout: active.layout as DashboardLayout }
+    return { templates: rows.map(rowToDTO), active: rowToDTO(active), layout: active.layout as DashboardLayout }
   },
 )
 

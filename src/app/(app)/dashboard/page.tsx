@@ -1,9 +1,5 @@
-import { getDashboardWidgetData, getActiveLayout, getCalendarData, listTemplates } from '@/lib/actions/dashboard'
-import { hasAnyTrades } from '@/lib/actions/trades'
-import { getTagGroups } from '@/lib/actions/tags'
-import { getRules } from '@/lib/actions/progress'
-import { getStrategies } from '@/lib/actions/strategies'
-import { isOnboardingDismissed } from '@/lib/onboarding'
+import { getDashboardWidgetData, getDashboardTemplates, getCalendarData } from '@/lib/actions/dashboard'
+import { getOnboardingStatus } from '@/lib/onboarding'
 import { readGlobalFilters } from '@/lib/global-filters'
 import DashboardClient from '@/components/dashboard/DashboardClient'
 import DemoNotice from '@/components/onboarding/DemoNotice'
@@ -16,44 +12,39 @@ export const metadata: Metadata = { title: t('meta.dashboard') }
 
 export default async function DashboardPage() {
   const now = new Date()
-  const [data, active, templates, filters, hasTrades, tagGroups, rules, strategies, dismissed] = await Promise.all([
+  const [data, dashboards, filters, onboarding] = await Promise.all([
     getDashboardWidgetData(),
-    getActiveLayout(),
-    listTemplates(),
+    getDashboardTemplates(),
     readGlobalFilters(),
-    hasAnyTrades(),
-    getTagGroups(),
-    getRules(),
-    getStrategies(),
-    isOnboardingDismissed(),
+    getOnboardingStatus(),
   ])
   const calendarInitial = await getCalendarData(now.getFullYear(), now.getMonth() + 1)
 
   const steps: OnboardingStep[] = [
-    { key: 'trade', done: hasTrades },
-    { key: 'strategy', done: strategies.length > 0 },
-    { key: 'tags', done: tagGroups.some((g) => g.values.length > 0) },
-    { key: 'discipline', done: rules.length > 0 },
+    { key: 'trade', done: onboarding.hasTrades },
+    { key: 'strategy', done: onboarding.hasStrategy },
+    { key: 'tags', done: onboarding.hasTag },
+    { key: 'discipline', done: onboarding.hasRule },
   ]
   const allDone = steps.every((s) => s.done)
-  const showChecklist = !dismissed && !allDone
+  const showChecklist = !onboarding.dismissed && !allDone
 
   return (
     <div className="p-5 w-full animate-in">
       <OnboardingCompleteTracker allDone={allDone} />
       {showChecklist ? (
-        <GettingStarted steps={steps} isDemo={!hasTrades} />
+        <GettingStarted steps={steps} isDemo={!onboarding.hasTrades} />
       ) : (
-        !hasTrades && <DemoNotice context="dashboard" />
+        !onboarding.hasTrades && <DemoNotice context="dashboard" />
       )}
       <DashboardClient
         data={data}
         calendarInitial={calendarInitial}
         currency="USD"
         unit={filters.unit}
-        layout={active.layout}
-        activeTemplate={active.template}
-        templates={templates}
+        layout={dashboards.layout}
+        activeTemplate={dashboards.active}
+        templates={dashboards.templates}
       />
     </div>
   )
