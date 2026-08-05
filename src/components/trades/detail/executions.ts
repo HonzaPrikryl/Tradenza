@@ -71,6 +71,28 @@ export function normalizeExecutions(trade: Trade): NormalizedExecution[] {
   return out
 }
 
+export interface PositionState {
+  entrySide: 'buy' | 'sell'
+  openQty: number
+}
+
+/**
+ * Net position implied by a set of executions, using the same rule the server
+ * applies when it derives a trade's status: the earliest execution opens the
+ * position and everything on the opposite side closes it. Executions without a
+ * usable time or a positive quantity are ignored, so a half-filled draft row
+ * never distorts the result.
+ */
+export function positionState(
+  execs: readonly { time: number; side: 'buy' | 'sell'; quantity: number }[],
+): PositionState {
+  const usable = execs.filter((e) => Number.isFinite(e.time) && e.quantity > 0).sort((a, b) => a.time - b.time)
+  if (usable.length === 0) return { entrySide: 'buy', openQty: 0 }
+  const entrySide = usable[0].side
+  const signed = usable.reduce((s, e) => s + (e.side === entrySide ? e.quantity : -e.quantity), 0)
+  return { entrySide, openQty: signed }
+}
+
 export function storedMultiplier(trade: Trade): number | undefined {
   const extra = trade.extra as { contractMultiplier?: unknown } | null
   const m = toNum(extra?.contractMultiplier)

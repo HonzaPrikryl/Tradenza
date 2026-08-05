@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeExecutions, storedMultiplier, storedRiskPlan } from './executions'
+import { normalizeExecutions, positionState, storedMultiplier, storedRiskPlan } from './executions'
 import type { Trade } from '@/lib/db'
 
 // Helper: build a Trade-shaped object. Numeric DB columns arrive as strings
@@ -101,5 +101,39 @@ describe('storedRiskPlan', () => {
   it('returns undefined when no risk plan is stored', () => {
     expect(storedRiskPlan(trade({ extra: {} }))).toBeUndefined()
     expect(storedRiskPlan(trade({ extra: null }))).toBeUndefined()
+  })
+})
+
+describe('positionState', () => {
+  const ex = (time: number, side: 'buy' | 'sell', quantity: number) => ({ time, side, quantity })
+
+  it('reports the full entry as open when nothing has closed it', () => {
+    expect(positionState([ex(100, 'buy', 3)])).toEqual({ entrySide: 'buy', openQty: 3 })
+  })
+
+  it('treats the earliest execution as the opening side, not the first listed', () => {
+    expect(positionState([ex(200, 'buy', 2), ex(100, 'sell', 2)]).entrySide).toBe('sell')
+  })
+
+  it('nets partial exits down to the remaining quantity', () => {
+    const out = positionState([ex(100, 'buy', 5), ex(200, 'sell', 2)])
+    expect(out.openQty).toBe(3)
+  })
+
+  it('reaches zero once the position is fully closed', () => {
+    expect(positionState([ex(100, 'buy', 4), ex(200, 'sell', 1), ex(300, 'sell', 3)]).openQty).toBe(0)
+  })
+
+  it('goes negative when the trade is reversed past flat', () => {
+    expect(positionState([ex(100, 'buy', 1), ex(200, 'sell', 3)]).openQty).toBe(-2)
+  })
+
+  it('ignores half-filled rows so a draft does not distort the badge', () => {
+    const out = positionState([ex(100, 'buy', 2), ex(NaN, 'sell', 2), ex(300, 'sell', 0)])
+    expect(out).toEqual({ entrySide: 'buy', openQty: 2 })
+  })
+
+  it('is flat for an empty list', () => {
+    expect(positionState([]).openQty).toBe(0)
   })
 })

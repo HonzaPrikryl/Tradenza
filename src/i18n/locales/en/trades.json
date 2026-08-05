@@ -183,6 +183,13 @@
       "fee": "Fee",
       "buy": "Buy",
       "sell": "Sell",
+      "add": "Add execution",
+      "newTitle": "New execution",
+      "position": "Position",
+      "openQty": "Open {qty} qty",
+      "flat": "Flat",
+      "willClose": "Saving this closes the trade.",
+      "willRemain": "{qty} qty will stay open after saving.",
       "deleteSelected": "Delete selected ({count})",
       "edit": "Edit",
       "save": "Save",
@@ -200,5 +207,60 @@
   "tagSelector": {
     "createFailed": "Could not create tag",
     "createGroupFailed": "Could not create category"
+  },
+  "backup": {
+    "exported": "Exported {count} trades",
+    "importCta": "Import",
+    "importTitle": "Import a Tradenza file",
+    "importHelp": "Choose a .json file exported from Tradenza. The trades arrive exactly as they left, including notes, risk plan, R:R, tags, strategy and images.",
+    "importConfirm": "Import",
+    "importFailed": "The file could not be imported",
+    "imported": "Imported {count} trades",
+    "allDuplicates": "Every trade in this file is already in that account",
+    "file": "Tradenza file (.json)",
+    "targetAccount": "Import into",
+    "duplicateNote": "Trades already in the chosen account are skipped, so importing the same file twice adds nothing.",
+    "running": "Importing…",
+    "tooLarge": "That file is too large (max 25 MB).",
+    "summary": {
+      "trades": "{count} trades",
+      "strategies": "{count} strategies",
+      "tags": "{count} tags",
+      "images": "{count} images"
+    },
+    "error": {
+      "notJson": "That file is not valid JSON.",
+      "notBundle": "That is not a Tradenza file. Create one with Export → Another Tradenza account.",
+      "newerVersion": "This file was written by a newer version of Tradenza. Update first, then import.",
+      "invalid": "This file is damaged or incomplete and cannot be imported.",
+      "unreadable": "That file could not be read."
+    }
+  },
+  "export": {
+    "cta": "Export",
+    "title": "Export {count} trades",
+    "subtitle": "Where are these trades going?",
+    "badge": "Nothing lost",
+    "bundle": {
+      "title": "Another Tradenza account",
+      "format": ".json",
+      "desc": "Moves trades between your accounts, with nothing left behind — notes, risk plan, R:R, tags, strategy and images all travel with them. Bring the file back in with Import."
+    },
+    "csv": {
+      "title": "A spreadsheet or another app",
+      "format": ".csv",
+      "desc": "One row per trade for Excel, Google Sheets or your own analysis. Tradenza can read it back too, but only what fits in columns — individual fills, the risk plan and images cannot."
+    }
+  },
+  "importResult": {
+    "imported": "{count} trades imported",
+    "none": "Nothing was imported",
+    "allDuplicates": "Already imported",
+    "detail": "{total} processed · {imported} imported · {skipped} skipped",
+    "duplicatesNote": "{count} match trades already in this account and were skipped. Import the same file twice and nothing is added.",
+    "showErrors": "Show {count} issues",
+    "importAnother": "Import another file",
+    "viewTrades": "View trades",
+    "imagesSkipped": "{count} images could not be copied and still point at their original location."
   }
 }

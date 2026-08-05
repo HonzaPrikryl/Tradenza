@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
-import { Pencil, Check, X, Trash2 } from 'lucide-react'
+import { Pencil, Check, X, Trash2, Plus } from 'lucide-react'
 import { cn, formatCurrency, formatDateTime } from '@/lib/utils'
 import { t, tRich } from '@/i18n'
 import { useConfirm } from '@/components/providers/ConfirmProvider'
@@ -13,7 +13,7 @@ import { useSelection } from '@/hooks/useSelection'
 import { updateTradeExecutions } from '@/lib/actions/trades'
 import { editorDefaultMultiplier } from '@/lib/futures'
 import DateTimeField from '@/components/ui/DateTimeField'
-import { storedMultiplier, type NormalizedExecution } from './executions'
+import { positionState, storedMultiplier, type NormalizedExecution } from './executions'
 import type { Trade } from '@/lib/db'
 
 const num = (s: string) => {
@@ -21,10 +21,9 @@ const num = (s: string) => {
   return isNaN(n) ? 0 : n
 }
 const pad = (n: number) => String(n).padStart(2, '0')
-const toLocalInput = (sec: number) => {
-  const d = new Date(sec * 1000)
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
+const toLocalInput = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+const fromUnix = (sec: number) => toLocalInput(new Date(sec * 1000))
 
 interface Row {
   id: string
@@ -43,6 +42,9 @@ const cellCls =
   'w-full rounded-md border border-border bg-input/40 px-2 py-1.5 text-sm tabular focus:border-primary focus:outline-none'
 const miniLabel = 'mb-0.5 block text-[10px] uppercase tracking-wide text-muted-foreground'
 
+const positionOf = (rows: Row[]) =>
+  positionState(rows.map((r) => ({ time: new Date(r.datetime).getTime(), side: r.side, quantity: num(r.qty) })))
+
 export default function ExecutionsEditor({ trade, executions }: { trade: Trade; executions: NormalizedExecution[] }) {
   const router = useRouter()
   const confirm = useConfirm()
@@ -50,7 +52,7 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
   const [rows, setRows] = useState<Row[]>(() =>
     executions.map((e) => ({
       id: mkId(),
-      datetime: toLocalInput(e.time),
+      datetime: fromUnix(e.time),
       side: e.side,
       qty: String(e.quantity),
       price: String(e.price),
@@ -62,18 +64,46 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
   const [multiplier, setMultiplier] = useState<string>(initMult ? String(initMult) : '')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Row | null>(null)
+  const [isNew, setIsNew] = useState(false)
   const sel = useSelection()
   const [saving, setSaving] = useState(false)
 
+  const { entrySide, openQty } = useMemo(() => positionOf(rows), [rows])
+  const isOpen = openQty > 0
+
+  const projectedOpenQty = useMemo(() => {
+    if (!draft) return openQty
+    const next = isNew ? [...rows, draft] : rows.map((r) => (r.id === draft.id ? draft : r))
+    return positionOf(next).openQty
+  }, [draft, isNew, rows, openQty])
+
   const startEdit = (r: Row) => {
+    setIsNew(false)
     setEditingId(r.id)
     setDraft({ ...r })
   }
   const cancelEdit = () => {
     setEditingId(null)
     setDraft(null)
+    setIsNew(false)
   }
   const patch = (p: Partial<Row>) => setDraft((d) => (d ? { ...d, ...p } : d))
+
+  const addRow = () => {
+    const closingSide: 'buy' | 'sell' = entrySide === 'buy' ? 'sell' : 'buy'
+    setIsNew(true)
+    const id = mkId()
+    setEditingId(id)
+    setDraft({
+      id,
+      datetime: toLocalInput(new Date()),
+      side: isOpen ? closingSide : entrySide,
+      qty: isOpen ? String(openQty) : '',
+      price: '',
+      comm: '',
+      fee: '',
+    })
+  }
 
   const toggleSel = (id: string) => sel.toggle(id)
   const rowIds = rows.map((r) => r.id)
@@ -109,11 +139,13 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
 
   const saveRow = async () => {
     if (!draft) return
-    if (!draft.datetime || num(draft.qty) <= 0 || num(draft.price) <= 0) {
+    if (!draft.datetime || isNaN(new Date(draft.datetime).getTime()) || num(draft.qty) <= 0 || num(draft.price) <= 0) {
       toast.error(t('trades.detail.exec.invalid'))
       return
     }
-    const next = rows.map((r) => (r.id === draft.id ? draft : r))
+    const next = isNew
+      ? [...rows, draft].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())
+      : rows.map((r) => (r.id === draft.id ? draft : r))
     if (await persist(next)) cancelEdit()
   }
 
@@ -151,27 +183,160 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
 
   const grossPnl = trade.grossPnl !== null ? Number(trade.grossPnl) : null
 
+  const editorForm = (onDelete?: () => void) => {
+    if (!draft) return null
+    return (
+      <div className="rounded-md border border-primary/50 px-2.5 py-2.5 space-y-2">
+        {isNew && (
+          <p className="text-[11px] font-medium uppercase tracking-wide text-primary">
+            {t('trades.detail.exec.newTitle')}
+          </p>
+        )}
+        <div>
+          <label className={miniLabel}>{t('trades.detail.exec.time')}</label>
+          <DateTimeField value={draft.datetime} onChange={(v) => patch({ datetime: v })} />
+        </div>
+        <div>
+          <label className={miniLabel}>{t('trades.detail.exec.side')}</label>
+          <div className="inline-flex rounded-md bg-muted/50 p-0.5">
+            {(['buy', 'sell'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => patch({ side: s })}
+                className={cn(
+                  'rounded px-3 py-1 text-xs font-medium transition-colors',
+                  draft.side === s
+                    ? s === 'buy'
+                      ? 'bg-profit/20 text-profit'
+                      : 'bg-loss/20 text-loss'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {t(`trades.detail.exec.${s}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className={miniLabel}>{t('trades.detail.exec.qty')}</label>
+            <input
+              autoFocus={isNew}
+              inputMode="decimal"
+              value={draft.qty}
+              onChange={(e) => patch({ qty: e.target.value })}
+              className={cellCls}
+            />
+          </div>
+          <div>
+            <label className={miniLabel}>{t('trades.detail.exec.multiplier')}</label>
+            <input
+              inputMode="decimal"
+              value={multiplier}
+              onChange={(e) => setMultiplier(e.target.value)}
+              className={cellCls}
+            />
+          </div>
+          <div>
+            <label className={miniLabel}>{t('trades.detail.exec.price')}</label>
+            <input
+              inputMode="decimal"
+              value={draft.price}
+              onChange={(e) => patch({ price: e.target.value })}
+              className={cellCls}
+            />
+          </div>
+          <div>
+            <label className={miniLabel}>{t('trades.detail.exec.commission')}</label>
+            <input
+              inputMode="decimal"
+              value={draft.comm}
+              onChange={(e) => patch({ comm: e.target.value })}
+              className={cellCls}
+            />
+          </div>
+          <div>
+            <label className={miniLabel}>{t('trades.detail.exec.fee')}</label>
+            <input
+              inputMode="decimal"
+              value={draft.fee}
+              onChange={(e) => patch({ fee: e.target.value })}
+              className={cellCls}
+            />
+          </div>
+        </div>
+
+        <p className="text-[11px] text-muted-foreground">
+          {projectedOpenQty <= 0
+            ? t('trades.detail.exec.willClose')
+            : t('trades.detail.exec.willRemain', { qty: projectedOpenQty })}
+        </p>
+
+        <div className="flex items-center justify-end gap-1 pt-0.5">
+          {onDelete && (
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={saving}
+              aria-label={t('trades.detail.exec.delete')}
+              className="mr-auto rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-loss/10 hover:text-loss disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={cancelEdit}
+            aria-label={t('trades.detail.exec.cancel')}
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={saveRow}
+            disabled={saving}
+            aria-label={t('trades.detail.exec.save')}
+            className="rounded-md bg-primary p-1.5 text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          >
+            <Check className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-4">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wide">{t('trades.detail.exec.title')}</span>
-        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-primary" />
-          {t('common.all')}
-        </label>
+        {rows.length > 0 && (
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input type="checkbox" checked={allChecked} onChange={toggleAll} className="accent-primary" />
+            {t('common.all')}
+          </label>
+        )}
       </div>
 
-      {/* Gross P&L summary */}
-      <div className="mb-3 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2">
-        <span className="text-xs text-muted-foreground">{t('trades.detail.grossPnl')}</span>
-        <span
-          className={cn(
-            'text-sm font-semibold tabular',
-            grossPnl === null ? 'text-muted-foreground' : grossPnl >= 0 ? 'text-profit' : 'text-loss',
-          )}
-        >
-          {grossPnl !== null ? formatCurrency(grossPnl) : '—'}
-        </span>
+      <div className="mb-3 space-y-1.5 rounded-md bg-muted/40 px-3 py-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{t('trades.detail.exec.position')}</span>
+          <span className={cn('text-xs font-medium', isOpen ? 'text-primary' : 'text-muted-foreground')}>
+            {isOpen ? t('trades.detail.exec.openQty', { qty: openQty }) : t('trades.detail.exec.flat')}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{t('trades.detail.grossPnl')}</span>
+          <span
+            className={cn(
+              'text-sm font-semibold tabular',
+              grossPnl === null ? 'text-muted-foreground' : grossPnl >= 0 ? 'text-profit' : 'text-loss',
+            )}
+          >
+            {grossPnl !== null ? formatCurrency(grossPnl) : '—'}
+          </span>
+        </div>
       </div>
 
       {sel.size > 0 && (
@@ -187,112 +352,8 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
 
       <div className="space-y-2">
         {rows.map((r) => {
-          if (editingId === r.id && draft) {
-            return (
-              <div key={r.id} className="rounded-md border border-primary/50 px-2.5 py-2.5 space-y-2">
-                <div>
-                  <label className={miniLabel}>{t('trades.detail.exec.time')}</label>
-                  <DateTimeField value={draft.datetime} onChange={(v) => patch({ datetime: v })} />
-                </div>
-                <div>
-                  <label className={miniLabel}>{t('trades.detail.exec.side')}</label>
-                  <div className="inline-flex rounded-md bg-muted/50 p-0.5">
-                    {(['buy', 'sell'] as const).map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => patch({ side: s })}
-                        className={cn(
-                          'rounded px-3 py-1 text-xs font-medium transition-colors',
-                          draft.side === s
-                            ? s === 'buy'
-                              ? 'bg-profit/20 text-profit'
-                              : 'bg-loss/20 text-loss'
-                            : 'text-muted-foreground hover:text-foreground',
-                        )}
-                      >
-                        {t(`trades.detail.exec.${s}`)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className={miniLabel}>{t('trades.detail.exec.qty')}</label>
-                    <input
-                      inputMode="decimal"
-                      value={draft.qty}
-                      onChange={(e) => patch({ qty: e.target.value })}
-                      className={cellCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={miniLabel}>{t('trades.detail.exec.multiplier')}</label>
-                    <input
-                      inputMode="decimal"
-                      value={multiplier}
-                      onChange={(e) => setMultiplier(e.target.value)}
-                      className={cellCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={miniLabel}>{t('trades.detail.exec.price')}</label>
-                    <input
-                      inputMode="decimal"
-                      value={draft.price}
-                      onChange={(e) => patch({ price: e.target.value })}
-                      className={cellCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={miniLabel}>{t('trades.detail.exec.commission')}</label>
-                    <input
-                      inputMode="decimal"
-                      value={draft.comm}
-                      onChange={(e) => patch({ comm: e.target.value })}
-                      className={cellCls}
-                    />
-                  </div>
-                  <div>
-                    <label className={miniLabel}>{t('trades.detail.exec.fee')}</label>
-                    <input
-                      inputMode="decimal"
-                      value={draft.fee}
-                      onChange={(e) => patch({ fee: e.target.value })}
-                      className={cellCls}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-end gap-1 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => deleteRow(r)}
-                    disabled={saving}
-                    aria-label={t('trades.detail.exec.delete')}
-                    className="mr-auto rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-loss/10 hover:text-loss disabled:opacity-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={cancelEdit}
-                    aria-label={t('trades.detail.exec.cancel')}
-                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={saveRow}
-                    disabled={saving}
-                    aria-label={t('trades.detail.exec.save')}
-                    className="rounded-md bg-primary p-1.5 text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    <Check className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            )
+          if (editingId === r.id && draft && !isNew) {
+            return <div key={r.id}>{editorForm(() => deleteRow(r))}</div>
           }
           return (
             <div
@@ -336,10 +397,25 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
             </div>
           )
         })}
-        {rows.length === 0 && (
+
+        {isNew && draft && editorForm()}
+
+        {rows.length === 0 && !isNew && (
           <p className="py-6 text-center text-sm text-muted-foreground">{t('trades.detail.exec.empty')}</p>
         )}
       </div>
+
+      {!isNew && (
+        <button
+          type="button"
+          onClick={addRow}
+          disabled={saving}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border px-3 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary disabled:opacity-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          {t('trades.detail.exec.add')}
+        </button>
+      )}
     </div>
   )
 }
