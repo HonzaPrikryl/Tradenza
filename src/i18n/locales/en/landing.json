@@ -72,7 +72,7 @@
     },
     "trade": {
       "title": "Review every trade like a pro",
-      "desc": "Open a trade on a full price chart with your executions marked, watch the running P&L build, rate your execution and journal the setup, emotions, mistakes and lessons — then arrange the sidebar panels and stats exactly how you like.",
+      "desc": "Open a trade on a full price chart with your executions marked, watch the running P&L build, rate your execution and journal the setup — then arrange the sidebar panels and stats exactly how you like.",
       "points": [
         "Chart with entries, exits and running P&L — futures, stocks, forex and crypto",
         "Multi-execution and multi-leg support",
@@ -102,7 +102,7 @@
     },
     "step2": {
       "title": "Review & journal",
-      "desc": "Open each trade on the chart, grade your execution, and capture the setup, emotions and lessons while they're fresh."
+      "desc": "Open each trade on the chart, grade your execution, and write up the setup and what you learned while it's fresh."
     },
     "step3": {
       "title": "Close the day",

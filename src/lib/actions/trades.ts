@@ -3,10 +3,9 @@
 import { db, trades, tags, tradeTags, accounts, strategies } from '@/lib/db'
 import { eq, and, or, desc, asc, gte, lte, ilike, inArray, count, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
-import { tradeFormSchema, type TradeFilters } from '@/types'
-import { calculatePnl, calculateRR } from '@/lib/utils'
-import { derivePnl, roundMoney } from '@/lib/trade-pnl'
-import { assetMultiplier } from '@/lib/futures'
+import type { TradeFilters } from '@/types'
+import { calculatePnl } from '@/lib/utils'
+import { roundMoney } from '@/lib/trade-pnl'
 import { readGlobalFilters } from '@/lib/global-filters'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { generalConditions } from './filter-sql'
@@ -22,147 +21,6 @@ import { sanitizeRichTextValue } from '@/lib/rich-text'
 import { cleanupOrphanedImages, tradeImageKeys } from '@/lib/orphan-images'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-type TradeFormInput = z.infer<typeof tradeFormSchema>
-
-// Maps validated form input to the trade columns shared by create and update,
-// including the derived gross/net P&L and planned R-multiple. Centralised so the
-// two write paths cannot drift: how a trade is persisted lives in one place.
-function buildTradeColumns(v: TradeFormInput, prevExtra?: Record<string, unknown> | null) {
-  // Value multiplier per asset class. assetClass is the user's explicit signal —
-  // it avoids misclassifying a stock whose ticker collides with a futures root.
-  // Forex used to be special-cased here while CSV import kept ×1, so the same
-  // EURUSD trade was worth 100,000× more depending on how it entered the app.
-  const multiplier = assetMultiplier(v.assetClass, v.symbol)
-
-  let grossPnl: string | null = null
-  let netPnl: string | null = null
-  if (v.exitPrice && v.exitQuantity) {
-    const pnl = derivePnl({
-      direction: v.direction,
-      entryPrice: v.entryPrice,
-      exitPrice: Number(v.exitPrice),
-      quantity: v.entryQuantity,
-      fees: v.fees,
-      multiplier,
-    })
-    grossPnl = pnl.grossPnl.toString()
-    netPnl = pnl.netPnl.toString()
-  }
-
-  let riskRewardRatio: string | null = null
-  if (v.stopLoss && v.takeProfit) {
-    riskRewardRatio =
-      calculateRR(v.direction, v.entryPrice, Number(v.stopLoss), Number(v.takeProfit))?.toString() ?? null
-  }
-
-  // Persist the multiplier (only when it differs from 1, i.e. futures/options) so
-  // every downstream consumer — the sidebar, notional-based P&L%, R-multiple and
-  // the SQL breakeven filter, which all read `extra.contractMultiplier` — values
-  // the trade exactly as the P&L above was computed. Merged with any existing
-  // extra so riskPlan / executions survive an edit; a class change back to a ×1
-  // market drops the stale key.
-  const mergedExtra: Record<string, unknown> = {
-    ...(prevExtra ?? {}),
-    contractMultiplier: multiplier !== 1 ? multiplier : undefined,
-  }
-  const extra = Object.values(mergedExtra).some((x) => x !== undefined) ? mergedExtra : null
-
-  return {
-    symbol: v.symbol,
-    direction: v.direction,
-    status: v.status,
-    assetClass: v.assetClass,
-    entryPrice: v.entryPrice.toString(),
-    entryQuantity: v.entryQuantity.toString(),
-    entryDatetime: new Date(v.entryDatetime),
-    exitPrice: v.exitPrice ? v.exitPrice.toString() : null,
-    exitQuantity: v.exitQuantity ? v.exitQuantity.toString() : null,
-    exitDatetime: v.exitDatetime ? new Date(v.exitDatetime) : null,
-    fees: v.fees.toString(),
-    grossPnl,
-    netPnl,
-    stopLoss: v.stopLoss ? v.stopLoss.toString() : null,
-    takeProfit: v.takeProfit ? v.takeProfit.toString() : null,
-    riskRewardRatio,
-    riskAmount: v.riskAmount ? v.riskAmount.toString() : null,
-    notes: v.notes || null,
-    rating: v.rating ? Number(v.rating) : null,
-    emotionBefore: v.emotionBefore || null,
-    emotionAfter: v.emotionAfter || null,
-    mistakes: v.mistakes || null,
-    lessons: v.lessons || null,
-    extra,
-  }
-}
-
-async function assignTags(tradeId: string, userId: string, tagIds: string[]) {
-  await db.delete(tradeTags).where(eq(tradeTags.tradeId, tradeId))
-  if (tagIds.length === 0) return
-  const owned = await db
-    .select({ id: tags.id })
-    .from(tags)
-    .where(and(eq(tags.userId, userId), inArray(tags.id, tagIds)))
-  const ownedIds = owned.map((t) => t.id)
-  if (ownedIds.length > 0) {
-    await db.insert(tradeTags).values(ownedIds.map((tagId) => ({ tradeId, tagId })))
-  }
-}
-
-// ─── Create trade ─────────────────────────────────────────────────────────────
-
-export const createTrade = mutationAction(
-  [tradeFormSchema, uuidArray.default([]), uuid.nullable().default(null)],
-  async ({ userId }, validated, tagIds, accountId) => {
-    const [trade] = await db
-      .insert(trades)
-      .values({
-        userId,
-        accountId: accountId || null,
-        ...buildTradeColumns(validated),
-        importSource: 'manual',
-      })
-      .returning()
-
-    await assignTags(trade.id, userId, tagIds)
-
-    revalidatePath('/dashboard')
-    revalidatePath('/trades')
-    return { success: true, trade }
-  },
-)
-
-// ─── Update trade ─────────────────────────────────────────────────────────────
-
-export const updateTrade = mutationAction(
-  [uuid, tradeFormSchema, uuidArray.optional(), uuid.nullable().optional()],
-  async ({ userId }, id, validated, tagIds, accountId) => {
-    const existing = await db.query.trades.findFirst({
-      where: and(eq(trades.id, id), eq(trades.userId, userId)),
-    })
-    if (!existing) throw new NotFoundError(t('errors.trade.notFound'))
-
-    const [updated] = await db
-      .update(trades)
-      .set({
-        // accountId is only touched when the caller passes it explicitly.
-        ...(accountId !== undefined ? { accountId: accountId || null } : {}),
-        ...buildTradeColumns(validated, existing.extra as Record<string, unknown> | null),
-        updatedAt: new Date(),
-      })
-      .where(and(eq(trades.id, id), eq(trades.userId, userId)))
-      .returning()
-
-    if (tagIds !== undefined) {
-      await assignTags(id, userId, tagIds)
-    }
-
-    revalidatePath('/dashboard')
-    revalidatePath('/trades')
-    revalidatePath(`/trades/${id}`)
-    return { success: true, trade: updated }
-  },
-)
 
 const journalSchema = z.object({
   notes: z.string().max(8_000_000).nullable().optional().transform(sanitizeRichTextValue),

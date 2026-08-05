@@ -130,14 +130,15 @@ export const trades = pgTable(
     // left over after the strategy's checklist changes are simply ignored on read.
     checklistProgress: jsonb('checklist_progress').$type<{ entry: string[]; exit: string[] }>(),
 
-    // Journaling
+    // Journaling. What a trader writes about a trade lives in `notes` (rich text,
+    // images) and in tags; `rating` is the one structured judgement. Free-text
+    // "emotion before/after", "mistakes" and "lessons" columns used to sit here
+    // and were removed in 0.6.0 — nothing ever wrote them, and the structured
+    // equivalents (a Mistake tag group, the discipline rules) are what the
+    // statistics can actually read.
     setupName: text('setup_name'),
     notes: text('notes'),
     rating: real('rating'),
-    emotionBefore: text('emotion_before'),
-    emotionAfter: text('emotion_after'),
-    mistakes: text('mistakes'),
-    lessons: text('lessons'),
 
     // Metadata
     importSource: text('import_source'), // 'manual', 'csv'

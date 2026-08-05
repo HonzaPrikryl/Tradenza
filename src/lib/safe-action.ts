@@ -31,7 +31,7 @@ type Handler<S extends SchemaTuple, R> = (ctx: ActionContext, ...args: ParsedArg
 // What the caller passes in (schema *input*). Built recursively so that a slot
 // whose schema accepts `undefined` (ZodOptional / ZodDefault) becomes an optional
 // argument — letting trailing optional args be omitted at the call site, exactly
-// as the actions are invoked today (e.g. `getAccounts()`, `createTrade(data)`).
+// as the actions are invoked today (e.g. `getAccounts()`, `deleteTrade(id)`).
 type InputArgs<S extends SchemaTuple> = S extends readonly [
   infer Head extends z.ZodTypeAny,
   ...infer Tail extends readonly z.ZodTypeAny[],

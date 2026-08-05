@@ -155,6 +155,13 @@
       "when": 1785676177203,
       "tag": "0021_user_timezone",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785939528558,
+      "tag": "0022_drop_unused_journal_fields",
+      "breakpoints": true
     }
   ]
 }
