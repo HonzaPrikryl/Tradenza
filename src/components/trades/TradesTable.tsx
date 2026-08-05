@@ -7,10 +7,21 @@ import { realizedR, formatR } from '@/lib/r-multiple'
 import { deleteTrade, deleteTrades, addTagToTrades, setTradesAccount, getFilteredTradeIds } from '@/lib/actions/trades'
 import { setTradesStrategy, type StrategyDTO } from '@/lib/actions/strategies'
 import { createTag, createTagGroup, type TagGroupWithValues } from '@/lib/actions/tags'
-import { exportTradesToCsv } from '@/lib/actions/export'
-import { track } from '@/lib/analytics'
+import { exportTradesToCsv, exportTradesToBundle } from '@/lib/actions/export'
+import { bundleFilename } from '@/lib/trade-bundle'
+import { track, type TransferFormat } from '@/lib/analytics'
 import Link from 'next/link'
-import { Trash2, ExternalLink, Download, Tag, ArrowRightLeft, BookMarked } from 'lucide-react'
+import {
+  Trash2,
+  ExternalLink,
+  Download,
+  Tag,
+  ArrowRightLeft,
+  BookMarked,
+  Archive,
+  FileSpreadsheet,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
@@ -20,6 +31,7 @@ import Select from '@/components/ui/Select'
 import ComboCreate, { type ComboOption } from '@/components/ui/ComboCreate'
 import Pagination from '@/components/ui/Pagination'
 import BulkModal from '@/components/trades/BulkModal'
+import Dialog from '@/components/ui/Dialog'
 import ActionMenu from '@/components/ui/ActionMenu'
 import SortableTh from '@/components/ui/SortableTh'
 import {
@@ -110,7 +122,7 @@ export default function TradesTable({
 
   const sel = useSelection()
   const [busy, setBusy] = useState(false)
-  const [dialog, setDialog] = useState<'tag' | 'transfer' | 'strategy' | null>(null)
+  const [dialog, setDialog] = useState<'tag' | 'transfer' | 'strategy' | 'export' | null>(null)
   const [dialogIds, setDialogIds] = useState<string[]>([])
   const [strategyId, setStrategyId] = useState('')
   const [groups, setGroups] = useState<TagGroupWithValues[]>(tagGroups)
@@ -176,24 +188,50 @@ export default function TradesTable({
     }
   }
 
-  const exportIds = async (targetIds: string[]) => {
+  const download = (content: string, filename: string, mime: string) => {
+    const blob = new Blob([content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  /**
+   * One export, two shapes.
+   *
+   * The formats are not interchangeable and never will be — a spreadsheet
+   * flattens, a backup preserves — but that is the app's problem, not the
+   * user's. So there is a single Export action, and the choice is made in terms
+   * of what the file is *for*.
+   */
+  const runExport = async (targetIds: string[], format: TransferFormat) => {
     setBusy(true)
     try {
-      const csv = await exportTradesToCsv(targetIds)
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `tradenza-export-${new Date().toISOString().slice(0, 10)}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-      track({ name: 'trades_exported', props: { count: targetIds.length || undefined } })
-      toast.success(t('trades.bulk.exported'))
+      if (format === 'csv') {
+        const csv = await exportTradesToCsv(targetIds)
+        download(csv, `tradenza-export-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;')
+        toast.success(t('trades.bulk.exported'))
+      } else {
+        const bundle = await exportTradesToBundle(targetIds)
+        // Compact, not pretty-printed: indentation inflates a large journal by
+        // roughly a third, and the file has to fit back through the import.
+        download(JSON.stringify(bundle), bundleFilename(), 'application/json;charset=utf-8;')
+        toast.success(t('trades.backup.exported', { count: bundle.trades.length }))
+      }
+      track({ name: 'trades_exported', props: { count: targetIds.length || undefined, format } })
+      setDialog(null)
     } catch (err) {
       toast.error(getActionErrorMessage(err, 'trades.bulk.actionFailed'))
     } finally {
       setBusy(false)
     }
+  }
+
+  const openExport = (targetIds: string[]) => {
+    setDialogIds(targetIds)
+    setDialog('export')
   }
 
   const openTag = (targetIds: string[]) => {
@@ -272,7 +310,7 @@ export default function TradesTable({
         window.open(`/trades/${trade.id}`, '_blank', 'noopener,noreferrer')
         break
       case 'export':
-        exportIds([trade.id])
+        openExport([trade.id])
         break
       case 'tag':
         openTag([trade.id])
@@ -381,12 +419,12 @@ export default function TradesTable({
             ))}
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <button
-              onClick={() => exportIds(ids())}
+              onClick={() => openExport(ids())}
               disabled={busy}
               className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-accent disabled:opacity-50"
             >
               <Download className="h-3.5 w-3.5" />
-              {t('trades.bulk.exportCsv')}
+              {t('trades.export.cta')}
             </button>
             <button
               onClick={() => openTag(ids())}
@@ -536,7 +574,7 @@ export default function TradesTable({
                         width={176}
                         items={[
                           { key: 'open', label: t('trades.openNewTab'), icon: ExternalLink },
-                          { key: 'export', label: t('trades.bulk.exportCsv'), icon: Download },
+                          { key: 'export', label: t('trades.export.cta'), icon: Download },
                           { key: 'tag', label: t('trades.bulk.addTag'), icon: Tag },
                           { key: 'transfer', label: t('trades.bulk.transfer'), icon: ArrowRightLeft },
                           { key: 'delete', label: t('trades.bulk.delete'), icon: Trash2, danger: true },
@@ -636,6 +674,56 @@ export default function TradesTable({
             />
           </div>
         </BulkModal>
+      )}
+
+      {dialog === 'export' && (
+        <Dialog onClose={() => setDialog(null)}>
+          <div className="flex items-center justify-between border-b border-border px-6 py-4">
+            <h2 className="text-base font-semibold">{t('trades.export.title', { count: dialogIds.length })}</h2>
+            <button
+              onClick={() => setDialog(null)}
+              aria-label={t('common.close')}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="space-y-3 px-6 py-5">
+            <p className="text-sm text-muted-foreground">{t('trades.export.subtitle')}</p>
+            {(
+              [
+                { format: 'bundle', icon: Archive, lossless: true },
+                { format: 'csv', icon: FileSpreadsheet, lossless: false },
+              ] as const
+            ).map(({ format, icon: Icon, lossless }) => (
+              <button
+                key={format}
+                type="button"
+                disabled={busy}
+                onClick={() => runExport(dialogIds, format)}
+                className="flex w-full items-start gap-3 rounded-lg border border-border px-4 py-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/40 disabled:opacity-50"
+              >
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <span className="min-w-0">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium">{t(`trades.export.${format}.title`)}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {t(`trades.export.${format}.format`)}
+                    </span>
+                    {lossless && (
+                      <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
+                        {t('trades.export.badge')}
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">
+                    {t(`trades.export.${format}.desc`)}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </Dialog>
       )}
     </div>
   )

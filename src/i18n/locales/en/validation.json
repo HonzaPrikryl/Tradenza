@@ -20,6 +20,11 @@
     "sideUnreadable": "{count} rows had a Side column we couldn't read — direction was taken from the sign of the quantity instead. Check that Side is mapped to the right column.",
     "unknownError": "Row {row}: {error}",
     "unknownErrorShort": "unknown error",
-    "logNotFound": "Import not found"
+    "logNotFound": "Import not found",
+    "tagsFailed": "Trades were imported, but their tags could not be linked."
+  },
+  "bundle": {
+    "tradeFailed": "Could not import {symbol}",
+    "imagesFailed": "Trades were imported, but their images could not be attached."
   }
 }

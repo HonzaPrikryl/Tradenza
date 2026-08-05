@@ -2,6 +2,13 @@ import posthog from 'posthog-js'
 
 export type ImportKind = 'trades' | 'fills'
 
+/**
+ * Which file a set of trades left or entered the app as. `csv` is the
+ * spreadsheet-shaped export, `bundle` the full-fidelity backup — worth
+ * distinguishing, since only one of them can be imported back.
+ */
+export type TransferFormat = 'csv' | 'bundle'
+
 export type ImportFunnelProps = {
   kind?: ImportKind
   broker?: string
@@ -46,8 +53,11 @@ export type AnalyticsEvent =
   | { name: 'onboarding_completed' }
   // — Getting trades in —
   | { name: 'trade_created'; props?: { source?: 'manual'; assetClass?: string } }
-  | { name: 'trades_imported'; props?: { count?: number; kind?: ImportKind; remapped?: string[] } }
-  | { name: 'trades_exported'; props?: { count?: number } }
+  | {
+      name: 'trades_imported'
+      props?: { count?: number; kind?: ImportKind; remapped?: string[]; source?: TransferFormat }
+    }
+  | { name: 'trades_exported'; props?: { count?: number; format?: TransferFormat } }
   // — CSV import funnel —
   | { name: 'import_parse_failed'; props?: { reason?: 'empty' | 'unreadable'; broker?: string } }
   | { name: 'import_file_parsed'; props?: ImportFunnelProps & { rows?: number; autoMapped?: number } }

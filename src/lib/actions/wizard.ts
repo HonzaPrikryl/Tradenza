@@ -1,6 +1,6 @@
 'use server'
 
-import { db, accounts, trades, importLogs } from '@/lib/db'
+import { db, accounts, trades, tradeTags, importLogs } from '@/lib/db'
 import { and, eq, gte, desc, inArray } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
@@ -19,10 +19,16 @@ import {
   detectDecimalSeparator,
   detectDayFirst,
   isFlat,
+  parseTagList,
   MAX_TRADE_ROWS,
   MAX_FILL_ROWS,
   type RoundTripLeg,
+  type TradeJournal,
 } from './wizard-helpers'
+import { resolveStrategyIds, resolveTagIds } from './reference-resolve'
+import { existingExternalIds, LINK_CHUNK } from './import-dedup'
+import { indexByExternalId, type InsertedTrade } from '@/lib/import-identity'
+import { matchKey } from '@/lib/trade-bundle'
 import { uuid } from '@/lib/validation'
 import { runAtomic } from '@/lib/db/atomic'
 import { cleanupOrphanedImages, tradeImageKeys } from '@/lib/orphan-images'
@@ -70,34 +76,6 @@ function fileDayFirst(rows: Record<string, string>[], mapping: Record<string, st
 }
 
 /**
- * Which of these external ids already exist in the account.
- *
- * Asks only about the ids the file actually produced, rather than reading every
- * trade in the account on every import — a scalper with 50k trades paid for all
- * of them to check a 200-row file. Hits `trades_external_id_idx`, chunked so the
- * IN list stays inside the parameter limit.
- */
-async function existingExternalIds(userId: string, accountId: string, candidates: string[]): Promise<Set<string>> {
-  const found = new Set<string>()
-  const unique = [...new Set(candidates)]
-  const CHUNK = 500
-  for (let i = 0; i < unique.length; i += CHUNK) {
-    const rows = await db
-      .select({ externalId: trades.externalId })
-      .from(trades)
-      .where(
-        and(
-          eq(trades.userId, userId),
-          eq(trades.accountId, accountId),
-          inArray(trades.externalId, unique.slice(i, i + CHUNK)),
-        ),
-      )
-    for (const r of rows) if (r.externalId) found.add(r.externalId)
-  }
-  return found
-}
-
-/**
  * Insert the parsed trades and record the import.
  *
  * The log is written in a `finally`, so a batch that dies halfway still leaves an
@@ -114,16 +92,18 @@ async function commitImport(args: {
   totalRows: number
   skippedRows: number
   errors: string[]
-}): Promise<number> {
-  const insertedIds: string[] = []
+}): Promise<InsertedTrade[]> {
+  const inserted: InsertedTrade[] = []
   const CHUNK = 100
   try {
     for (let i = 0; i < args.toInsert.length; i += CHUNK) {
-      const inserted = await db
+      const rows = await db
         .insert(trades)
         .values(args.toInsert.slice(i, i + CHUNK))
-        .returning({ id: trades.id })
-      insertedIds.push(...inserted.map((r) => r.id))
+        // The external id comes back with the generated one so callers can
+        // match a row to the input it came from without trusting result order.
+        .returning({ id: trades.id, externalId: trades.externalId })
+      inserted.push(...rows)
     }
   } finally {
     try {
@@ -133,18 +113,55 @@ async function commitImport(args: {
         filename: args.filename,
         source: 'csv',
         totalRows: args.totalRows,
-        importedRows: insertedIds.length,
+        importedRows: inserted.length,
         skippedRows: args.skippedRows,
         errorRows: args.errors.length,
         errors: args.errors.length > 0 ? args.errors : null,
-        tradeIds: insertedIds.length > 0 ? insertedIds : null,
+        tradeIds: inserted.length > 0 ? inserted.map((r) => r.id) : null,
       })
       await db.update(accounts).set({ updatedAt: new Date() }).where(eq(accounts.id, args.accountId))
     } catch {
       // Never let bookkeeping mask the insert failure it is reporting on.
     }
   }
-  return insertedIds.length
+  return inserted
+}
+
+const TRADE_STATUSES = ['open', 'closed', 'cancelled'] as const
+
+/**
+ * The journal columns of one row.
+ *
+ * Every field is optional and unmapped columns simply stay null, so a broker
+ * export that carries none of this behaves exactly as it did before. Values are
+ * read defensively — a `Status` column saying "Filled" is a broker's word for
+ * something else, not one of ours, and is ignored rather than stored.
+ */
+function readJournal(get: (field: string) => string | undefined, decimal: '.' | ','): TradeJournal {
+  const text = (field: string, max = 20000) => {
+    const raw = get(field)?.trim()
+    return raw ? raw.slice(0, max) : null
+  }
+  const number = (field: string) => parseNumber(get(field), decimal)
+
+  const statusRaw = get('status')?.trim().toLowerCase()
+  const status = TRADE_STATUSES.find((s) => s === statusRaw) ?? null
+
+  const rating = number('rating')
+
+  return {
+    status,
+    exitQuantity: number('exitQuantity'),
+    multiplier: number('multiplier'),
+    stopLoss: number('stopLoss'),
+    takeProfit: number('takeProfit'),
+    riskAmount: number('riskAmount'),
+    riskRewardRatio: number('riskRewardRatio'),
+    rating: rating !== null && rating >= 0 && rating <= 5 ? rating : null,
+    setupName: text('setupName', 200),
+    strategy: text('strategy', 120),
+    tags: parseTagList(get('tags')),
+  }
 }
 
 async function assertAccountOwnership(userId: string, accountId: string) {
@@ -176,8 +193,6 @@ const manualTradeSchema = z.object({
   assetClass: z.enum(['stocks', 'futures', 'forex', 'crypto', 'options', 'cfd', 'other']),
   symbol: z.string().trim().min(1).max(20),
   contractMultiplier: z.coerce.number().min(0).optional(),
-  // Contract expiration date ("YYYY-MM-DD"), informational only.
-  expirationDate: z.string().optional(),
   executions: z.array(executionSchema).min(1),
 })
 
@@ -253,7 +268,6 @@ export const saveManualTrade = mutationAction([manualTradeSchema], async ({ user
       extra: {
         executions: execs,
         contractMultiplier: v.contractMultiplier ?? null,
-        expirationDate: v.expirationDate ?? null,
       },
     })
     .returning()
@@ -383,6 +397,7 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
         grossPnl: parseNumber(get('grossPnl'), decimal),
         netPnl: parseNumber(get('netPnl'), decimal),
         notes: get('notes')?.trim() || null,
+        journal: readJournal(get, decimal),
       })
     } catch (err) {
       errors.push(
@@ -404,28 +419,55 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
   const tradeExternalId = (x: (typeof merged)[number]) => `${x.symbol}_${x.entryDatetime.toISOString()}_${x.direction}`
   const existingIds = await existingExternalIds(userId, v.accountId, merged.map(tradeExternalId))
 
+  // Journal references are resolved once for the whole file rather than per
+  // trade, so a hundred trades sharing one setup cost one lookup. Both are
+  // no-ops when the file maps neither column, which is every broker export.
+  const willImport = merged.filter((x) => !existingIds.has(tradeExternalId(x)))
+  const strategyMap = await resolveStrategyIds(
+    userId,
+    willImport.flatMap((x) => (x.journal.strategy ? [{ name: x.journal.strategy }] : [])),
+  )
+  const tagMap = await resolveTagIds(
+    userId,
+    // A CSV names tags without their group, so matching ignores grouping: an
+    // existing tag wins whichever group it sits in, instead of a duplicate
+    // being created outside it.
+    willImport.flatMap((x) => x.journal.tags.map((name) => ({ group: null, name }))),
+    [],
+    { ignoreGroups: true },
+  )
+  // Tag links are written after the insert, so each queued trade parks what it
+  // needs under its own external id — the one identifier that survives the
+  // round trip through the database.
+  const pendingTags = new Map<string, string[]>()
+
   for (const trade of merged) {
     const externalId = tradeExternalId(trade)
     if (existingIds.has(externalId)) {
       duplicates += trade.legCount
       continue
     }
+    const journal = trade.journal
 
     // Resolve asset class: a symbol matching a known futures contract is always
     // futures (overrides the picker); otherwise honour the asset class chosen for
     // this import, constrained to what the broker supports.
     const resolvedAssetClass = contractMultiplier(trade.symbol) > 0 ? 'futures' : v.assetClass
     // Per-point value multiplier: futures → contract size, options → 100, else 1.
-    const mult = assetMultiplier(resolvedAssetClass, trade.symbol)
+    // A multiplier column in the file wins: it is what the trade was actually
+    // valued at, which the instrument's default only approximates.
+    const mult =
+      journal.multiplier && journal.multiplier > 0
+        ? journal.multiplier
+        : assetMultiplier(resolvedAssetClass, trade.symbol)
 
     // A row-per-exit export gives each leg both its entry and its exit size, so
     // comparing the two totals is what tells a fully closed position from one
     // that still has size on. Exports that ship no exit quantity at all fall back
     // to "an exit price or a P&L means it's done".
+    const exitQuantity = trade.exitQuantity > 0 ? trade.exitQuantity : (journal.exitQuantity ?? 0)
     const fullyExited =
-      trade.exitQuantity > 0
-        ? trade.exitQuantity >= trade.entryQuantity
-        : trade.exitPrice !== null || trade.netPnl !== null
+      exitQuantity > 0 ? exitQuantity >= trade.entryQuantity : trade.exitPrice !== null || trade.netPnl !== null
 
     // Prefer the broker-provided P&L (summed across partials); only compute from
     // prices when none was supplied — applying the instrument multiplier so
@@ -458,29 +500,41 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
       accountId: v.accountId,
       symbol: trade.symbol,
       direction: trade.direction,
-      // Closed only once the exits cover the entries. A position whose partials
-      // are still open in the export used to be filed as closed just because one
-      // of its legs carried an exit price.
-      status: fullyExited ? 'closed' : 'open',
+      // A status column in the file is authoritative — it is the app's own word
+      // for the trade, including "cancelled", which the fills cannot express.
+      // Otherwise: closed only once the exits cover the entries. A position whose
+      // partials are still open in the export used to be filed as closed just
+      // because one of its legs carried an exit price.
+      status: journal.status ?? (fullyExited ? 'closed' : 'open'),
       assetClass: resolvedAssetClass,
       entryPrice: trade.entryPrice.toString(),
       entryQuantity: trade.entryQuantity.toString(),
       entryDatetime: trade.entryDatetime,
       exitPrice: trade.exitPrice?.toString() ?? null,
-      exitQuantity: trade.exitQuantity > 0 ? trade.exitQuantity.toString() : null,
+      exitQuantity: exitQuantity > 0 ? exitQuantity.toString() : null,
       exitDatetime: trade.exitDatetime,
       fees: trade.fees.toString(),
       grossPnl,
       netPnl,
       notes: trade.notes,
+      // ── Journal & risk, when the file carried them ──
+      strategyId: journal.strategy ? (strategyMap.byKey.get(matchKey(journal.strategy)) ?? null) : null,
+      stopLoss: journal.stopLoss?.toString() ?? null,
+      takeProfit: journal.takeProfit?.toString() ?? null,
+      riskAmount: journal.riskAmount?.toString() ?? null,
+      riskRewardRatio: journal.riskRewardRatio?.toString() ?? null,
+      rating: journal.rating,
+      setupName: journal.setupName,
       importSource: 'csv',
       externalId,
       extra,
     })
+    const tagIds = [...new Set(journal.tags.map((name) => tagMap.byKey.get(matchKey(name))).filter(Boolean))]
+    if (tagIds.length > 0) pendingTags.set(externalId, tagIds as string[])
     existingIds.add(externalId)
   }
 
-  const imported = await commitImport({
+  const inserted = await commitImport({
     userId,
     accountId: account.id,
     filename: v.filename,
@@ -490,8 +544,33 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
     errors,
   })
 
+  // Tag links, matched through the external id rather than result position.
+  // Best-effort: the trades are in, and failing the whole import over a tag
+  // link would be a worse outcome than a trade that arrives untagged.
+  const idByExternalId = indexByExternalId(inserted)
+  const tagLinks = [...pendingTags].flatMap(([externalId, tagIds]) => {
+    const tradeId = idByExternalId.get(externalId)
+    return tradeId ? tagIds.map((tagId) => ({ tradeId, tagId })) : []
+  })
+  if (tagLinks.length > 0) {
+    try {
+      for (let i = 0; i < tagLinks.length; i += LINK_CHUNK) {
+        await db.insert(tradeTags).values(tagLinks.slice(i, i + LINK_CHUNK))
+      }
+    } catch {
+      errors.push(t('validation.import.tagsFailed'))
+    }
+  }
+
   revalidateAll()
-  return { total: v.rows.length, imported, skipped, duplicates, errors, unmappedRequired: [] }
+  return {
+    total: v.rows.length,
+    imported: inserted.length,
+    skipped,
+    duplicates,
+    errors,
+    unmappedRequired: [],
+  }
 })
 
 export interface ImportHistoryRow {
@@ -737,7 +816,7 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
 
   for (const g of groups) buildTrade(g.symbol, g.fills)
 
-  const imported = await commitImport({
+  const inserted = await commitImport({
     userId,
     accountId: account.id,
     filename: v.filename,
@@ -748,5 +827,12 @@ export const importFillsCsv = importAction([fillImportSchema], async ({ userId }
   })
 
   revalidateAll()
-  return { total: v.rows.length, imported, skipped, duplicates, errors: [], unmappedRequired: [] }
+  return {
+    total: v.rows.length,
+    imported: inserted.length,
+    skipped,
+    duplicates,
+    errors: [],
+    unmappedRequired: [],
+  }
 })

@@ -29,5 +29,8 @@
   },
   "execution": {
     "invalidDate": "One of the executions has an invalid date."
+  },
+  "export": {
+    "tooManyTrades": "That is more than {max} trades — more than a single file can hold. Select fewer and export them in parts."
   }
 }

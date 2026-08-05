@@ -187,6 +187,84 @@ export function tzOffset(tz: string, date: Date): number {
 // weighted prices, summed P&L — while preserving each fill as an execution so the
 // scale-out detail and running P&L survive.
 
+/**
+ * What a trade carries beyond its fills: the plan, the review and the labels.
+ *
+ * Absent from every broker export and present in ours, so it travels alongside
+ * the numbers rather than inside them. Each field is independently optional —
+ * a file may map the tags column and nothing else.
+ */
+export interface TradeJournal {
+  status: 'open' | 'closed' | 'cancelled' | null
+  exitQuantity: number | null
+  multiplier: number | null
+  stopLoss: number | null
+  takeProfit: number | null
+  riskAmount: number | null
+  riskRewardRatio: number | null
+  rating: number | null
+  setupName: string | null
+  strategy: string | null
+  tags: string[]
+}
+
+export const EMPTY_JOURNAL: TradeJournal = {
+  status: null,
+  exitQuantity: null,
+  multiplier: null,
+  stopLoss: null,
+  takeProfit: null,
+  riskAmount: null,
+  riskRewardRatio: null,
+  rating: null,
+  setupName: null,
+  strategy: null,
+  tags: [],
+}
+
+/**
+ * Fold the journals of a position's partials into one.
+ *
+ * A row-per-exit export repeats the trade's journal on every partial, or fills
+ * it in on only one of them. Either way the first row that actually supplies a
+ * value is the answer; tags are unioned, since a hand-edited file can spread
+ * them across the partials.
+ */
+export function mergeJournals(journals: (TradeJournal | undefined)[]): TradeJournal {
+  const present = journals.filter((j): j is TradeJournal => !!j)
+  if (present.length === 0) return { ...EMPTY_JOURNAL, tags: [] }
+
+  const firstOf = <K extends keyof TradeJournal>(key: K): TradeJournal[K] =>
+    present.map((j) => j[key]).find((v) => v !== null && v !== undefined && v !== '') ?? EMPTY_JOURNAL[key]
+
+  return {
+    status: firstOf('status'),
+    exitQuantity: firstOf('exitQuantity'),
+    multiplier: firstOf('multiplier'),
+    stopLoss: firstOf('stopLoss'),
+    takeProfit: firstOf('takeProfit'),
+    riskAmount: firstOf('riskAmount'),
+    riskRewardRatio: firstOf('riskRewardRatio'),
+    rating: firstOf('rating'),
+    setupName: firstOf('setupName'),
+    strategy: firstOf('strategy'),
+    tags: [...new Set(present.flatMap((j) => j.tags))],
+  }
+}
+
+/** Split a tag cell — "Breakout; Late entry" — into individual tag names. */
+export function parseTagList(raw: string | undefined): string[] {
+  if (!raw) return []
+  return [
+    ...new Set(
+      raw
+        .split(/[;|,]/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, 50)
+}
+
 export interface RoundTripLeg {
   symbol: string // already upper-cased
   direction: 'long' | 'short'
@@ -199,6 +277,7 @@ export interface RoundTripLeg {
   grossPnl: number | null
   netPnl: number | null
   notes: string | null
+  journal?: TradeJournal
 }
 
 export interface MergedExecution {
@@ -223,6 +302,7 @@ export interface MergedTrade {
   grossPnl: number | null
   netPnl: number | null
   notes: string | null
+  journal: TradeJournal
   legCount: number
   executions: MergedExecution[]
 }
@@ -297,6 +377,7 @@ function buildMergedTrade(legs: RoundTripLeg[]): MergedTrade {
     grossPnl: sumProvided(legs, (l) => l.grossPnl),
     netPnl: sumProvided(legs, (l) => l.netPnl),
     notes: legs.map((l) => l.notes).find((n) => n && n.trim()) ?? null,
+    journal: mergeJournals(legs.map((l) => l.journal)),
     legCount: legs.length,
     executions,
   }

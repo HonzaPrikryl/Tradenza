@@ -198,11 +198,49 @@ export const COLUMN_CANDIDATES: Record<string, string[]> = {
     'profit',
   ],
   notes: ['notes', 'note', 'comment', 'comments'],
+
+  // ── Journal & risk ──
+  // Broker exports almost never carry these; our own CSV export does, which is
+  // what makes a spreadsheet round-trip keep the parts of a trade the trader
+  // actually wrote. Candidates are deliberately specific — a loose 'risk' or
+  // 'profit' token here would steal a column a broker meant for something else.
+  status: ['trade status', 'position status', 'status'],
+  exitQuantity: ['exit qty', 'exit quantity', 'closed qty', 'closed quantity', 'close quantity'],
+  multiplier: ['contract multiplier', 'point value', 'contract size', 'tick multiplier', 'multiplier', 'mult'],
+  stopLoss: ['stop loss', 'stoploss', 'stop price', 'sl'],
+  takeProfit: ['take profit', 'takeprofit', 'profit target', 'target price', 'tp'],
+  riskAmount: ['risk amount', 'amount at risk', 'risk per trade'],
+  riskRewardRatio: ['planned r:r', 'planned rr', 'risk reward ratio', 'risk/reward', 'reward risk', 'r:r', 'rr'],
+  rating: ['rating', 'stars', 'grade'],
+  setupName: ['setup name', 'setup', 'pattern'],
+  strategy: ['strategy', 'playbook'],
+  tags: ['tags', 'labels', 'tag', 'label'],
 }
 
 export function detectColumns(headers: string[]): Record<string, string> {
   return resolveColumns(headers, COLUMN_CANDIDATES) as Record<string, string>
 }
+
+/**
+ * Journal and risk fields a trade carries beyond its fills. Optional in every
+ * import — a broker export has none of them — but present in our own CSV, which
+ * is what lets a spreadsheet round-trip come back with the trade's notes, plan
+ * and tags rather than just its numbers.
+ */
+export const IMPORT_JOURNAL_FIELDS = [
+  'status',
+  'exitQuantity',
+  'multiplier',
+  'stopLoss',
+  'takeProfit',
+  'riskAmount',
+  'riskRewardRatio',
+  'rating',
+  'setupName',
+  'strategy',
+  'tags',
+] as const
+export type ImportJournalField = (typeof IMPORT_JOURNAL_FIELDS)[number]
 
 export const IMPORT_FIELDS = [
   'symbol',
@@ -218,6 +256,7 @@ export const IMPORT_FIELDS = [
   'grossPnl',
   'netPnl',
   'notes',
+  ...IMPORT_JOURNAL_FIELDS,
 ] as const
 export type ImportField = (typeof IMPORT_FIELDS)[number]
 export const IMPORT_REQUIRED: ImportField[] = ['symbol', 'entryPrice', 'entryDate']
@@ -360,6 +399,9 @@ export function buildImportMapping(headers: string[]): Partial<Record<ImportFiel
   if (det.grossPnl) map.grossPnl = det.grossPnl
   if (det.netPnl) map.netPnl = det.netPnl
   if (det.notes) map.notes = det.notes
+  for (const field of IMPORT_JOURNAL_FIELDS) {
+    if (det[field]) map[field] = det[field]
+  }
 
   const entryDate = dates.entryDate ?? det.entryDatetime
   const exitDate = dates.exitDate ?? det.exitDatetime

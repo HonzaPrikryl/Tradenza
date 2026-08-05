@@ -11,7 +11,11 @@ import {
   isFlat,
   resolveSideAndQuantity,
   mergeRoundTripPartials,
+  mergeJournals,
+  parseTagList,
+  EMPTY_JOURNAL,
   type RoundTripLeg,
+  type TradeJournal,
 } from './wizard-helpers'
 
 const leg = (over: Partial<RoundTripLeg>): RoundTripLeg => ({
@@ -421,5 +425,52 @@ describe('parseBuySell — fill-log semantics', () => {
   it('still returns null for anything unrecognised', () => {
     expect(parseBuySell('Market')).toBeNull()
     expect(parseBuySell(undefined)).toBeNull()
+  })
+})
+
+describe('parseTagList', () => {
+  it('splits on semicolons, the separator our exporter writes', () => {
+    expect(parseTagList('Breakout; Late entry')).toEqual(['Breakout', 'Late entry'])
+  })
+
+  it('also accepts commas and pipes, and trims each name', () => {
+    expect(parseTagList(' A , B | C ')).toEqual(['A', 'B', 'C'])
+  })
+
+  it('drops empties and duplicates', () => {
+    expect(parseTagList('A;;A; ;B')).toEqual(['A', 'B'])
+  })
+
+  it('is empty for an absent or blank cell', () => {
+    expect(parseTagList(undefined)).toEqual([])
+    expect(parseTagList('   ')).toEqual([])
+  })
+})
+
+describe('mergeJournals', () => {
+  const j = (over: Partial<TradeJournal> = {}): TradeJournal => ({ ...EMPTY_JOURNAL, tags: [], ...over })
+
+  it('is empty when no leg carried a journal', () => {
+    expect(mergeJournals([undefined, undefined])).toEqual({ ...EMPTY_JOURNAL, tags: [] })
+  })
+
+  it('takes the first leg that actually supplies each value', () => {
+    const out = mergeJournals([j({ stopLoss: null, rating: 4 }), j({ stopLoss: 19990, rating: 2 })])
+    expect(out.stopLoss).toBe(19990)
+    expect(out.rating).toBe(4)
+  })
+
+  it('treats an empty string as absent, so a blank cell does not win', () => {
+    const out = mergeJournals([j({ setupName: '' as unknown as string }), j({ setupName: 'ORB' })])
+    expect(out.setupName).toBe('ORB')
+  })
+
+  it('unions tags across the partials without duplicating them', () => {
+    const out = mergeJournals([j({ tags: ['A', 'B'] }), j({ tags: ['B', 'C'] })])
+    expect(out.tags).toEqual(['A', 'B', 'C'])
+  })
+
+  it('keeps an explicit status from whichever partial carried it', () => {
+    expect(mergeJournals([j(), j({ status: 'cancelled' })]).status).toBe('cancelled')
   })
 })

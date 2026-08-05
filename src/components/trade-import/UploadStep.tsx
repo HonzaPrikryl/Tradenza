@@ -7,17 +7,7 @@ import Papa from 'papaparse'
 import { toast } from 'sonner'
 import { getActionErrorMessage } from '@/lib/action-error-message'
 import { handleRateLimit } from '@/components/ui/rate-limit-toast'
-import {
-  FileUp,
-  Info,
-  ChevronDown,
-  FileText,
-  X,
-  Loader2,
-  CheckCircle2,
-  AlertTriangle,
-  SlidersHorizontal,
-} from 'lucide-react'
+import { FileUp, Info, ChevronDown, FileText, X, Loader2, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from '@/i18n'
 import Select from '@/components/ui/Select'
@@ -47,13 +37,33 @@ import {
   MAX_FILL_ROWS,
 } from '@/lib/actions/wizard-helpers'
 import { setAccountsFilter } from '@/lib/global-filters'
+import { parseTradeBundle, MAX_BUNDLE_BYTES, type TradeBundle } from '@/lib/trade-bundle'
+import type { BundleImportResult } from '@/lib/actions/import-bundle'
+import BundleImportPanel from '@/components/trades/BundleImportPanel'
+import ImportResultCard from './ImportResultCard'
 
 const NONE = '__none__'
 type ImportMode = 'trades' | 'fills'
 
 // Fields whose cells the importer reads as numbers / instants. Used to show the
 // user what a column will actually become before anything is written.
-const NUMERIC_FIELDS = ['entryPrice', 'exitPrice', 'quantity', 'fees', 'grossPnl', 'netPnl', 'price', 'commission']
+const NUMERIC_FIELDS = [
+  'entryPrice',
+  'exitPrice',
+  'quantity',
+  'fees',
+  'grossPnl',
+  'netPnl',
+  'price',
+  'commission',
+  'exitQuantity',
+  'multiplier',
+  'stopLoss',
+  'takeProfit',
+  'riskAmount',
+  'riskRewardRatio',
+  'rating',
+]
 const DATE_FIELDS = ['entryDate', 'exitDate', 'datetime']
 
 // Mirrors FORMAT_SAMPLE_ROWS on the server so both reach the same conclusion.
@@ -73,11 +83,12 @@ export default function UploadStep({
   const tzOptions = useMemo(() => timezoneOptions(tz), [tz])
   const [file, setFile] = useState<File | null>(null)
   const [rows, setRows] = useState<Record<string, string>[]>([])
+  const [bundle, setBundle] = useState<{ filename: string; bundle: TradeBundle } | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<WizardImportResult | null>(null)
+  const [bundleResult, setBundleResult] = useState<BundleImportResult | null>(null)
   const [expanded, setExpanded] = useState(false)
-  const [showErrors, setShowErrors] = useState(false)
   const [colMap, setColMap] = useState<Record<string, string>>({})
   const [showAllFields, setShowAllFields] = useState(false)
   const [mode, setMode] = useState<ImportMode>('trades')
@@ -246,14 +257,30 @@ export default function UploadStep({
     )
   }
 
-  const onDrop = useCallback(
-    (accepted: File[]) => {
-      const f = accepted[0]
-      if (!f) return
-      setResult(null)
-      setParseError(null)
-      remappedRef.current = new Set()
-      settledRef.current = false
+  /**
+   * A Tradenza backup dropped here is not a spreadsheet to be mapped — it is a
+   * complete journal that already knows what every value means. Detecting it by
+   * content rather than by extension means the user never has to know there are
+   * two import paths: they drop the file they have, and the right one runs.
+   */
+  const tryBundle = useCallback(async (f: File): Promise<boolean> => {
+    const looksJson = f.type === 'application/json' || /\.json$/i.test(f.name)
+    if (!looksJson) return false
+    if (f.size > MAX_BUNDLE_BYTES) {
+      setParseError(t('trades.backup.tooLarge'))
+      return true
+    }
+    const parsed = parseTradeBundle(await f.text())
+    if (!parsed.ok) {
+      setParseError(t(`trades.backup.error.${parsed.reason}`))
+      return true
+    }
+    setBundle({ filename: f.name, bundle: parsed.bundle })
+    return true
+  }, [])
+
+  const parseCsv = useCallback(
+    (f: File) => {
       Papa.parse<string[]>(f, {
         header: false,
         skipEmptyLines: 'greedy',
@@ -295,9 +322,28 @@ export default function UploadStep({
     [broker.id],
   )
 
+  const onDrop = useCallback(
+    (accepted: File[]) => {
+      const f = accepted[0]
+      if (!f) return
+      setResult(null)
+      setParseError(null)
+      setBundle(null)
+      remappedRef.current = new Set()
+      settledRef.current = false
+
+      tryBundle(f)
+        .then((handled) => {
+          if (!handled) parseCsv(f)
+        })
+        .catch(() => setParseError(t('trades.backup.error.unreadable')))
+    },
+    [tryBundle, parseCsv],
+  )
+
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
-    accept: { 'text/csv': ['.csv'], 'text/plain': ['.txt'] },
+    accept: { 'text/csv': ['.csv'], 'text/plain': ['.txt'], 'application/json': ['.json'] },
     maxFiles: 1,
     noClick: true,
   })
@@ -354,92 +400,76 @@ export default function UploadStep({
     remappedRef.current = new Set()
     setFile(null)
     setRows([])
+    setBundle(null)
     setResult(null)
+    setBundleResult(null)
     setParseError(null)
     setModeTouched(false)
     setShowAllFields(false)
   }
 
+  /** Back to the trades list, filtered to the account we just imported into. */
+  const goToTrades = async () => {
+    try {
+      await setAccountsFilter([accountId])
+    } catch {
+      /* noop */
+    }
+    router.push('/trades')
+  }
+
+  const resultActions = (
+    <>
+      <button
+        onClick={reset}
+        className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
+      >
+        {t('trades.importResult.importAnother')}
+      </button>
+      <button
+        onClick={goToTrades}
+        className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+      >
+        {t('trades.importResult.viewTrades')}
+      </button>
+    </>
+  )
+
+  // Both import paths end the same way: the outcome replaces the step, rather
+  // than appearing under a dropzone and a mapping table that no longer apply.
   if (result) {
-    const ok = result.imported > 0
-    // Nothing imported because everything was already in the account is a normal
-    // outcome, not a failure — saying "nothing was imported" reads like a bug.
-    const allDuplicates = !ok && result.duplicates > 0 && result.skipped === 0
     return (
-      <div className="mx-auto max-w-xl rounded-2xl border border-border bg-card p-8 text-center">
-        {ok || allDuplicates ? (
-          <CheckCircle2 className={cn('mx-auto h-12 w-12', ok ? 'text-profit' : 'text-muted-foreground')} />
-        ) : (
-          <AlertTriangle className="mx-auto h-12 w-12 text-amber-400" />
-        )}
-        <h2 className="mt-4 text-xl font-semibold">
-          {ok
-            ? t('addTrades.upload.resultTitle', { count: result.imported })
-            : allDuplicates
-              ? t('addTrades.upload.resultTitleDuplicates')
-              : t('addTrades.upload.resultTitleNone')}
-        </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {t('addTrades.upload.resultDetail', {
-            total: result.total,
-            imported: result.imported,
-            skipped: result.skipped,
-          })}
-        </p>
+      <ImportResultCard
+        className="mx-auto max-w-xl"
+        outcome={result}
+        warning={
+          result.unmappedRequired.length > 0
+            ? t('addTrades.upload.missingColumns', { cols: result.unmappedRequired.join(', ') })
+            : null
+        }
+        actions={resultActions}
+      />
+    )
+  }
 
-        {result.duplicates > 0 && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {t('addTrades.upload.resultDuplicates', { count: result.duplicates })}
-          </p>
-        )}
-
-        {result.unmappedRequired.length > 0 && (
-          <p className="mt-3 text-sm text-amber-400">
-            {t('addTrades.upload.missingColumns', { cols: result.unmappedRequired.join(', ') })}
-          </p>
-        )}
-
-        {result.errors.length > 0 && (
-          <div className="mt-4 text-left">
-            <button
-              onClick={() => setShowErrors((s) => !s)}
-              className="flex items-center gap-1 text-sm text-primary hover:underline"
-            >
-              {t('addTrades.upload.showErrors', { count: result.errors.length })}
-              <ChevronDown className={cn('h-4 w-4 transition-transform', showErrors && 'rotate-180')} />
-            </button>
-            {showErrors && (
-              <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
-                {result.errors.map((e, i) => (
-                  <li key={i}>{e}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
-
-        <div className="mt-6 flex justify-center gap-3">
-          <button
-            onClick={reset}
-            className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
-          >
-            {t('addTrades.upload.importAnother')}
-          </button>
-          <button
-            onClick={async () => {
-              try {
-                await setAccountsFilter([accountId])
-              } catch {
-                /* noop */
-              }
-              router.push('/trades')
-            }}
-            className="rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          >
-            {t('addTrades.upload.viewTrades')}
-          </button>
-        </div>
-      </div>
+  if (bundleResult) {
+    return (
+      <ImportResultCard
+        className="mx-auto max-w-xl"
+        outcome={{
+          total: bundleResult.total,
+          imported: bundleResult.imported,
+          duplicates: bundleResult.duplicates,
+          skipped: bundleResult.failed,
+          errors: bundleResult.errors,
+        }}
+        warning={
+          bundleResult.imagesSkipped > 0
+            ? t('trades.importResult.imagesSkipped', { count: bundleResult.imagesSkipped })
+            : null
+        }
+        actions={resultActions}
+      />
     )
   }
 
@@ -499,7 +529,24 @@ export default function UploadStep({
             )}
           >
             <input {...getInputProps()} />
-            {file ? (
+            {bundle ? (
+              <div>
+                <FileText className="mx-auto h-7 w-7 text-primary" />
+                <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+                  <span className="font-medium">{bundle.filename}</span>
+                  <button
+                    onClick={reset}
+                    className="text-muted-foreground hover:text-foreground"
+                    aria-label={t('addTrades.common.close')}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('trades.backup.summary.trades', { count: bundle.bundle.trades.length })}
+                </p>
+              </div>
+            ) : file ? (
               <div>
                 <FileText className="mx-auto h-7 w-7 text-primary" />
                 <div className="mt-3 flex items-center justify-center gap-2 text-sm">
@@ -522,6 +569,7 @@ export default function UploadStep({
                 <p className="mt-3 text-sm text-muted-foreground">
                   {isDragActive ? t('addTrades.upload.dropActive') : t('addTrades.upload.dropHere')}
                 </p>
+                <p className="mt-1 text-xs text-muted-foreground">{t('addTrades.upload.dropHint')}</p>
                 {parseError && <p className="mt-2 text-xs text-loss">{parseError}</p>}
                 <button
                   onClick={open}
@@ -569,8 +617,21 @@ export default function UploadStep({
         </div>
       </div>
 
+      {/* A Tradenza backup: nothing to map, every value already has a meaning */}
+      {bundle && (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <h3 className="text-base font-semibold">{t('trades.backup.importTitle')}</h3>
+          <BundleImportPanel
+            bundle={bundle.bundle}
+            filename={bundle.filename}
+            accountId={accountId}
+            onResult={setBundleResult}
+          />
+        </div>
+      )}
+
       {/* Column mapping */}
-      {file && rows.length > 0 && (
+      {!bundle && file && rows.length > 0 && (
         <div className="rounded-2xl border border-border bg-card p-6">
           <h3 className="text-base font-semibold">{t('addTrades.upload.mapping.title')}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{t('addTrades.upload.mapping.subtitle')}</p>

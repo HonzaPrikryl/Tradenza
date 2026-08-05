@@ -309,3 +309,91 @@ describe('extractTable', () => {
     expect(rows).toHaveLength(1)
   })
 })
+
+describe('buildImportMapping — our own CSV export', () => {
+  // The exact headers exportTradesToCsv writes. A round trip through a
+  // spreadsheet is only worth anything if every one of them comes back.
+  const OUR_HEADERS = [
+    'Symbol',
+    'Side',
+    'Status',
+    'Asset Class',
+    'Qty',
+    'Exit Qty',
+    'Multiplier',
+    'Entry Price',
+    'Exit Price',
+    'Entry Time',
+    'Exit Time',
+    'Gross P&L',
+    'Net P&L',
+    'Commission',
+    'Stop Loss',
+    'Take Profit',
+    'Risk Amount',
+    'Planned R:R',
+    'R Multiple',
+    'Setup',
+    'Strategy',
+    'Entry Adherence',
+    'Exit Adherence',
+    'Account',
+    'Tags',
+    'Rating',
+    'Notes',
+  ]
+
+  it('maps every journal column our exporter writes', () => {
+    const m = buildImportMapping(OUR_HEADERS)
+    expect(m).toMatchObject({
+      symbol: 'Symbol',
+      side: 'Side',
+      status: 'Status',
+      quantity: 'Qty',
+      exitQuantity: 'Exit Qty',
+      multiplier: 'Multiplier',
+      entryPrice: 'Entry Price',
+      exitPrice: 'Exit Price',
+      entryDate: 'Entry Time',
+      exitDate: 'Exit Time',
+      grossPnl: 'Gross P&L',
+      netPnl: 'Net P&L',
+      fees: 'Commission',
+      stopLoss: 'Stop Loss',
+      takeProfit: 'Take Profit',
+      riskAmount: 'Risk Amount',
+      riskRewardRatio: 'Planned R:R',
+      setupName: 'Setup',
+      strategy: 'Strategy',
+      tags: 'Tags',
+      rating: 'Rating',
+      notes: 'Notes',
+    })
+  })
+
+  it('never assigns one column to two fields', () => {
+    const used = Object.values(buildImportMapping(OUR_HEADERS))
+    expect(new Set(used).size).toBe(used.length)
+  })
+
+  it('leaves a plain broker export untouched by the journal candidates', () => {
+    const m = buildImportMapping(['Symbol', 'Side', 'Qty', 'Entry Price', 'Exit Price', 'Open Date', 'Net P&L'])
+    expect(m.symbol).toBe('Symbol')
+    expect(m.entryPrice).toBe('Entry Price')
+    expect(m.stopLoss).toBeUndefined()
+    expect(m.tags).toBeUndefined()
+    expect(m.rating).toBeUndefined()
+  })
+
+  it('does not let "Take Profit" be swallowed by the generic profit candidate', () => {
+    const m = buildImportMapping(['Symbol', 'Entry Price', 'Open Date', 'Take Profit', 'Profit'])
+    expect(m.takeProfit).toBe('Take Profit')
+    expect(m.netPnl).toBe('Profit')
+  })
+
+  it('keeps "Risk Amount" and "Planned R:R" apart', () => {
+    const m = buildImportMapping(['Symbol', 'Entry Price', 'Open Date', 'Risk Amount', 'Planned R:R'])
+    expect(m.riskAmount).toBe('Risk Amount')
+    expect(m.riskRewardRatio).toBe('Planned R:R')
+  })
+})

@@ -9,6 +9,7 @@ import { readGlobalSettings } from '@/lib/global-settings'
 import TradesTableClient from '@/components/trades/TradesTableClient'
 import TradesHeader from '@/components/trades/TradesHeader'
 import TradesStatsCards from '@/components/trades/TradesStatsCards'
+import ImportBundleButton from '@/components/trades/ImportBundleButton'
 import DemoNotice from '@/components/onboarding/DemoNotice'
 import type { TradeFilters } from '@/types'
 import { t } from '@/i18n'
@@ -59,7 +60,14 @@ export default async function TradesPage({
 
   return (
     <div className="p-4 sm:p-6 animate-in">
-      <TradesHeader total={result.total} />
+      <TradesHeader
+        total={result.total}
+        actions={
+          accounts.length > 0 ? (
+            <ImportBundleButton accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} />
+          ) : null
+        }
+      />
       {!hasTrades && <DemoNotice context="trades" />}
       {activeStrategy && (
         <div className="mb-3 flex items-center gap-2 text-sm">

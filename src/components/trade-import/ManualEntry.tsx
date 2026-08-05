@@ -13,7 +13,6 @@ import { track } from '@/lib/analytics'
 import { assetMultiplier, editorDefaultMultiplier } from '@/lib/futures'
 import { getBroker, GENERIC_BROKER, type AssetType } from '@/lib/brokers'
 import DateTimeField from '@/components/ui/DateTimeField'
-import DateField from '@/components/ui/DateField'
 import {
   Table,
   TableBody,
@@ -51,7 +50,6 @@ const qtyHeaderKey = (assetClass: AssetClass): string => {
 interface Execution {
   id: string
   dateTime: string // "YYYY-MM-DDTHH:mm:ss"
-  expDate: string // "YYYY-MM-DD"
   multiplier: string
   qty: string
   side: 'buy' | 'sell'
@@ -63,7 +61,6 @@ interface Execution {
 const emptyExec = (side: 'buy' | 'sell' = 'buy', multiplier = ''): Execution => ({
   id: Math.random().toString(36).slice(2),
   dateTime: '',
-  expDate: '',
   multiplier,
   qty: '',
   side,
@@ -126,10 +123,7 @@ export default function ManualEntry({
       const side = rows.length > 0 && rows[0].side === 'buy' ? 'sell' : 'buy'
       const last = rows[rows.length - 1]
       const row = emptyExec(side, rowMultiplier(assetClass, symbol))
-      if (last) {
-        row.expDate = last.expDate
-        row.qty = last.qty
-      }
+      if (last) row.qty = last.qty
       return [...rows, row]
     })
 
@@ -178,7 +172,6 @@ export default function ManualEntry({
         assetClass,
         symbol: trimmed,
         contractMultiplier: num(execs[0]?.multiplier) || assetMultiplier(assetClass, trimmed),
-        expirationDate: execs[0]?.expDate || undefined,
         executions: execs.map((e) => ({
           datetime: new Date(e.dateTime).toISOString(),
           side: e.side,
@@ -256,7 +249,6 @@ export default function ManualEntry({
               <TableHead>
                 <TableHeadRow className="border-b-0 bg-muted/40">
                   <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.dateTime')}</TableHeaderCell>
-                  <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.expDate')}</TableHeaderCell>
                   <TableHeaderCell className="px-3 py-2.5">{t('addTrades.manual.col.multiplier')}</TableHeaderCell>
                   <TableHeaderCell className="px-3 py-2.5">
                     {t(`addTrades.manual.col.${qtyHeaderKey(assetClass)}`)}
@@ -271,11 +263,8 @@ export default function ManualEntry({
               <TableBody>
                 {execs.map((r) => (
                   <TableRow key={r.id} className="border-b-0 border-t border-border align-middle">
-                    <TableCell className="px-3 py-2 min-w-[13rem]">
+                    <TableCell className="px-3 py-2 max-w-[1rem]">
                       <DateTimeField value={r.dateTime} onChange={(v) => update(r.id, { dateTime: v })} />
-                    </TableCell>
-                    <TableCell className="px-3 py-2 min-w-[11rem]">
-                      <DateField value={r.expDate} onChange={(v) => update(r.id, { expDate: v })} />
                     </TableCell>
                     <TableCell className="px-3 py-2 w-24">
                       <input
@@ -357,7 +346,7 @@ export default function ManualEntry({
                   </TableRow>
                 ))}
                 <TableRow className="border-b-0 border-t border-border">
-                  <TableCell colSpan={9} className="px-4 py-3">
+                  <TableCell colSpan={8} className="px-4 py-3">
                     <button
                       type="button"
                       onClick={addRow}

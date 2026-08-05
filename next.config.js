@@ -38,6 +38,7 @@ const nextConfig = {
   experimental: {
     serverActions: {
       allowedOrigins: serverActionOrigins,
+      bodySizeLimit: '12mb',
     },
     // Tree-shake barrel imports for heavy packages so only used modules ship.
     optimizePackageImports: ['@mui/material', '@mui/system', '@mui/x-date-pickers', 'lucide-react', 'date-fns'],

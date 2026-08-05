@@ -47,7 +47,7 @@
     "yourFile": "Upload your file",
     "timeZone": "Time zone",
     "timeZoneHint": "Please select the file time zone. If you want to see data in a different time zone please update it in your settings.",
-    "dropHere": "Drag and drop your CSV or TXT file here",
+    "dropHere": "Drag and drop your file here",
     "dropActive": "Drop the file to parse it",
     "uploadButton": "Upload file",
     "emptyFile": "The file is empty or has no readable rows.",
@@ -58,14 +58,6 @@
     "importing": "Importing…",
     "importedToast": "{count} trades imported",
     "importError": "Import failed",
-    "resultTitle": "{count} trades imported",
-    "resultTitleNone": "Nothing was imported",
-    "resultTitleDuplicates": "Already imported",
-    "resultDetail": "{total} rows processed · {imported} imported · {skipped} skipped",
-    "resultDuplicates": "{count} rows match trades already in this account and were skipped. Import the same file twice and nothing is added.",
-    "showErrors": "Show {count} issues",
-    "importAnother": "Import another file",
-    "viewTrades": "View trades",
     "supportedAssets": "Supported Asset Types:",
     "assetType": "Asset type",
     "assetTypeHint": "Which asset type is this file? We use it to value each trade correctly.",
@@ -119,9 +111,19 @@
       "grossPnl": "Gross P&L",
       "netPnl": "Net P&L",
       "setupName": "Setup",
-      "notes": "Notes"
+      "notes": "Notes",
+      "exitQuantity": "Exit quantity",
+      "multiplier": "Contract multiplier",
+      "stopLoss": "Stop loss",
+      "takeProfit": "Take profit",
+      "riskAmount": "Risk amount",
+      "riskRewardRatio": "Planned R:R",
+      "rating": "Rating",
+      "strategy": "Strategy",
+      "tags": "Tags"
     },
-    "tooManyRows": "This file has {count} rows — more than the {max} we can import at once. Split it and import the parts separately."
+    "tooManyRows": "This file has {count} rows — more than the {max} we can import at once. Split it and import the parts separately.",
+    "dropHint": "A CSV or TXT from your broker, or a .json exported from Tradenza."
   },
   "manual": {
     "title": "Add manually",
@@ -152,7 +154,6 @@
     },
     "col": {
       "dateTime": "Date & Time",
-      "expDate": "Exp Date",
       "multiplier": "Multiplier",
       "contracts": "Number of contracts",
       "shares": "Number of shares",
