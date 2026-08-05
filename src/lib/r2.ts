@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  PutObjectCommand,
+  CopyObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
+} from '@aws-sdk/client-s3'
 
 // Cloudflare R2 is S3-compatible, so we talk to it with the AWS S3 SDK pointed
 // at the R2 endpoint. Used server-side to store binary uploads (e.g. note
@@ -48,6 +54,32 @@ export async function uploadToR2(key: string, body: Uint8Array, contentType: str
   )
   const base = (process.env.R2_PUBLIC_URL as string).replace(/\/$/, '')
   return `${base}/${key}`
+}
+
+/**
+ * Duplicate an object already in the bucket under a new key, returning its
+ * public URL.
+ *
+ * Server-side copy rather than download-and-re-upload: the bytes never leave R2,
+ * so importing a journal with a few hundred screenshots costs no bandwidth and
+ * cannot half-succeed on a slow client connection. Used when images change
+ * owner — an imported trade must reference an object under the *receiving*
+ * user's prefix, otherwise deleting the exporter's account would take the
+ * importer's screenshots with it.
+ */
+export async function copyR2Object(sourceKey: string, destKey: string): Promise<string> {
+  const Bucket = process.env.R2_BUCKET_NAME as string
+  await client().send(
+    new CopyObjectCommand({
+      Bucket,
+      // CopySource is bucket-qualified and URL-encoded, per the S3 API.
+      CopySource: `${Bucket}/${sourceKey.split('/').map(encodeURIComponent).join('/')}`,
+      Key: destKey,
+      CacheControl: 'public, max-age=31536000, immutable',
+    }),
+  )
+  const base = (process.env.R2_PUBLIC_URL as string).replace(/\/$/, '')
+  return `${base}/${destKey}`
 }
 
 /**

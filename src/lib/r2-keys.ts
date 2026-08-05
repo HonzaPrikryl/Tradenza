@@ -27,6 +27,19 @@ export function r2KeyFromUrl(url: string | null | undefined): string | null {
   return key && !key.includes('..') ? key : null
 }
 
+/**
+ * Whether an object key sits under this user's own upload prefix.
+ *
+ * Uploads land in `notes/{userId}/…`, so the key alone answers "is this already
+ * mine?". Import uses it to reference an image instead of duplicating it when a
+ * journal moves between one user's own accounts — orphan cleanup scans
+ * everything that user owns, so a second reference is enough to keep the object
+ * alive, and copying would silently double their storage on every import.
+ */
+export function r2KeyBelongsTo(key: string | null | undefined, userId: string): boolean {
+  return !!key && !!userId && key.startsWith(`notes/${userId}/`)
+}
+
 /** Object keys for every `<img>` in a rich-text field that points at our bucket. */
 export function r2KeysFromHtml(html: string | null | undefined): string[] {
   if (!html) return []
@@ -36,4 +49,25 @@ export function r2KeysFromHtml(html: string | null | undefined): string[] {
     if (key) keys.push(key)
   }
   return keys
+}
+
+/**
+ * Repoint every `<img>` in a rich-text field at a replacement URL.
+ *
+ * Used when a note changes owner (import): the images it embeds are copied to
+ * the receiving user's prefix, and the note has to point at the copies. Only
+ * sources that resolve to one of our own keys are considered — external images
+ * and inline `data:` URLs are left exactly as they are, and any key the caller
+ * has no replacement for keeps its original URL.
+ */
+export function rewriteHtmlImageUrls(
+  html: string | null | undefined,
+  replacement: (key: string) => string | undefined,
+): string | null {
+  if (!html) return html ?? null
+  return html.replace(/(<img\b[^>]*\bsrc\s*=\s*)(["'])([^"']+)\2/gi, (match, prefix, quote, src) => {
+    const key = r2KeyFromUrl(String(src).replace(/&amp;/g, '&'))
+    const next = key ? replacement(key) : undefined
+    return next ? `${prefix}${quote}${next}${quote}` : match
+  })
 }
