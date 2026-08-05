@@ -12,6 +12,27 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-08-05
+
+A production fix and a small calendar addition. The dashboard could refuse to
+load with a database error — it asked for too much at once — and the monthly
+calendar now shows which days you actually wrote something about.
+
+### Added
+
+- **The calendar marks days that carry a note.** A small icon in the day cell
+  when the day has a daily note, or any trade that day has one — including days
+  with a note but no trades.
+
+### Fixed
+
+- **The dashboard could fail to load with a database connection error.** It
+  fanned out to eleven queries at once, and the serverless driver opens a
+  connection per query, so a single page view was a burst large enough for Neon
+  to refuse — reported from production. The four getting-started checks are now
+  one query and the template list is read once instead of twice, taking the page
+  from eleven concurrent queries to three.
+
 ## [0.6.0] - 2026-08-05
 
 Getting a trade journal out of Tradenza, and back in. The CSV export was a
@@ -479,7 +500,8 @@ dashboard, statistics, strategies & playbooks, discipline tracking, tags,
 prop-firm trading accounts, candle charts, PWA — running on Next.js 15,
 Drizzle ORM, PostgreSQL (Neon) and Clerk.
 
-[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.6.0...HEAD
+[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.6.1
 [0.6.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.6.0
 [0.5.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.5.0
 [0.4.1]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.4.1
