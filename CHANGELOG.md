@@ -12,12 +12,76 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-08-05
+
+Getting a trade journal out of Tradenza, and back in. The CSV export was a
+one-way door: it flattened a trade for a spreadsheet and dropped everything
+without a column — the fills, the risk plan, the tags, the screenshots — and
+nothing read it back. This release adds a complete export that round-trips, and
+teaches the spreadsheet export and importer to carry as much as a spreadsheet
+can. Along the way, the trade detail page finally lets you close an open trade.
+
+**Upgrading.** Migration `0022` drops four `trades` columns — `emotion_before`,
+`emotion_after`, `mistakes`, `lessons`. No released version ever wrote to them,
+so the migration cannot lose data; it applies itself on start. No new
+environment variables. One thing to check: importing a backup uploads a file of
+up to 10 MB, so a self-host behind a reverse proxy may need its own upload limit
+raised (`client_max_body_size` on nginx). Vercel and the Docker image are
+already fine.
+
+### Added
+
+- **Add executions from the trade detail page.** An open trade could not be
+  closed — the editor only edited rows that already existed. The new button
+  pre-fills the closing side and remaining quantity, and stays editable for
+  scale-ins and partial take-profits.
+- **Complete export (`.json`).** Carries every field a trade has: notes, rating,
+  stop loss, take profit, planned R:R, risk amount, the tick-level risk plan and
+  individual fills, checklist progress, tags with their groups, the strategy
+  playbook, and images.
+- **Import a complete export back.** Into another account or another Tradenza.
+  Strategies and tags are matched by name and created when missing; trades
+  already present are skipped, so importing twice changes nothing.
+- **The import step accepts either file.** A Tradenza export is recognised by
+  its contents and restored without a mapping step; broker CSVs work as before.
+- Playbook criteria groups can be collapsed on the trade detail page.
+
 ### Changed
 
-- Tags no longer appear under the symbol in the trades list. On an account with
-  a well-used tag vocabulary the badges pushed rows to two or three lines and
-  made the table hard to scan; tags are still shown, filterable and editable on
-  the trade detail page.
+- **One Export action.** The choice is now made in the export dialog, described
+  by where the file is going rather than by two similarly-named buttons.
+- **The spreadsheet export carries more, and the importer reads it back.** Added
+  status, asset class, exit quantity, multiplier, planned R:R and setup on the
+  way out; on the way in it now also restores stop loss, take profit, planned
+  R:R, risk amount, rating, setup, strategy and tags.
+- **Every import ends on the same result card** — imported, already there,
+  skipped, and an expandable list of what went wrong.
+
+### Removed
+
+- **The unused "emotion before/after", "mistakes" and "lessons" fields.** They
+  existed in the database and in a validation schema, but no screen ever wrote
+  or showed them — the actions that accepted them had no caller. What a trade
+  needs saying about it goes in notes and tags, which the statistics can read;
+  see migration `0022`.
+- The **expiration date** column in manual entry. It was stored and never read:
+  the chart identifies a futures contract from the symbol, or by matching the
+  fill price against every listed expiry.
+- Tags under the symbol in the trades list. They pushed rows to two or three
+  lines; tags remain visible, filterable and editable on the trade detail page.
+
+### Fixed
+
+- **Importing a backup over ~1 MB failed with an unreadable error** — Next's
+  default server-action body limit. The limit now matches what the app accepts,
+  and the size check that can explain itself runs first.
+- **A backup import wrote one trade at a time**, three round trips each, which
+  no serverless request survives on a large journal. Writes are batched, with a
+  row-by-row retry so one bad trade doesn't take the batch with it.
+- **Importing between two of your own accounts duplicated every image** in
+  object storage. Images already yours are referenced, not copied.
+- Exporting more trades than a single file can hold now says so, instead of
+  writing a backup the importer would later refuse.
 
 ## [0.5.0] - 2026-08-02
 
@@ -415,7 +479,8 @@ dashboard, statistics, strategies & playbooks, discipline tracking, tags,
 prop-firm trading accounts, candle charts, PWA — running on Next.js 15,
 Drizzle ORM, PostgreSQL (Neon) and Clerk.
 
-[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.5.0...HEAD
+[unreleased]: https://github.com/HonzaPrikryl/tradenza/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.6.0
 [0.5.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.5.0
 [0.4.1]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.4.1
 [0.4.0]: https://github.com/HonzaPrikryl/tradenza/releases/tag/v0.4.0
