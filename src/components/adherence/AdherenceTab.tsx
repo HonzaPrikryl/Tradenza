@@ -51,61 +51,34 @@ export default function AdherenceTab({ filtersKey }: { filtersKey?: string }) {
   if (failed) return <Note>{t('adherence.toast.saveError')}</Note>
   if (!data) return <Skeleton />
 
-  // Only the genuine "nothing defined" case gets the onboarding panel — having criteria
-  // but no closed trades is a different message, left to each widget's own empty state.
-  if (data.definedCriteria === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card/40 px-6 py-16 text-center">
-        <h2 className="text-base font-semibold">{t('adherence.empty.title')}</h2>
-        <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
-          {t('adherence.empty.description')}
-        </p>
-        <Link
-          href="/strategies?tab=criteria"
-          className="mt-5 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          {t('adherence.empty.cta')}
-        </Link>
-      </div>
-    )
-  }
-
-  // Criteria exist but nothing is left to measure — say which of the two reasons it is
-  // rather than rendering a page of dashes. Unticking everything must offer the way back.
-  if (data.trades === 0) {
-    const byChoice = hidden.length > 0
-    return (
-      <div className="space-y-3">
-        {scope && !byChoice && <ScopeChip label={scope} />}
-        <div className="rounded-xl border border-dashed border-border bg-card/40 px-6 py-14 text-center">
-          <p className="text-sm font-medium">
-            {t(byChoice ? 'adherence.noSetupsShown.title' : 'adherence.noTradesInFilter.title')}
-          </p>
-          <p className="mx-auto mt-1.5 max-w-md text-xs leading-relaxed text-muted-foreground">
-            {t(byChoice ? 'adherence.noSetupsShown.description' : 'adherence.noTradesInFilter.description')}
-          </p>
-          {byChoice && (
-            <button
-              type="button"
-              onClick={() => setHidden([])}
-              className="mt-4 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary hover:text-primary"
-            >
-              {t('adherence.perStrategy.showAll', { count: hidden.length })}
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
+  const byChoice = hidden.length > 0
 
   return (
     <div className="space-y-5">
-      {/* Everything except the by-setup list is derived from the current selection, so it
-          fades while the new figures load rather than flashing a skeleton. */}
       <div className={cn('space-y-5 transition-opacity', busy && 'opacity-60')}>
         <div className="space-y-3">
           {scope && <ScopeChip label={scope} />}
-          <VerdictBanner verdict={data.verdict} />
+          {data.trades === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card/40 px-5 py-4 text-center">
+              <p className="text-sm font-medium">
+                {t(byChoice ? 'adherence.noSetupsShown.title' : 'adherence.noTradesInFilter.title')}
+              </p>
+              <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
+                {t(byChoice ? 'adherence.noSetupsShown.description' : 'adherence.noTradesInFilter.description')}
+              </p>
+              {byChoice && (
+                <button
+                  type="button"
+                  onClick={() => setHidden([])}
+                  className="mt-3 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary hover:text-primary"
+                >
+                  {t('adherence.perStrategy.showAll', { count: hidden.length })}
+                </button>
+              )}
+            </div>
+          ) : (
+            <VerdictBanner verdict={data.verdict} />
+          )}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">

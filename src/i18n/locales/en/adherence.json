@@ -111,20 +111,25 @@
     "empty": "Review a few trades and the trend starts here."
   },
   "perStrategy": {
-    "title": "By setup",
+    "title": "By strategy",
     "trades": "{count, plural, one {# trade} other {# trades}}",
     "toggle": "Include {name} in the figures above",
     "showAll": "Show all ({count} hidden)",
-    "empty": "No setups with closed trades yet."
+    "empty": "No strategies with closed trades yet."
   },
   "criteria": {
     "subtitle": "The yes/no checks each trade is measured against. Changes apply from today on.",
+    "needsStrategy": {
+      "title": "Create a strategy first",
+      "description": "Criteria describe how a strategy is traded, so there has to be one to attach them to.",
+      "cta": "New strategy"
+    },
     "add": "Add criterion",
     "seed": "Start from a template",
-    "universalTitle": "Every setup",
-    "universalLead": "Written once, applied to all your setups.",
-    "perStrategyTitle": "Per setup",
-    "perStrategyLead": "Checks only this setup is measured against, on top of the universal ones.",
+    "universalTitle": "Every strategy",
+    "universalLead": "Written once, applied to all your strategies.",
+    "perStrategyTitle": "Per strategy",
+    "perStrategyLead": "Checks only this strategy is measured against, on top of the universal ones.",
     "universalOnly": "universal only",
     "emptyBlock": "No criteria yet.",
     "form": {
@@ -136,7 +141,7 @@
       "definition": "What counts as met",
       "definitionPlaceholder": "Optional — the detail you'd otherwise argue with yourself about",
       "context": "Adding to:",
-      "scopeUniversal": "Every setup",
+      "scopeUniversal": "Every strategy",
       "mode": "Is this the same criterion?",
       "modeFix": "Yes — just better wording",
       "modeFixHint": "Past trades keep counting towards it.",

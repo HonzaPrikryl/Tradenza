@@ -34,7 +34,8 @@
     "notFound": "Criterion not found."
   },
   "adherence": {
-    "locked": "This trade's review window has closed — its adherence can't be changed."
+    "locked": "This trade's review window has closed — its adherence can't be changed.",
+    "needsStrategy": "Create a setup before writing criteria — there is nothing to attach them to yet."
   },
   "export": {
     "tooManyTrades": "That is more than {max} trades — more than a single file can hold. Select fewer and export them in parts."

@@ -87,6 +87,8 @@ export default function StrategiesClient({
     })
   }, [strategies, query, sortKey, sortDir])
 
+  const strategiesKey = strategies.map((s) => s.id).join(',')
+
   const openNew = () => setModal({ strategy: null })
   const openEdit = (s: StrategyDTO) => setModal({ strategy: s })
 
@@ -261,7 +263,9 @@ export default function StrategiesClient({
       <div {...tabPanelProps(TAB_ID, 'adherence', tab === 'adherence')}>
         {opened.has('adherence') && <AdherenceTab filtersKey={filtersKey} />}
       </div>
-      <div {...tabPanelProps(TAB_ID, 'criteria', tab === 'criteria')}>{opened.has('criteria') && <CriteriaTab />}</div>
+      <div {...tabPanelProps(TAB_ID, 'criteria', tab === 'criteria')}>
+        {opened.has('criteria') && <CriteriaTab strategiesKey={strategiesKey} onCreateStrategy={openNew} />}
+      </div>
 
       {modal && (
         <StrategyFormModal strategy={modal.strategy} onClose={() => setModal(null)} onSaved={() => router.refresh()} />

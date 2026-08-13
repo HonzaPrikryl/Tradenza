@@ -154,6 +154,19 @@ export const getAllChecklistItems = authedAction([], async ({ userId }): Promise
   return loadChecklistItems(userId, timezone)
 })
 
+/**
+ * Criteria describe how a setup is traded, so one has to exist first. Without this a user
+ * could fill the universal blocks on an empty journal and have nothing to measure: a trade
+ * with no strategy is scored against nothing (see applicableItems).
+ */
+async function assertHasStrategy(userId: string): Promise<void> {
+  const any = await db.query.strategies.findFirst({
+    where: and(eq(strategies.userId, userId), isNull(strategies.archivedAt)),
+    columns: { id: true },
+  })
+  if (!any) throw new ValidationError(t('errors.adherence.needsStrategy'))
+}
+
 async function assertOwnedStrategy(userId: string, strategyId: string | null): Promise<void> {
   if (!strategyId) return
   const owned = await db.query.strategies.findFirst({
@@ -169,6 +182,7 @@ const revalidateAdherence = () => {
 }
 
 export const createChecklistItem = mutationAction([itemSchema], async ({ userId }, input) => {
+  await assertHasStrategy(userId)
   await assertOwnedStrategy(userId, input.strategyId)
   const { timezone } = await readGlobalSettings()
   const [item] = await db
@@ -357,6 +371,7 @@ const UNIVERSAL_TEMPLATE: { block: 'gate' | 'exit'; label: string; definition: s
 /** Fill the empty universal blocks from the template — only empty ones, so re-running
  *  can't duplicate what the user has written. */
 export const seedUniversalCriteria = mutationAction([], async ({ userId }) => {
+  await assertHasStrategy(userId)
   const { timezone } = await readGlobalSettings()
   const existing = await db
     .select({ block: checklistItems.block })

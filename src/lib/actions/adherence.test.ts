@@ -61,7 +61,13 @@ vi.mock('@/lib/db', () => {
   }
 })
 
-import { updateChecklistItem, setTradeBlockProgress, confirmTradeAllMet, createStrategyCriteria } from './adherence'
+import {
+  updateChecklistItem,
+  setTradeBlockProgress,
+  confirmTradeAllMet,
+  createStrategyCriteria,
+  createChecklistItem,
+} from './adherence'
 import type { ChecklistItem } from '@/lib/adherence'
 
 /** Item ids must be real UUIDs — the actions validate them before they reach the engine. */
@@ -215,6 +221,22 @@ describe('updateChecklistItem', () => {
     findFirstMock.mockResolvedValue({ id: ID, strategyId: null, block: 'gate', sortOrder: 0 })
     await updateChecklistItem(ID, { label: 'New', definition: null }, 'replace')
     expect(writes.map((w) => w.kind)).toEqual(['update', 'insert'])
+  })
+})
+
+describe('createChecklistItem', () => {
+  // Criteria hang off setups: a trade with no strategy is measured against nothing, so a
+  // journal with no setups at all could only ever collect criteria that score nothing.
+  it('refuses to write anything until a setup exists', async () => {
+    findFirstMock.mockResolvedValue(undefined)
+    await expect(createChecklistItem({ block: 'gate', label: 'In window', strategyId: null })).rejects.toThrow()
+    expect(writes).toHaveLength(0)
+  })
+
+  it('writes once a setup exists', async () => {
+    findFirstMock.mockResolvedValue({ id: STRATEGY })
+    await createChecklistItem({ block: 'gate', label: 'In window', strategyId: null })
+    expect(lastWrite('insert').values).toMatchObject({ block: 'gate', label: 'In window', strategyId: null })
   })
 })
 

@@ -26,7 +26,13 @@ import { t, tRich } from '@/i18n'
  * Where the checklist is defined. Deleting is presented as "retire" because a criterion
  * keeps governing the trades it already governed.
  */
-export default function CriteriaTab() {
+export default function CriteriaTab({
+  strategiesKey,
+  onCreateStrategy,
+}: {
+  strategiesKey?: string
+  onCreateStrategy?: () => void
+}) {
   const confirm = useConfirm()
   const [data, setData] = useState<AdherenceSetup | null>(null)
   const [failed, setFailed] = useState(false)
@@ -49,15 +55,18 @@ export default function CriteriaTab() {
 
   useEffect(() => {
     void reload()
-  }, [reload])
+  }, [reload, strategiesKey])
 
   if (failed) return <Note>{t('adherence.toast.saveError')}</Note>
   if (!data) return <Skeleton />
 
-  // Offered only while a universal block is empty; the action skips the non-empty ones.
-  const canSeed = !CHECKLIST_BLOCKS.filter((b) => b !== 'setup').every((b) =>
-    data.items.some((i) => i.strategyId === null && i.block === b),
-  )
+  const hasStrategy = data.strategies.length > 0
+
+  const canSeed =
+    hasStrategy &&
+    !CHECKLIST_BLOCKS.filter((b) => b !== 'setup').every((b) =>
+      data.items.some((i) => i.strategyId === null && i.block === b),
+    )
 
   const seed = () => {
     startTransition(async () => {
@@ -171,14 +180,16 @@ export default function CriteriaTab() {
           {perStrategy && items.length === 0 && (
             <span className="truncate text-xs text-muted-foreground/70">{t('adherence.criteria.universalOnly')}</span>
           )}
-          <button
-            type="button"
-            onClick={() => setItemDialog({ item: null, block, strategyId })}
-            className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t('adherence.criteria.add')}
-          </button>
+          {hasStrategy && (
+            <button
+              type="button"
+              onClick={() => setItemDialog({ item: null, block, strategyId })}
+              className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t('adherence.criteria.add')}
+            </button>
+          )}
         </div>
         {items.length > 0 ? (
           <SortableList
@@ -202,6 +213,25 @@ export default function CriteriaTab() {
   return (
     <div className="space-y-5">
       <p className="text-sm leading-relaxed text-muted-foreground">{t('adherence.criteria.subtitle')}</p>
+
+      {!hasStrategy && (
+        <div className="rounded-xl border border-dashed border-border bg-card/40 px-5 py-4 text-center">
+          <p className="text-sm font-medium">{t('adherence.criteria.needsStrategy.title')}</p>
+          <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-muted-foreground">
+            {t('adherence.criteria.needsStrategy.description')}
+          </p>
+          {onCreateStrategy && (
+            <button
+              type="button"
+              onClick={onCreateStrategy}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t('adherence.criteria.needsStrategy.cta')}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Universal blocks: defined once, applied to every setup. */}
       <section className="rounded-xl border border-border bg-card">
@@ -234,8 +264,8 @@ export default function CriteriaTab() {
           <p className="mt-0.5 text-xs text-muted-foreground">{t('adherence.criteria.perStrategyLead')}</p>
         </div>
         <div className="space-y-6 p-3 sm:p-4">
-          {data.strategies.length === 0 ? (
-            <Note>{t('adherence.perStrategy.empty')}</Note>
+          {!hasStrategy ? (
+            <Note>{t('adherence.criteria.needsStrategy.description')}</Note>
           ) : (
             data.strategies.map((s) => (
               <div key={s.id}>

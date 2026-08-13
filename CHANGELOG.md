@@ -12,6 +12,16 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ## [Unreleased]
 
+### Fixed
+
+- **Criteria could be written before any setup existed.** They could never score
+  anything — a trade with no strategy is measured against nothing — so the
+  Criteria tab now asks for a setup first and the server refuses the write.
+- **A new setup didn't show up under "Per setup"** until the page was reloaded.
+- **The Adherence tab replaced itself with an onboarding panel** while nothing
+  was defined yet. It shows the normal layout, with one line saying what is
+  missing.
+
 ## [0.7.0] - 2026-08-13
 
 Adherence, rebuilt. The old checklist produced one number you couldn't act on
