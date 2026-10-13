@@ -137,3 +137,15 @@ describe('positionState', () => {
     expect(positionState([]).openQty).toBe(0)
   })
 })
+
+describe('positionState with dividends', () => {
+  it('ignores dividend rows', () => {
+    expect(
+      positionState([
+        { time: 1, side: 'dividend', quantity: 1 },
+        { time: 2, side: 'sell', quantity: 3 },
+        { time: 3, side: 'dividend', quantity: 1 },
+      ]),
+    ).toEqual({ entrySide: 'sell', openQty: 3 })
+  })
+})

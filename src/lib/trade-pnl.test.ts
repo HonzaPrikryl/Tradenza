@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { roundMoney, derivePnl } from './trade-pnl'
+import { roundMoney, derivePnl, deriveTradeFromExecutions, type PersistedExecution } from './trade-pnl'
 
 describe('roundMoney', () => {
   it('strips binary-float dust', () => {
@@ -60,5 +60,64 @@ describe('derivePnl', () => {
     })
     expect(grossPnl).toBe(0.6) // (1.3 - 1.1) * 3 = 0.6 (not 0.6000000000000001)
     expect(netPnl).toBe(0.5)
+  })
+})
+
+describe('deriveTradeFromExecutions', () => {
+  const ex = (datetime: string, side: PersistedExecution['side'], quantity: number, price: number, fee = 0) => ({
+    datetime,
+    side,
+    quantity,
+    price,
+    commission: 0,
+    fee,
+  })
+
+  it('adds a dividend to P&L without touching position or averages', () => {
+    const d = deriveTradeFromExecutions(
+      [
+        ex('2026-01-02T10:00:00Z', 'buy', 100, 50),
+        ex('2026-03-15T10:00:00Z', 'dividend', 1, 42, 6.3),
+        ex('2026-06-01T10:00:00Z', 'sell', 100, 55),
+      ],
+      1,
+    )!
+    expect(d.direction).toBe('long')
+    expect(d.status).toBe('closed')
+    expect(d.entryQuantity).toBe(100)
+    expect(d.exitQuantity).toBe(100)
+    expect(d.entryPrice).toBe(50)
+    expect(d.exitPrice).toBe(55)
+    expect(d.dividends).toBe(42)
+    // 500 price gain + 42 dividend; withholding tax counts as a fee
+    expect(d.grossPnl).toBe(542)
+    expect(d.netPnl).toBe(535.7)
+  })
+
+  it('does not apply the contract multiplier to dividends', () => {
+    const d = deriveTradeFromExecutions(
+      [
+        ex('2026-01-02T10:00:00Z', 'buy', 1, 10),
+        ex('2026-01-03T10:00:00Z', 'dividend', 1, 5),
+        ex('2026-01-04T10:00:00Z', 'sell', 1, 11),
+      ],
+      100,
+    )!
+    expect(d.grossPnl).toBe(105)
+  })
+
+  it('ignores a dividend dated before the opening fill when picking the side', () => {
+    const d = deriveTradeFromExecutions(
+      [ex('2026-01-01T10:00:00Z', 'dividend', 1, 5), ex('2026-01-02T10:00:00Z', 'sell', 3, 20)],
+      1,
+    )!
+    expect(d.direction).toBe('short')
+    expect(d.status).toBe('open')
+    expect(d.entryDatetime.toISOString()).toBe('2026-01-02T10:00:00.000Z')
+    expect(d.netPnl).toBeNull()
+  })
+
+  it('returns null when there is no buy/sell execution', () => {
+    expect(deriveTradeFromExecutions([ex('2026-01-01T10:00:00Z', 'dividend', 1, 5)], 1)).toBeNull()
   })
 })

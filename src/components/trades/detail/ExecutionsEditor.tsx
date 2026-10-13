@@ -14,6 +14,7 @@ import { updateTradeExecutions } from '@/lib/actions/trades'
 import { editorDefaultMultiplier } from '@/lib/futures'
 import DateTimeField from '@/components/ui/DateTimeField'
 import { positionState, storedMultiplier, type NormalizedExecution } from './executions'
+import type { ExecutionSide } from '@/lib/trade-pnl'
 import type { Trade } from '@/lib/db'
 
 const num = (s: string) => {
@@ -28,7 +29,7 @@ const fromUnix = (sec: number) => toLocalInput(new Date(sec * 1000))
 interface Row {
   id: string
   datetime: string
-  side: 'buy' | 'sell'
+  side: ExecutionSide
   qty: string
   price: string
   comm: string
@@ -41,6 +42,18 @@ const mkId = () => `e${_idc++}`
 const cellCls =
   'w-full rounded-md border border-border bg-input/40 px-2 py-1.5 text-sm tabular focus:border-primary focus:outline-none'
 const miniLabel = 'mb-0.5 block text-[10px] uppercase tracking-wide text-muted-foreground'
+
+const SIDES = ['buy', 'sell', 'dividend'] as const
+const sideTone: Record<ExecutionSide, string> = {
+  buy: 'text-profit',
+  sell: 'text-loss',
+  dividend: 'text-dividend',
+}
+const sideBg: Record<ExecutionSide, string> = {
+  buy: 'bg-profit/15',
+  sell: 'bg-loss/15',
+  dividend: 'bg-dividend/15',
+}
 
 const positionOf = (rows: Row[]) =>
   positionState(rows.map((r) => ({ time: new Date(r.datetime).getTime(), side: r.side, quantity: num(r.qty) })))
@@ -199,18 +212,14 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
         <div>
           <label className={miniLabel}>{t('trades.detail.exec.side')}</label>
           <div className="inline-flex rounded-md bg-muted/50 p-0.5">
-            {(['buy', 'sell'] as const).map((s) => (
+            {SIDES.map((s) => (
               <button
                 key={s}
                 type="button"
-                onClick={() => patch({ side: s })}
+                onClick={() => patch(s === 'dividend' && !draft.qty ? { side: s, qty: '1' } : { side: s })}
                 className={cn(
                   'rounded px-3 py-1 text-xs font-medium transition-colors',
-                  draft.side === s
-                    ? s === 'buy'
-                      ? 'bg-profit/20 text-profit'
-                      : 'bg-loss/20 text-loss'
-                    : 'text-muted-foreground hover:text-foreground',
+                  draft.side === s ? cn(sideBg[s], sideTone[s]) : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 {t(`trades.detail.exec.${s}`)}
@@ -268,9 +277,11 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
         </div>
 
         <p className="text-[11px] text-muted-foreground">
-          {projectedOpenQty <= 0
-            ? t('trades.detail.exec.willClose')
-            : t('trades.detail.exec.willRemain', { qty: projectedOpenQty })}
+          {draft.side === 'dividend'
+            ? t('trades.detail.exec.dividendHint')
+            : projectedOpenQty <= 0
+              ? t('trades.detail.exec.willClose')
+              : t('trades.detail.exec.willRemain', { qty: projectedOpenQty })}
         </p>
 
         <div className="flex items-center justify-end gap-1 pt-0.5">
@@ -374,7 +385,8 @@ export default function ExecutionsEditor({ trade, executions }: { trade: Trade; 
                 <span
                   className={cn(
                     'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase',
-                    r.side === 'buy' ? 'bg-profit/15 text-profit' : 'bg-loss/15 text-loss',
+                    sideBg[r.side],
+                    sideTone[r.side],
                   )}
                 >
                   {t(`trades.detail.exec.${r.side}`)}

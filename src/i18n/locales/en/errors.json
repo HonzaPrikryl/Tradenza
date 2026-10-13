@@ -28,7 +28,8 @@
     "notFound": "Strategy not found."
   },
   "execution": {
-    "invalidDate": "One of the executions has an invalid date."
+    "invalidDate": "One of the executions has an invalid date.",
+    "dividendOnly": "A trade needs at least one buy or sell execution — a dividend can only be added to an existing position."
   },
   "checklistItem": {
     "notFound": "Criterion not found."

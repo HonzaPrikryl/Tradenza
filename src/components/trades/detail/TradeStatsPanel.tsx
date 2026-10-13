@@ -20,6 +20,7 @@ import { setSidebarPrefs } from '@/lib/sidebar-prefs'
 import { resolveListOrder, SIDEBAR_LISTS, type SidebarListId, type SidebarPrefs } from '@/lib/trade-sidebar'
 import type { Trade } from '@/lib/db'
 import { storedMultiplier, storedRiskPlan, type NormalizedExecution, type RiskPlanLeg } from './executions'
+import { dividendAmount } from '@/lib/trade-pnl'
 
 function initLegs(stored: RiskPlanLeg[] | undefined, totalQty: number): RiskPlanLeg[] {
   const base = stored?.length ? stored : [{ ticks: 0, qty: totalQty }]
@@ -168,7 +169,7 @@ export default function TradeStatsPanel({
 
   const runningFromCandles = useMemo(() => {
     if (!candles || candles.length === 0) return null
-    const evs = [...executions].sort((a, b) => a.time - b.time)
+    const evs = executions.filter((e) => e.side !== 'dividend').sort((a, b) => a.time - b.time)
     const upTo = exitSec ?? Infinity
     let ei = 0
     let pos = 0
@@ -224,7 +225,10 @@ export default function TradeStatsPanel({
     const hasStored = grossPnl !== null || netPnl !== null
     if (closed && hasStored) {
       const actualGross = grossPnl !== null ? grossPnl : netPnl! + fees
-      const factor = Math.abs(terminalPts) > 1e-9 ? actualGross / terminalPts : mult
+      // Stored gross includes dividends, which have no price path — scale on the
+      // price-driven part only so they surface as the final jump to Net P&L.
+      const priceGross = actualGross - dividendAmount(executions)
+      const factor = Math.abs(terminalPts) > 1e-9 ? priceGross / terminalPts : mult
       const series = pts.map((p) => p * factor)
       series[series.length - 1] = netPnl !== null ? netPnl : actualGross - fees
       return { series, lowPrice, highPrice }
@@ -235,7 +239,10 @@ export default function TradeStatsPanel({
   const runningPnl = runningFromCandles?.series ?? []
   const showRunning = runningPnl.length >= 2
 
-  const execPrices = executions.map((e) => e.price).filter((p) => p > 0)
+  const execPrices = executions
+    .filter((e) => e.side !== 'dividend')
+    .map((e) => e.price)
+    .filter((p) => p > 0)
   const priceLow = runningFromCandles ? runningFromCandles.lowPrice : execPrices.length ? Math.min(...execPrices) : null
   const priceHigh = runningFromCandles
     ? runningFromCandles.highPrice

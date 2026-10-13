@@ -50,6 +50,7 @@ module.exports = {
         profit: 'hsl(var(--profit))',
         loss: 'hsl(var(--loss))',
         breakeven: 'hsl(var(--breakeven))',
+        dividend: 'hsl(var(--dividend))',
       },
       borderRadius: {
         lg: 'var(--radius)',

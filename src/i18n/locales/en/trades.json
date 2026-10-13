@@ -182,6 +182,8 @@
       "fee": "Fee",
       "buy": "Buy",
       "sell": "Sell",
+      "dividend": "Dividend",
+      "dividendHint": "Enter the cash received as qty 1 × amount. Withholding tax goes in Fee.",
       "add": "Add execution",
       "newTitle": "New execution",
       "position": "Position",

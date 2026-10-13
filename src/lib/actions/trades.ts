@@ -4,8 +4,7 @@ import { db, trades, tags, tradeTags, accounts, strategies } from '@/lib/db'
 import { eq, ne, and, or, desc, asc, gte, lte, ilike, inArray, count, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import type { TradeFilters } from '@/types'
-import { calculatePnl } from '@/lib/utils'
-import { roundMoney } from '@/lib/trade-pnl'
+import { deriveTradeFromExecutions } from '@/lib/trade-pnl'
 import { readGlobalFilters } from '@/lib/global-filters'
 import { readGlobalSettings } from '@/lib/global-settings'
 import { generalConditions } from './filter-sql'
@@ -93,7 +92,7 @@ export const updateTradeRiskPlan = mutationAction([uuid, riskPlanSchema], async 
 
 const execEditSchema = z.object({
   datetime: z.string().min(1),
-  side: z.enum(['buy', 'sell']),
+  side: z.enum(['buy', 'sell', 'dividend']),
   quantity: z.coerce.number().positive(),
   price: z.coerce.number().positive(),
   commission: z.coerce.number().min(0).default(0),
@@ -111,45 +110,17 @@ export const updateTradeExecutions = mutationAction([uuid, execUpdateSchema], as
   })
   if (!existing) throw new NotFoundError(t('errors.trade.notFound'))
 
-  const execs = [...v.executions].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())
-  for (const e of execs) {
+  for (const e of v.executions) {
     if (isNaN(new Date(e.datetime).getTime())) throw new ValidationError(t('errors.execution.invalidDate'))
   }
-
-  const direction: 'long' | 'short' = execs[0].side === 'buy' ? 'long' : 'short'
-  const entrySide = execs[0].side
-  const entries = execs.filter((e) => e.side === entrySide)
-  const exits = execs.filter((e) => e.side !== entrySide)
-
-  const sumQty = (rows: typeof execs) => rows.reduce((s, e) => s + e.quantity, 0)
-  const avgPrice = (rows: typeof execs) => {
-    const qty = sumQty(rows)
-    return qty === 0 ? 0 : rows.reduce((s, e) => s + e.price * e.quantity, 0) / qty
-  }
-
-  const entryQuantity = sumQty(entries)
-  const exitQuantity = sumQty(exits)
-  const entryPrice = avgPrice(entries)
-  const exitPrice = exits.length > 0 ? avgPrice(exits) : null
-  const fees = execs.reduce((s, e) => s + e.commission + e.fee, 0)
-  const entryDatetime = new Date(entries[0].datetime)
-  const exitDatetime = exits.length > 0 ? new Date(exits[exits.length - 1].datetime) : null
 
   const prevExtra = (existing.extra as Record<string, unknown> | null) ?? {}
   const storedMult = Number(prevExtra.contractMultiplier)
   const mult = v.contractMultiplier && v.contractMultiplier > 0 ? v.contractMultiplier : storedMult > 0 ? storedMult : 1
 
-  let grossPnl: string | null = null
-  let netPnl: string | null = null
-  const matchedQty = Math.min(entryQuantity, exitQuantity)
-  if (exitPrice !== null && matchedQty > 0) {
-    const pnl = calculatePnl(direction, entryPrice, exitPrice, matchedQty, 0)
-    const gross = pnl.grossPnl * mult
-    grossPnl = roundMoney(gross).toString()
-    netPnl = roundMoney(gross - fees).toString()
-  }
-
-  const status: 'open' | 'closed' = exitQuantity >= entryQuantity && exits.length > 0 ? 'closed' : 'open'
+  const d = deriveTradeFromExecutions(v.executions, mult)
+  if (!d) throw new ValidationError(t('errors.execution.dividendOnly'))
+  const execs = d.sorted
 
   const nextExtra = {
     ...prevExtra,
@@ -160,17 +131,17 @@ export const updateTradeExecutions = mutationAction([uuid, execUpdateSchema], as
   await db
     .update(trades)
     .set({
-      direction,
-      status,
-      entryPrice: entryPrice.toString(),
-      entryQuantity: entryQuantity.toString(),
-      entryDatetime,
-      exitPrice: exitPrice?.toString() ?? null,
-      exitQuantity: exitQuantity > 0 ? exitQuantity.toString() : null,
-      exitDatetime,
-      fees: fees.toString(),
-      grossPnl,
-      netPnl,
+      direction: d.direction,
+      status: d.status,
+      entryPrice: d.entryPrice.toString(),
+      entryQuantity: d.entryQuantity.toString(),
+      entryDatetime: d.entryDatetime,
+      exitPrice: d.exitPrice?.toString() ?? null,
+      exitQuantity: d.exitQuantity > 0 ? d.exitQuantity.toString() : null,
+      exitDatetime: d.exitDatetime,
+      fees: d.fees.toString(),
+      grossPnl: d.grossPnl?.toString() ?? null,
+      netPnl: d.netPnl?.toString() ?? null,
       extra: nextExtra,
       updatedAt: new Date(),
     })

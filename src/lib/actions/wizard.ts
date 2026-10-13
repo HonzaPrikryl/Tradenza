@@ -5,7 +5,7 @@ import { and, eq, gte, desc, inArray } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { calculatePnl } from '@/lib/utils'
-import { roundMoney } from '@/lib/trade-pnl'
+import { roundMoney, deriveTradeFromExecutions } from '@/lib/trade-pnl'
 import { contractMultiplier, assetMultiplier } from '@/lib/futures'
 import { IMPORT_REQUIRED, FILL_REQUIRED } from '@/lib/csv-columns'
 import { t } from '@/i18n'
@@ -181,7 +181,7 @@ function revalidateAll() {
 
 const executionSchema = z.object({
   datetime: z.string().min(1),
-  side: z.enum(['buy', 'sell']),
+  side: z.enum(['buy', 'sell', 'dividend']),
   quantity: z.coerce.number().positive(),
   price: z.coerce.number().positive(),
   commission: z.coerce.number().min(0).default(0),
@@ -201,50 +201,20 @@ export type ManualTradeInput = z.infer<typeof manualTradeSchema>
 export const saveManualTrade = mutationAction([manualTradeSchema], async ({ userId }, v) => {
   await assertAccountOwnership(userId, v.accountId)
 
-  const execs = [...v.executions].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime())
-
-  for (const e of execs) {
+  for (const e of v.executions) {
     if (isNaN(new Date(e.datetime).getTime())) {
       throw new ValidationError(t('validation.wizard.invalidExecutionDate'))
     }
   }
-
-  const direction: 'long' | 'short' = execs[0].side === 'buy' ? 'long' : 'short'
-  const entrySide = execs[0].side
-  const entries = execs.filter((e) => e.side === entrySide)
-  const exits = execs.filter((e) => e.side !== entrySide)
-
-  const sumQty = (rows: typeof execs) => rows.reduce((s, e) => s + e.quantity, 0)
-  const avgPrice = (rows: typeof execs) => {
-    const qty = sumQty(rows)
-    return qty === 0 ? 0 : rows.reduce((s, e) => s + e.price * e.quantity, 0) / qty
-  }
-
-  const entryQuantity = sumQty(entries)
-  const exitQuantity = sumQty(exits)
-  const entryPrice = avgPrice(entries)
-  const exitPrice = exits.length > 0 ? avgPrice(exits) : null
-  const fees = execs.reduce((s, e) => s + e.commission + e.fee, 0)
-
-  const entryDatetime = new Date(entries[0].datetime)
-  const exitDatetime = exits.length > 0 ? new Date(exits[exits.length - 1].datetime) : null
 
   // An explicit per-execution multiplier wins; otherwise fall back to the shared
   // rule rather than to 1. Falling back to 1 priced a manually entered options or
   // forex trade as if it were a stock whenever the field was cleared.
   const mult =
     v.contractMultiplier && v.contractMultiplier > 0 ? v.contractMultiplier : assetMultiplier(v.assetClass, v.symbol)
-  let grossPnl: string | null = null
-  let netPnl: string | null = null
-  const matchedQty = Math.min(entryQuantity, exitQuantity)
-  if (exitPrice !== null && matchedQty > 0) {
-    const pnl = calculatePnl(direction, entryPrice, exitPrice, matchedQty, 0)
-    const gross = pnl.grossPnl * mult
-    grossPnl = roundMoney(gross).toString()
-    netPnl = roundMoney(gross - fees).toString()
-  }
-
-  const status: 'open' | 'closed' = exitQuantity >= entryQuantity && exits.length > 0 ? 'closed' : 'open'
+  const d = deriveTradeFromExecutions(v.executions, mult)
+  if (!d) throw new ValidationError(t('validation.wizard.dividendOnly'))
+  const execs = d.sorted
 
   const [trade] = await db
     .insert(trades)
@@ -252,18 +222,18 @@ export const saveManualTrade = mutationAction([manualTradeSchema], async ({ user
       userId,
       accountId: v.accountId,
       symbol: v.symbol.toUpperCase(),
-      direction,
-      status,
+      direction: d.direction,
+      status: d.status,
       assetClass: v.assetClass,
-      entryPrice: entryPrice.toString(),
-      entryQuantity: entryQuantity.toString(),
-      entryDatetime,
-      exitPrice: exitPrice?.toString() ?? null,
-      exitQuantity: exitQuantity > 0 ? exitQuantity.toString() : null,
-      exitDatetime,
-      fees: fees.toString(),
-      grossPnl,
-      netPnl,
+      entryPrice: d.entryPrice.toString(),
+      entryQuantity: d.entryQuantity.toString(),
+      entryDatetime: d.entryDatetime,
+      exitPrice: d.exitPrice?.toString() ?? null,
+      exitQuantity: d.exitQuantity > 0 ? d.exitQuantity.toString() : null,
+      exitDatetime: d.exitDatetime,
+      fees: d.fees.toString(),
+      grossPnl: d.grossPnl?.toString() ?? null,
+      netPnl: d.netPnl?.toString() ?? null,
       importSource: 'manual',
       extra: {
         executions: execs,
