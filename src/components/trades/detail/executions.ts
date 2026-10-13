@@ -1,9 +1,10 @@
 import type { Trade } from '@/lib/db'
+import type { ExecutionSide } from '@/lib/trade-pnl'
 
 export interface NormalizedExecution {
   /** Unix seconds. */
   time: number
-  side: 'buy' | 'sell'
+  side: ExecutionSide
   quantity: number
   price: number
   commission: number
@@ -37,7 +38,7 @@ export function normalizeExecutions(trade: Trade): NormalizedExecution[] {
       if (!Number.isFinite(ts) || price <= 0 || qty <= 0) continue
       out.push({
         time: Math.floor(ts / 1000),
-        side: e.side === 'sell' ? 'sell' : 'buy',
+        side: e.side === 'sell' || e.side === 'dividend' ? e.side : 'buy',
         quantity: qty,
         price,
         commission: toNum(e.commission),
@@ -79,16 +80,18 @@ export interface PositionState {
 /**
  * Net position implied by a set of executions, using the same rule the server
  * applies when it derives a trade's status: the earliest execution opens the
- * position and everything on the opposite side closes it. Executions without a
- * usable time or a positive quantity are ignored, so a half-filled draft row
- * never distorts the result.
+ * position and everything on the opposite side closes it. Dividends (cash, not
+ * fills) and executions without a usable time or a positive quantity are
+ * ignored, so a half-filled draft row never distorts the result.
  */
 export function positionState(
-  execs: readonly { time: number; side: 'buy' | 'sell'; quantity: number }[],
+  execs: readonly { time: number; side: ExecutionSide; quantity: number }[],
 ): PositionState {
-  const usable = execs.filter((e) => Number.isFinite(e.time) && e.quantity > 0).sort((a, b) => a.time - b.time)
+  const usable = execs
+    .filter((e) => e.side !== 'dividend' && Number.isFinite(e.time) && e.quantity > 0)
+    .sort((a, b) => a.time - b.time)
   if (usable.length === 0) return { entrySide: 'buy', openQty: 0 }
-  const entrySide = usable[0].side
+  const entrySide = usable[0].side as 'buy' | 'sell'
   const signed = usable.reduce((s, e) => s + (e.side === entrySide ? e.quantity : -e.quantity), 0)
   return { entrySide, openQty: signed }
 }

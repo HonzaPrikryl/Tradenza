@@ -13,6 +13,7 @@ import { track } from '@/lib/analytics'
 import { assetMultiplier, editorDefaultMultiplier } from '@/lib/futures'
 import { getBroker, GENERIC_BROKER, type AssetType } from '@/lib/brokers'
 import DateTimeField from '@/components/ui/DateTimeField'
+import { dividendAmount, type ExecutionSide } from '@/lib/trade-pnl'
 import {
   Table,
   TableBody,
@@ -52,13 +53,20 @@ interface Execution {
   dateTime: string // "YYYY-MM-DDTHH:mm:ss"
   multiplier: string
   qty: string
-  side: 'buy' | 'sell'
+  side: ExecutionSide
   price: string
   comm: string
   fee: string
 }
 
-const emptyExec = (side: 'buy' | 'sell' = 'buy', multiplier = ''): Execution => ({
+const SIDES = ['buy', 'sell', 'dividend'] as const
+const sideActive: Record<ExecutionSide, string> = {
+  buy: 'bg-profit/20 text-profit',
+  sell: 'bg-loss/20 text-loss',
+  dividend: 'bg-dividend/20 text-dividend',
+}
+
+const emptyExec = (side: ExecutionSide = 'buy', multiplier = ''): Execution => ({
   id: Math.random().toString(36).slice(2),
   dateTime: '',
   multiplier,
@@ -120,19 +128,23 @@ export default function ManualEntry({
 
   const addRow = () =>
     setExecs((rows) => {
-      const side = rows.length > 0 && rows[0].side === 'buy' ? 'sell' : 'buy'
+      const opening = rows.find((r) => r.side !== 'dividend')
+      const side = opening?.side === 'buy' ? 'sell' : 'buy'
       const last = rows[rows.length - 1]
       const row = emptyExec(side, rowMultiplier(assetClass, symbol))
-      if (last) row.qty = last.qty
+      if (last && last.side !== 'dividend') row.qty = last.qty
       return [...rows, row]
     })
 
   const validExecs = execs.filter((r) => r.dateTime && num(r.qty) > 0 && num(r.price) > 0)
-  const canSave = hasSymbol && validExecs.length > 0 && validExecs.length === execs.length
+  const hasFill = validExecs.some((e) => e.side !== 'dividend')
+  const canSave = hasSymbol && hasFill && validExecs.length === execs.length
+  const hasDividend = execs.some((e) => e.side === 'dividend')
 
   const summary = useMemo(() => {
-    if (validExecs.length === 0) return null
-    const sorted = [...validExecs].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+    if (!hasFill) return null
+    const all = [...validExecs].sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime())
+    const sorted = all.filter((e) => e.side !== 'dividend')
     const entrySide = sorted[0].side
     const direction: 'long' | 'short' = entrySide === 'buy' ? 'long' : 'short'
     const entries = sorted.filter((e) => e.side === entrySide)
@@ -146,7 +158,8 @@ export default function ManualEntry({
     const exitQty = qty(exits)
     const avgEntry = avg(entries)
     const avgExit = exits.length > 0 ? avg(exits) : null
-    const fees = sorted.reduce((s, e) => s + num(e.comm) + num(e.fee), 0)
+    const fees = all.reduce((s, e) => s + num(e.comm) + num(e.fee), 0)
+    const dividends = dividendAmount(all.map((e) => ({ side: e.side, quantity: num(e.qty), price: num(e.price) })))
     const matched = Math.min(entryQty, exitQty)
     // Mirror the server's fallback exactly. The preview used to drop to ×1 when
     // the field was cleared while the save fell back to the instrument's real
@@ -156,11 +169,11 @@ export default function ManualEntry({
     let netPnl: number | null = null
     if (avgExit !== null && matched > 0) {
       const gross = (direction === 'long' ? avgExit - avgEntry : avgEntry - avgExit) * matched * mult
-      netPnl = gross - fees
+      netPnl = gross + dividends - fees
     }
     const open = exitQty < entryQty || exits.length === 0
-    return { direction, entryQty, exitQty, avgEntry, avgExit, fees, netPnl, open }
-  }, [validExecs, assetClass, symbol])
+    return { direction, entryQty, exitQty, avgEntry, avgExit, fees, dividends, netPnl, open }
+  }, [validExecs, hasFill, assetClass, symbol])
 
   const save = async (addNext: boolean) => {
     if (!canSave || saving) return
@@ -286,18 +299,14 @@ export default function ManualEntry({
                     </TableCell>
                     <TableCell className="px-3 py-2">
                       <div className="inline-flex rounded-md bg-muted/50 p-0.5">
-                        {(['buy', 'sell'] as const).map((s) => (
+                        {SIDES.map((s) => (
                           <button
                             key={s}
                             type="button"
-                            onClick={() => update(r.id, { side: s })}
+                            onClick={() => update(r.id, s === 'dividend' ? { side: s, qty: '1' } : { side: s })}
                             className={cn(
                               'rounded px-2.5 py-1 text-xs font-medium transition-colors',
-                              r.side === s
-                                ? s === 'buy'
-                                  ? 'bg-profit/20 text-profit'
-                                  : 'bg-loss/20 text-loss'
-                                : 'text-muted-foreground hover:text-foreground',
+                              r.side === s ? sideActive[s] : 'text-muted-foreground hover:text-foreground',
                             )}
                           >
                             {t(`addTrades.manual.${s}`)}
@@ -361,6 +370,8 @@ export default function ManualEntry({
             </Table>
           </TableContainer>
 
+          {hasDividend && <p className="mt-3 text-xs text-muted-foreground">{t('addTrades.manual.dividendHint')}</p>}
+
           {/* Live summary */}
           {summary && (
             <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm">
@@ -386,6 +397,12 @@ export default function ManualEntry({
                 <span className="text-muted-foreground">{t('addTrades.manual.summary.fees')}: </span>
                 <span className="font-medium tabular">{summary.fees.toLocaleString()}</span>
               </span>
+              {summary.dividends > 0 && (
+                <span>
+                  <span className="text-muted-foreground">{t('addTrades.manual.summary.dividends')}: </span>
+                  <span className="font-medium tabular text-dividend">{summary.dividends.toLocaleString()}</span>
+                </span>
+              )}
               <span>
                 <span className="text-muted-foreground">{t('addTrades.manual.summary.status')}: </span>
                 <span className="font-medium">

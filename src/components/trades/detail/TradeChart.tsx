@@ -104,7 +104,9 @@ export default function TradeChart({
 
     const firstT = candles[0].t
     const lastT = candles[candles.length - 1].t
-    const markers: SeriesMarker<UTCTimestamp>[] = executions.map((e) => {
+    // Dividends are cash credits, not fills at a market price — nothing to plot.
+    const fills = executions.filter((e) => e.side !== 'dividend')
+    const markers: SeriesMarker<UTCTimestamp>[] = fills.map((e) => {
       const snapped = Math.min(Math.max(Math.floor(e.time / intervalSec) * intervalSec, firstT), lastT) + tzShift
       return e.side === 'buy'
         ? {
@@ -126,7 +128,7 @@ export default function TradeChart({
     createSeriesMarkers(candleSeries, markers)
 
     const seenPrices = new Set<number>()
-    for (const e of executions) {
+    for (const e of fills) {
       const key = Math.round(e.price * 1e6)
       if (seenPrices.has(key)) continue
       seenPrices.add(key)

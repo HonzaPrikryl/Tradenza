@@ -43,6 +43,7 @@
     --profit: 158 64% 52%; /* zelená — zisk */
     --loss: 0 72% 60%; /* červená — ztráta */
     --breakeven: 217 91% 62%; /* modrá — break even */
+    --dividend: 42 92% 52%; /* žlutá — dividenda */
     --neutral: 220 8% 55%;
 
     /* Sidebar */
@@ -74,6 +75,7 @@
     --profit: 158 64% 38%;
     --loss: 0 72% 51%;
     --breakeven: 217 84% 48%;
+    --dividend: 38 95% 40%;
     --neutral: 220 8% 45%;
     --sidebar: 220 8% 96%;
     --sidebar-border: 220 8% 88%;

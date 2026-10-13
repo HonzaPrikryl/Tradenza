@@ -10,7 +10,8 @@
   "mainAccount": "Main account",
   "wizard": {
     "accountNotFound": "Account not found",
-    "invalidExecutionDate": "One of the executions has an invalid date"
+    "invalidExecutionDate": "One of the executions has an invalid date",
+    "dividendOnly": "A trade needs at least one buy or sell execution — a dividend can only be added to an existing position"
   },
   "import": {
     "missingSymbol": "Row {row}: missing Symbol",
