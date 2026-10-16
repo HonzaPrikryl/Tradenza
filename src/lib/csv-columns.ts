@@ -286,6 +286,27 @@ function keywordScore(row: string[]): number {
   }).length
 }
 
+// A repeated time or price column is the exit leg of a round trip: MetaTrader's
+// Positions report reads "Time, …, Price, …, Time, Price". Rows are keyed by
+// header, so without renaming, the second column silently overwrote the first and
+// every trade's entry became its exit.
+const EXIT_PAIRED = new Set(['time', 'date', 'datetime', 'date time', 'price'])
+
+export function dedupeHeaders(headers: string[]): string[] {
+  const seen = new Map<string, number>()
+  const taken = new Set(headers.map((h) => h.toLowerCase()))
+  return headers.map((h) => {
+    const key = h.toLowerCase()
+    const n = (seen.get(key) ?? 0) + 1
+    seen.set(key, n)
+    if (n === 1) return h
+    let name = n === 2 && EXIT_PAIRED.has(normalizeHeader(h).norm) ? `Close ${h}` : `${h} ${n}`
+    while (taken.has(name.toLowerCase())) name = `${name} ${n}`
+    taken.add(name.toLowerCase())
+    return name
+  })
+}
+
 export function extractTable(matrix: string[][]): { headers: string[]; rows: Record<string, string>[] } {
   const nonEmpty = matrix.filter((r) => r.some((c) => (c ?? '').trim() !== ''))
   if (nonEmpty.length === 0) return { headers: [], rows: [] }
@@ -304,7 +325,7 @@ export function extractTable(matrix: string[][]): { headers: string[]; rows: Rec
   }
   if (headerIdx === -1) headerIdx = 0
 
-  const headers = nonEmpty[headerIdx].map((h, i) => (h ?? '').trim() || `col${i + 1}`)
+  const headers = dedupeHeaders(nonEmpty[headerIdx].map((h, i) => (h ?? '').trim() || `col${i + 1}`))
   const len = headers.length
   const rows: Record<string, string>[] = []
   for (let i = headerIdx + 1; i < nonEmpty.length; i++) {

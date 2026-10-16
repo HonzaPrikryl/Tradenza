@@ -474,7 +474,11 @@ export const importTradesCsv = importAction([csvImportSchema], async ({ userId }
     // futures/options round-trips without a P&L column are still valued correctly.
     let grossPnl = trade.grossPnl !== null ? roundMoney(trade.grossPnl).toString() : null
     let netPnl = trade.netPnl !== null ? roundMoney(trade.netPnl).toString() : null
-    if (netPnl === null && trade.exitPrice !== null) {
+    if (netPnl === null && trade.grossPnl !== null) {
+      // A broker gross P&L is already in account currency and already valued at
+      // the real contract size; recomputing from prices would throw that away.
+      netPnl = roundMoney(trade.grossPnl - trade.fees).toString()
+    } else if (netPnl === null && trade.exitPrice !== null) {
       const matched = Math.min(trade.entryQuantity, trade.exitQuantity)
       const pnl = calculatePnl(trade.direction, trade.entryPrice, trade.exitPrice, matched, 0)
       const gross = pnl.grossPnl * mult

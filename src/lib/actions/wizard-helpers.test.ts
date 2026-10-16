@@ -273,6 +273,10 @@ describe('tzOffset', () => {
 })
 
 describe('parseDateInTz', () => {
+  it("reads MetaTrader's dotted year-first dates in the chosen timezone", () => {
+    expect(parseDateInTz('2026.08.27 10:00:00', 'Europe/Prague')?.toISOString()).toBe('2026-08-27T08:00:00.000Z')
+    expect(parseDateInTz('2026/08/27 10:00', 'UTC')?.toISOString()).toBe('2026-08-27T10:00:00.000Z')
+  })
   it('passes through an explicit ISO/Z instant', () => {
     expect(parseDateInTz('2026-01-05T12:00:00Z', 'America/New_York')?.toISOString()).toBe('2026-01-05T12:00:00.000Z')
   })

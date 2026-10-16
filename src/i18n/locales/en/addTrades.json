@@ -53,6 +53,7 @@
     "emptyFile": "The file is empty or has no readable rows.",
     "parseError": "The file could not be parsed. Make sure it's a valid CSV.",
     "rowsDetected": "{count} rows detected",
+    "mtDealsPaired": "MetaTrader deal list detected — {deals} deals paired into {count} entry/exit rows",
     "missingColumns": "Required columns not found: {cols}. Check your export settings.",
     "importButton": "Import {count} rows",
     "importing": "Importing…",

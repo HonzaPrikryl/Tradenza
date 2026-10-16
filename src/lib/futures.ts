@@ -1,4 +1,4 @@
-import { forexPipSize, forexContractSize } from './forex'
+import { forexPipSize, forexContractSize, isForexPair } from './forex'
 
 export const FUTURES_MULTIPLIERS: Record<string, number> = {
   // ── Equity index (CME) ──────────────────────────────────────────────
@@ -211,11 +211,31 @@ export function contractMultiplier(symbol: string): number {
 // controls 100 shares, so P&L per point of premium is ×100.
 export const OPTIONS_MULTIPLIER = 100
 
+// Spot metals quoted like a currency pair (XAUUSD, XAGUSD) and traded in lots on
+// MetaTrader-style platforms. A lot is 100 oz of gold and 5,000 oz of silver at
+// essentially every broker, so lots × price move × 1 understated gold P&L 100×,
+// and treating the pair as forex (100,000 units) overstated it 1,000×. Broker
+// decoration is ignored: "XAUUSD+", "XAUUSD.m", "XAU/USD", "XAUUSDm".
+const SPOT_METAL_LOT: [RegExp, number][] = [
+  [/^(XAU[A-Z]{3}|GOLD)[A-Z]?$/, 100],
+  [/^(XAG[A-Z]{3}|SILVER)[A-Z]?$/, 5000],
+]
+
+export function spotMetalContractSize(symbol: string): number | undefined {
+  const core = (symbol ?? '')
+    .toUpperCase()
+    .replace(/[+#!]+$/, '')
+    .replace(/\.[A-Z0-9]+$/, '')
+    .replace(/[^A-Z]/g, '')
+  return SPOT_METAL_LOT.find(([re]) => re.test(core))?.[1]
+}
+
 /**
  * The value multiplier to apply to a per-point price move for a given asset class:
  *  - futures → the instrument's contract multiplier (falls back to 1 if unknown)
  *  - options → 100 (one contract = 100 shares)
  *  - forex   → the standard-lot contract size, because size is entered in lots
+ *  - spot metals (XAUUSD, XAGUSD) as forex or cfd → ounces per lot
  *  - stocks / crypto / other → 1 (raw price × quantity is already correct)
  *
  * Centralises the rule so the manual entry form, CSV import and the trade editor
@@ -227,7 +247,14 @@ export const OPTIONS_MULTIPLIER = 100
 export function assetMultiplier(assetClass: string, symbol: string): number {
   if (assetClass === 'futures') return contractMultiplier(symbol) || 1
   if (assetClass === 'options') return OPTIONS_MULTIPLIER
-  if (assetClass === 'forex') return forexContractSize(symbol)
+  if (assetClass === 'forex' || assetClass === 'cfd') {
+    const metal = spotMetalContractSize(symbol)
+    if (metal) return metal
+  }
+  // Only a real currency pair is 100,000 units a lot. An index or oil CFD filed
+  // under forex (NAS100, US30, USOIL) has a broker-specific size we can't know;
+  // 1 is the honest default rather than a 100,000× overstatement.
+  if (assetClass === 'forex') return isForexPair(symbol) ? forexContractSize(symbol) : 1
   return 1
 }
 

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  dedupeHeaders,
   detectColumns,
   extractTable,
   looksLikeFills,
@@ -395,5 +396,59 @@ describe('buildImportMapping — our own CSV export', () => {
     const m = buildImportMapping(['Symbol', 'Entry Price', 'Open Date', 'Risk Amount', 'Planned R:R'])
     expect(m.riskAmount).toBe('Risk Amount')
     expect(m.riskRewardRatio).toBe('Planned R:R')
+  })
+})
+
+describe('dedupeHeaders / MetaTrader positions', () => {
+  it('names a repeated time/price column as the exit leg', () => {
+    expect(dedupeHeaders(['Time', 'Price', 'Time', 'Price', 'Note', 'Note'])).toEqual([
+      'Time',
+      'Price',
+      'Close Time',
+      'Close Price',
+      'Note',
+      'Note 2',
+    ])
+  })
+
+  it('keeps entry and exit apart in an MT5 Positions export', () => {
+    const { headers, rows } = extractTable([
+      [
+        'Time',
+        'Position',
+        'Symbol',
+        'Type',
+        'Volume',
+        'Price',
+        'S / L',
+        'T / P',
+        'Time',
+        'Price',
+        'Commission',
+        'Swap',
+        'Profit',
+      ],
+      [
+        '2026.09.01 10:00:00',
+        '1',
+        'XAUUSD+',
+        'buy',
+        '0.01',
+        '2400',
+        '',
+        '',
+        '2026.09.01 11:00:00',
+        '2410',
+        '-0.07',
+        '0',
+        '10',
+      ],
+    ])
+    const m = buildImportMapping(headers)
+    expect(rows[0][m.entryPrice!]).toBe('2400')
+    expect(rows[0][m.exitPrice!]).toBe('2410')
+    expect(rows[0][m.entryDate!]).toBe('2026.09.01 10:00:00')
+    expect(rows[0][m.exitDate!]).toBe('2026.09.01 11:00:00')
+    expect(m.side).toBe('Type')
   })
 })

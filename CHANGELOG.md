@@ -14,6 +14,23 @@ matching `ghcr.io/honzaprikryl/tradenza` image. See
 
 ### Fixed
 
+- **MetaTrader deal lists imported every deal as its own trade.** Opening deals
+  became closed $0.00 trades, the in/out column was read as the side so nearly
+  everything came in as long, and win rate was roughly halved. A deal list is
+  now recognised and its in/out deals are paired FIFO into real trades, keeping
+  the broker's profit, commission and swap.
+- **MetaTrader Positions exports used the exit as the entry.** The report repeats
+  its Time and Price columns; the second pair overwrote the first. Repeated
+  columns are now kept apart and read as the exit.
+- **MetaTrader dates (`2026.08.27 10:00:00`)** are read in the time zone chosen
+  for the import instead of the server's.
+- **Spot gold and silver were valued 100× too low** (as CFD) or 1,000× too high
+  (as forex). XAUUSD/XAGUSD now use 100 oz / 5,000 oz per lot, broker suffixes
+  included. Index and oil symbols filed under forex no longer get the 100,000
+  currency lot size.
+- **A file with a gross P&L but no net P&L** had its result recomputed from
+  prices; the broker figure, minus fees, is now kept.
+
 - **Criteria could be written before any setup existed.** They could never score
   anything — a trade with no strategy is measured against nothing — so the
   Criteria tab now asks for a setup first and the server refuses the write.

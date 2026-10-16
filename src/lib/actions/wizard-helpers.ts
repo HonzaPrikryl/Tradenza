@@ -460,9 +460,10 @@ export function parseDateInTz(value: string | undefined, tz: string, dayFirst = 
     h = 0,
     mi = 0,
     sec = 0
-  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?$/)
+  // Year-first, dashed (ISO) or dotted/slashed (MetaTrader's "2026.08.27 10:00:00").
+  let m = s.match(/^(\d{4})([-./])(\d{1,2})\2(\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?)?$/)
   if (m) {
-    ;[y, mo, d, h, mi, sec] = [+m[1], +m[2], +m[3], +(m[4] ?? 0), +(m[5] ?? 0), +(m[6] ?? 0)]
+    ;[y, mo, d, h, mi, sec] = [+m[1], +m[3], +m[4], +(m[5] ?? 0), +(m[6] ?? 0), +(m[7] ?? 0)]
   } else if (
     (m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ ,]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp]\.?[Mm]\.?)?)?$/))
   ) {

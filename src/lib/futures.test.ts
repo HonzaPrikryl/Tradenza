@@ -74,6 +74,23 @@ describe('assetMultiplier', () => {
     // EURUSD trade was worth 100,000x more depending on how it entered the app.
     expect(assetMultiplier('forex', 'EURUSD')).toBe(forexContractSize('EURUSD'))
     expect(assetMultiplier('forex', 'USDJPY')).toBe(forexContractSize('USDJPY'))
+    expect(assetMultiplier('forex', 'EURUSD+')).toBe(forexContractSize('EURUSD'))
+  })
+
+  it('values spot metals per ounce-lot, whatever the broker suffix', () => {
+    for (const sym of ['XAUUSD', 'XAUUSD+', 'XAUUSD.m', 'XAU/USD', 'xauusdm', 'GOLD']) {
+      expect(assetMultiplier('forex', sym)).toBe(100)
+      expect(assetMultiplier('cfd', sym)).toBe(100)
+    }
+    expect(assetMultiplier('cfd', 'XAGUSD+')).toBe(5000)
+    // Barrick Gold trades as GOLD — a stock is never a metal lot.
+    expect(assetMultiplier('stocks', 'GOLD')).toBe(1)
+  })
+
+  it('does not give a non-pair filed under forex the 100,000 lot size', () => {
+    expect(assetMultiplier('forex', 'NAS100+')).toBe(1)
+    expect(assetMultiplier('forex', 'US30')).toBe(1)
+    expect(assetMultiplier('cfd', 'NAS100+')).toBe(1)
   })
 })
 

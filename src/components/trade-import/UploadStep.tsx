@@ -24,6 +24,7 @@ import {
   FILL_FIELDS,
   FILL_REQUIRED,
 } from '@/lib/csv-columns'
+import { normalizeMtDeals } from '@/lib/mt5-deals'
 import { importTradesCsv, importFillsCsv, type WizardImportResult } from '@/lib/actions/wizard'
 import { track, headerSample, type ImportFunnelProps } from '@/lib/analytics'
 import { timezoneOptions, FALLBACK_TIMEZONE } from '@/lib/timezones'
@@ -85,6 +86,9 @@ export default function UploadStep({
   const [rows, setRows] = useState<Record<string, string>[]>([])
   const [bundle, setBundle] = useState<{ filename: string; bundle: TradeBundle } | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
+  // Set when the file was a MetaTrader deal list we paired into trades: the row
+  // count the user sees no longer matches their file, so say why.
+  const [mtDeals, setMtDeals] = useState<{ deals: number } | null>(null)
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<WizardImportResult | null>(null)
   const [bundleResult, setBundleResult] = useState<BundleImportResult | null>(null)
@@ -286,7 +290,9 @@ export default function UploadStep({
         skipEmptyLines: 'greedy',
         complete: (res) => {
           const matrix = (res.data as string[][]).map((r) => r.map((c) => (c ?? '').toString()))
-          const { rows: data } = extractTable(matrix)
+          const table = extractTable(matrix)
+          const { rows: data, converted } = normalizeMtDeals(table)
+          setMtDeals(converted ? { deals: table.rows.length } : null)
           if (data.length === 0) {
             track({ name: 'import_parse_failed', props: { reason: 'empty', broker: broker.id } })
             setParseError(t('addTrades.upload.emptyFile'))
@@ -395,6 +401,7 @@ export default function UploadStep({
   }
 
   const reset = () => {
+    setMtDeals(null)
     settledRef.current = true
     funnelRef.current = null
     remappedRef.current = new Set()
@@ -560,7 +567,9 @@ export default function UploadStep({
                   </button>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {t('addTrades.upload.rowsDetected', { count: rows.length })}
+                  {mtDeals
+                    ? t('addTrades.upload.mtDealsPaired', { deals: mtDeals.deals, count: rows.length })
+                    : t('addTrades.upload.rowsDetected', { count: rows.length })}
                 </p>
               </div>
             ) : (
